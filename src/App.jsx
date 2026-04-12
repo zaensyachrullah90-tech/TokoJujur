@@ -10,12 +10,17 @@ import {
 
 // =========================================================================
 // PENGATURAN KONEKSI SUPABASE (UNTUK DI VS CODE LOKAL)
-import { createClient } from '@supabase/supabase-js';
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+// =========================================================================
+// PENTING: Di VS Code Anda, tambahkan 4 baris kode di bawah ini 
+// (hapus tanda komentar //) dan hapus baris "const supabase = null;"
+
+  import { createClient } from '@supabase/supabase-js';
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+  const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 // =========================================================================
 
+// Mock fallback untuk Canvas agar kompilasi tidak error/blank screen
 
 // --- LOGIKA BANTUAN ---
 const formatRupiah = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka || 0);
@@ -143,12 +148,6 @@ export default function App() {
     } catch (error) { console.error(error); }
   };
 
-  // --- LOGIKA KERANJANG & TOKO ---
-  const filteredProducts = products.filter(p => 
-    p.nama.toLowerCase().includes(searchQuery.toLowerCase()) || 
-    (p.barcode && p.barcode.includes(searchQuery))
-  );
-
   const openProductModal = (product) => {
     setSelectedProduct(product);
     setTempQty(cart[product.id] || 0);
@@ -176,7 +175,6 @@ export default function App() {
 
   const jumlahItem = Object.values(cart).reduce((a, b) => a + b, 0);
 
-  // --- PROSES TRANSAKSI KE SUPABASE ---
   const handleSelesaiBayar = async () => {
     if (!supabase) return;
     setIsProcessing(true);
@@ -235,7 +233,6 @@ export default function App() {
     setView('toko');
   };
 
-  // --- ADMIN LOGIC ---
   const handleLogin = (e) => {
     e.preventDefault();
     if (loginInput === settings.admin_password) {
@@ -291,22 +288,33 @@ export default function App() {
   // RENDER UI 
   // =========================================================
 
+  // TAMPILAN JIKA ENV VARIABLES BELUM DIISI (BAIK LOKAL MAUPUN CLOUDFLARE)
   if (!supabase) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-white">
-        <AlertTriangle size={72} className="text-yellow-500 mb-6 animate-pulse" />
+        <AlertTriangle size={72} className="text-rose-500 mb-6 animate-pulse" />
         <h1 className="text-3xl font-extrabold mb-3">Siap Dipindahkan ke VS Code</h1>
-        <p className="text-slate-400 max-w-lg mb-8">
-          Untuk mencegah error saat *preview* di platform ini, fungsi impor <code className="text-emerald-400">@supabase</code> dinonaktifkan sementara. 
+        <p className="text-slate-300 max-w-lg mb-8 text-sm leading-relaxed">
+          Untuk mencegah error kompilasi pada pratinjau ini, fungsi import Supabase dinonaktifkan sementara. 
         </p>
+        
         <div className="bg-slate-900 p-6 rounded-2xl border border-slate-700 text-left max-w-xl w-full shadow-2xl">
-          <p className="font-bold text-emerald-400 mb-4 text-lg">Langkah Terakhir di VS Code Anda:</p>
-          <ol className="list-decimal pl-5 space-y-3 text-slate-300 font-medium text-sm">
-            <li>Jalankan: <code className="bg-slate-950 px-2 py-1 rounded text-emerald-300 font-mono">npm install @supabase/supabase-js</code></li>
-            <li>Buat file <code className="bg-slate-950 px-2 py-1 rounded text-emerald-300 font-mono">.env.local</code> (isi dengan URL & Key Supabase)</li>
-            <li>Di file <code className="bg-slate-950 px-2 py-1 rounded text-emerald-300 font-mono">App.jsx</code> ini, cari bagian <strong className="text-white">PENGATURAN KONEKSI SUPABASE</strong> di baris paling atas.</li>
-            <li>Hapus tanda komentar <code className="text-slate-500">(//)</code> pada kode import & koneksi.</li>
-            <li>Hapus baris <code className="bg-slate-950 px-2 py-1 rounded text-red-400 font-mono">const supabase = null;</code></li>
+          <p className="font-bold text-sky-400 mb-3 text-lg flex items-center gap-2">💻 Langkah Mengaktifkan di VS Code:</p>
+          <ol className="list-decimal pl-5 space-y-2 text-slate-300 text-sm mb-6">
+            <li>Jalankan <code className="bg-slate-800 text-emerald-300 px-1 rounded">npm install @supabase/supabase-js</code>.</li>
+            <li>Di file <code className="bg-slate-800 text-emerald-300 px-1 rounded">App.jsx</code> ini, cari bagian PENGATURAN KONEKSI SUPABASE (paling atas).</li>
+            <li>Hapus tanda komentar <code className="bg-slate-800 text-slate-400 px-1 rounded">//</code> pada baris import dan inisialisasi supabase.</li>
+            <li>Hapus baris <code className="bg-slate-800 text-rose-400 px-1 rounded">const supabase = null;</code>.</li>
+          </ol>
+
+          <hr className="border-slate-800 mb-6"/>
+
+          <p className="font-bold text-sky-400 mb-3 text-lg flex items-center gap-2">🌐 Jika Layar Ini Muncul di Cloudflare Pages:</p>
+          <ol className="list-decimal pl-5 space-y-2 text-slate-300 text-sm">
+            <li>Buka Dashboard Cloudflare &gt; Pages &gt; Proyek Anda &gt; <strong>Settings</strong>.</li>
+            <li>Klik menu <strong>Environment variables</strong>.</li>
+            <li>Tambahkan <code className="bg-slate-800 text-emerald-300 px-1 rounded">VITE_SUPABASE_URL</code> dan <code className="bg-slate-800 text-emerald-300 px-1 rounded">VITE_SUPABASE_ANON_KEY</code>.</li>
+            <li>Masuk ke tab <strong>Deployments</strong>, lalu klik <strong>Retry deployment</strong>.</li>
           </ol>
         </div>
       </div>
@@ -316,6 +324,11 @@ export default function App() {
   if (isLoadingDB) {
     return <div className="min-h-screen bg-slate-50 flex items-center justify-center flex-col text-emerald-600"><Loader2 className="animate-spin mb-4" size={48} /><h2 className="font-bold text-xl">Membuka Toko...</h2></div>;
   }
+
+  const filteredProducts = products.filter(p => 
+    p.nama.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    (p.barcode && p.barcode.includes(searchQuery))
+  );
 
   // --- RENDER: TOKO ---
   if (view === 'toko') {
