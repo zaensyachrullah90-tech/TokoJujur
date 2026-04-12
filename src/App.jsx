@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { 
   Store, Search, Camera, X, ChevronRight, ArrowLeft, 
   CreditCard, QrCode, Copy, CheckCircle, AlertTriangle, 
-  Lock, BarChart3, Package, Settings, LogOut, PlusCircle, Trash2, Download, Power, UploadCloud, Edit
+  Lock, BarChart3, Package, Settings, LogOut, PlusCircle, Trash2, Download, Power, UploadCloud, Edit, TrendingUp, List
 } from 'lucide-react';
 
 // =========================================================================
@@ -114,7 +114,7 @@ function MainApp() {
   
   // STATE CRUD BARANG (TAMBAH & EDIT)
   const [showAddForm, setShowAddForm] = useState(false);
-  const [editingId, setEditingId] = useState(null); // State baru untuk menyimpan ID barang yang diedit
+  const [editingId, setEditingId] = useState(null); 
   const [newProduct, setNewProduct] = useState({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '' });
   const [useDiskon, setUseDiskon] = useState(false);
 
@@ -757,7 +757,13 @@ function MainApp() {
           {metodeBayar === 'qris' && (
              <div className="p-8 bg-white rounded-[40px] border-2 border-slate-50 shadow-sm mb-10 text-center animate-fade-in flex flex-col items-center">
                {settings.qris_url ? (
-                 <img src={formatImageUrl(settings.qris_url)} className="w-64 h-64 mx-auto mb-6 border p-4 rounded-3xl shadow-sm object-contain bg-white" alt="QRIS Pembayaran"/>
+                 <>
+                   <img src={formatImageUrl(settings.qris_url)} className="w-64 h-64 mx-auto mb-6 border p-4 rounded-3xl shadow-sm object-contain bg-white" alt="QRIS Pembayaran"/>
+                   {/* FITUR BARU: TOMBOL DOWNLOAD QRIS UNTUK PEMBELI */}
+                   <button onClick={handleDownloadQRIS} className="mb-4 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-6 py-3 rounded-2xl font-black flex items-center gap-2 transition-all active:scale-95">
+                     <Download size={18}/> DOWNLOAD QRIS
+                   </button>
+                 </>
                ) : (
                  <div className="w-64 h-64 mx-auto mb-6 border-2 border-dashed border-slate-200 rounded-3xl flex items-center justify-center bg-slate-50 text-slate-400 font-bold text-sm">QRIS Belum Diatur</div>
                )}
@@ -839,6 +845,24 @@ function MainApp() {
         const totalPendapatanKotor = filteredTransactions.reduce((sum, t) => sum + (t.total || 0), 0);
         const totalKeuntunganBersih = filteredTransactions.reduce((sum, t) => sum + (t.profit || 0), 0);
 
+        // --- FITUR BARU: LOGIKA PERINGKAT BARANG ---
+        const itemSalesMap = {};
+        filteredTransactions.forEach(t => {
+          t.items.forEach(item => {
+            if (!itemSalesMap[item.id]) itemSalesMap[item.id] = { qty: 0, revenue: 0 };
+            itemSalesMap[item.id].qty += item.qty;
+            itemSalesMap[item.id].revenue += item.totalHarga;
+          });
+        });
+
+        // Gabungkan dengan semua daftar produk agar barang dengan penjualan 0 tetap muncul
+        const productRankings = products.map(p => ({
+          id: p.id,
+          nama: p.nama,
+          qty: itemSalesMap[p.id]?.qty || 0,
+          revenue: itemSalesMap[p.id]?.revenue || 0
+        })).sort((a, b) => b.qty - a.qty); // Urutkan dari terjual paling banyak
+
         return (
           <div className="min-h-screen flex flex-col md:flex-row bg-slate-50 relative">
             {/* ADMIN SIDEBAR (STICKY/FREEZE) */}
@@ -862,7 +886,7 @@ function MainApp() {
                       <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-slate-800">Ikhtisar Penjualan</h1>
                       <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto">
                         <div className="flex flex-wrap items-center gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm w-full md:w-auto">
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Filter:</span>
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Filter Waktu:</span>
                           <input type="date" value={filterStart} onChange={e => setFilterStart(e.target.value)} className="bg-slate-50 px-3 py-2 rounded-xl text-sm font-bold outline-none text-slate-700 focus:ring-2 focus:ring-emerald-500 border border-slate-100 flex-1 md:flex-none"/>
                           <span className="text-slate-300 font-black hidden md:inline">-</span>
                           <input type="date" value={filterEnd} onChange={e => setFilterEnd(e.target.value)} className="bg-slate-50 px-3 py-2 rounded-xl text-sm font-bold outline-none text-slate-700 focus:ring-2 focus:ring-emerald-500 border border-slate-100 flex-1 md:flex-none"/>
@@ -879,27 +903,66 @@ function MainApp() {
                        <div className="bg-emerald-600 p-6 md:p-8 rounded-[40px] text-white shadow-2xl shadow-emerald-200"><p className="text-[10px] font-black opacity-60 uppercase tracking-widest mb-3">Profit Bersih</p><p className="text-3xl font-black">{formatRupiah(totalKeuntunganBersih)}</p></div>
                        <div className="bg-white p-6 md:p-8 rounded-[40px] border border-slate-100 shadow-sm"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Total Transaksi</p><p className="text-3xl font-black text-slate-800">{filteredTransactions.length}</p></div>
                     </div>
-                    <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden">
-                      <div className="overflow-x-auto">
-                        <table className="w-full text-left min-w-[700px]">
-                           <thead className="bg-slate-50 border-b-2 border-slate-100"><tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest"><th className="p-6">ID & Tanggal</th><th className="p-6">Total Belanja</th><th className="p-6 text-emerald-600">Keuntungan</th><th className="p-6 text-center">Metode</th></tr></thead>
-                           <tbody className="divide-y divide-slate-50">
-                             {filteredTransactions.length === 0 && <tr><td colSpan="4" className="p-6 text-center text-slate-400 font-bold">Belum ada data transaksi pada filter tersebut.</td></tr>}
-                             {filteredTransactions.slice().reverse().map(t => (
-                               <tr key={t.id} className="text-sm font-bold text-slate-700 hover:bg-slate-50/50 transition-colors">
-                                 <td className="p-6">
-                                   <span className="block text-slate-900 mb-1">{t.id}</span>
-                                   <span className="text-xs text-slate-400">{t.tanggal}</span>
-                                 </td>
-                                 <td className="p-6">{formatRupiah(t.total)}</td>
-                                 <td className="p-6 text-emerald-600">{formatRupiah(t.profit)}</td>
-                                 <td className="p-6 text-center uppercase text-[10px]"><span className="bg-slate-100 px-3 py-1.5 rounded-xl font-black text-slate-500">{t.metode}</span></td>
-                               </tr>
-                             ))}
-                           </tbody>
-                        </table>
-                      </div>
+
+                    {/* FITUR BARU: TABEL PERINGKAT BARANG & RIWAYAT TRANSAKSI */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mb-8 md:mb-12">
+                        {/* Tabel Peringkat Barang */}
+                        <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+                          <div className="p-6 md:p-8 border-b border-slate-100">
+                            <h2 className="font-black text-xl text-slate-800 flex items-center gap-2"><TrendingUp className="text-emerald-500"/> Peringkat Barang</h2>
+                            <p className="text-xs text-slate-500 font-semibold mt-1">Laku s/d Tidak Laku (Berdasarkan Filter Waktu).</p>
+                          </div>
+                          <div className="overflow-y-auto max-h-[400px]">
+                            <table className="w-full text-left">
+                               <thead className="bg-slate-50 sticky top-0"><tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest"><th className="p-4">Nama Barang</th><th className="p-4 text-center">Terjual</th><th className="p-4 text-right">Pendapatan</th></tr></thead>
+                               <tbody className="divide-y divide-slate-50">
+                                 {productRankings.length === 0 && <tr><td colSpan="3" className="p-6 text-center text-slate-400 font-bold">Data kosong.</td></tr>}
+                                 {productRankings.map((p, idx) => (
+                                   <tr key={p.id} className="text-sm font-bold hover:bg-slate-50 transition-colors">
+                                     <td className="p-4 flex items-center gap-3">
+                                       <span className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[10px] ${idx < 3 && p.qty > 0 ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-500'}`}>{idx + 1}</span>
+                                       <span className={`truncate ${p.qty === 0 ? 'text-slate-400' : 'text-slate-700'}`}>{p.nama}</span>
+                                     </td>
+                                     <td className="p-4 text-center">
+                                       <span className={`px-2 py-1 rounded-md text-[10px] ${p.qty > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-50 text-rose-500'}`}>{p.qty}</span>
+                                     </td>
+                                     <td className={`p-4 text-right ${p.revenue === 0 ? 'text-slate-400' : 'text-slate-600'}`}>{formatRupiah(p.revenue)}</td>
+                                   </tr>
+                                 ))}
+                               </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        {/* Tabel Riwayat Transaksi */}
+                        <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+                          <div className="p-6 md:p-8 border-b border-slate-100">
+                            <h2 className="font-black text-xl text-slate-800 flex items-center gap-2"><List className="text-blue-500"/> Riwayat Transaksi</h2>
+                            <p className="text-xs text-slate-500 font-semibold mt-1">Daftar transaksi terbaru.</p>
+                          </div>
+                          <div className="overflow-x-auto overflow-y-auto max-h-[400px]">
+                            <table className="w-full text-left min-w-[500px]">
+                               <thead className="bg-slate-50 sticky top-0"><tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest"><th className="p-4">Tanggal & Waktu</th><th className="p-4">Total Belanja</th><th className="p-4 text-center">Metode</th></tr></thead>
+                               <tbody className="divide-y divide-slate-50">
+                                 {filteredTransactions.length === 0 && <tr><td colSpan="3" className="p-6 text-center text-slate-400 font-bold">Belum ada transaksi.</td></tr>}
+                                 {filteredTransactions.slice().reverse().map(t => (
+                                   <tr key={t.id} className="text-sm font-bold text-slate-700 hover:bg-slate-50/50 transition-colors">
+                                     <td className="p-4">
+                                       <span className="block text-xs text-slate-500">{t.tanggal}</span>
+                                     </td>
+                                     <td className="p-4">
+                                        <span className="block">{formatRupiah(t.total)}</span>
+                                        <span className="text-[10px] text-emerald-600">+ Untung {formatRupiah(t.profit)}</span>
+                                     </td>
+                                     <td className="p-4 text-center uppercase text-[10px]"><span className="bg-slate-100 px-3 py-1.5 rounded-xl font-black text-slate-500">{t.metode}</span></td>
+                                   </tr>
+                                 ))}
+                               </tbody>
+                            </table>
+                          </div>
+                        </div>
                     </div>
+
                  </div>
                )}
 
