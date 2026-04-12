@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 
 // =========================================================================
-// PENGATURAN KONEKSI SUPABASE
+// PENGATURAN KONEKSI SUPABASE (FINAL & CLEAN)
 // =========================================================================
 // PENTING UNTUK DI VS CODE: Hapus tanda komentar (//) pada 3 baris di bawah ini
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
@@ -19,7 +19,7 @@ const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 // Baris ini HANYA untuk preview agar tidak error, hapus baris ini saat di VS Code:
-
+const supabase = null;
 
 // --- LOGIKA BANTUAN ---
 const formatRupiah = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka || 0);
