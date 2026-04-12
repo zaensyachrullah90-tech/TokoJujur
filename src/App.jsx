@@ -5,7 +5,7 @@ import {
   Store, QrCode, CreditCard, ChevronRight, ArrowLeft,
   Search, X, Lock, LogOut, TrendingUp, Edit, Trash2, List, TrendingDown,
   Fish, Carrot, Apple, Beef, Soup, Cookie, Pill, Sparkles, Flame, ShoppingBasket, Camera, Barcode,
-  AlertTriangle, Loader2
+  AlertTriangle, Loader2, Download
 } from 'lucide-react';
 
 // =========================================================================
@@ -13,11 +13,12 @@ import {
 // =========================================================================
 // PENTING: Di VS Code Anda, tambahkan 4 baris kode di bawah ini 
 // (hapus tanda komentar //) dan hapus baris "const supabase = null;"
-
-  import { createClient } from '@supabase/supabase-js';
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
-  const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+//
+import { createClient } from '@supabase/supabase-js';
+const env = typeof import.meta !== 'undefined' ? import.meta.env : {};
+const supabaseUrl = env.VITE_SUPABASE_URL;
+const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY;
+const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 // =========================================================================
 
 // Mock fallback untuk Canvas agar kompilasi tidak error/blank screen
@@ -71,7 +72,11 @@ export default function App() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [tempQty, setTempQty] = useState(0);
 
-  const [isAdminLogged, setIsAdminLogged] = useState(false);
+  // Sesi Admin Tersimpan Permanen di Browser
+  const [isAdminLogged, setIsAdminLogged] = useState(() => {
+    return localStorage.getItem('tokojujur_admin') === 'true';
+  });
+  
   const [adminTab, setAdminTab] = useState('analisa'); 
   const [loginInput, setLoginInput] = useState('');
   const [filterStart, setFilterStart] = useState('');
@@ -175,9 +180,9 @@ export default function App() {
 
   const jumlahItem = Object.values(cart).reduce((a, b) => a + b, 0);
 
+  // --- PROSES PEMBAYARAN OPTIMISTIS (ZERO LOADING) ---
   const handleSelesaiBayar = async () => {
-    if (!supabase) return;
-    setIsProcessing(true);
+    setIsProcessing(true); // Sekadar cegah klik dobel
     
     const detailPesanan = Object.entries(cart).map(([id, qty]) => {
       const product = products.find(p => p.id === parseInt(id));
@@ -207,23 +212,27 @@ export default function App() {
       metode: metodeBayar
     };
 
-    const { error: errTrx } = await supabase.from('transaksi').insert([newTransaction]);
-    if (errTrx) {
-      alert("Gagal memproses pembayaran. Coba lagi.");
-      setIsProcessing(false);
-      return;
-    }
+    // 1. UPDATE UI LOKAL SEKETIKA (Tidak ada Loading / Nyangkut)
+    setTransactions(prev => [newTransaction, ...prev]);
+    setProducts(prev => prev.map(p => {
+      const boughtItem = detailPesanan.find(i => i.id === p.id);
+      return boughtItem ? { ...p, stok: p.stok - boughtItem.qty } : p;
+    }));
+    
+    setStrukTerakhir(newTransaction);
+    setView('struk');
+    setIsProcessing(false);
 
-    for (const item of detailPesanan) {
-      const currentProduct = products.find(p => p.id === item.id);
-      if (currentProduct) {
-         await supabase.from('produk').update({ stok: currentProduct.stok - item.qty }).eq('id', item.id);
+    // 2. BACKGROUND SYNC KE DATABASE
+    if (supabase) {
+      supabase.from('transaksi').insert([newTransaction]).then(({error}) => {
+         if(error) console.error("Error Sync Transaksi:", error);
+      });
+      for (const item of detailPesanan) {
+        const p = products.find(prod => prod.id === item.id);
+        if (p) supabase.from('produk').update({ stok: p.stok - item.qty }).eq('id', item.id).then();
       }
     }
-
-    setStrukTerakhir(newTransaction);
-    setIsProcessing(false);
-    setView('struk');
   };
 
   const handleTutupStruk = () => {
@@ -237,51 +246,105 @@ export default function App() {
     e.preventDefault();
     if (loginInput === settings.admin_password) {
       setIsAdminLogged(true);
+      localStorage.setItem('tokojujur_admin', 'true');
       setLoginInput('');
     } else {
       alert('Password Salah!');
     }
   };
 
+  const handleLogout = () => {
+    setIsAdminLogged(false);
+    localStorage.removeItem('tokojujur_admin');
+    setView('toko');
+  };
+
+  // --- TAMBAH BARANG OPTIMISTIS (ZERO LOADING) ---
   const handleAddProduct = async (e) => {
     e.preventDefault();
-    if (!supabase) return;
-    setIsProcessing(true);
     let diskonRule = null;
     if (useDiskon && newProduct.diskonQty > 1 && newProduct.diskonHarga > 0) {
         diskonRule = { min_qty: parseInt(newProduct.diskonQty), harga_total: parseInt(newProduct.diskonHarga) };
     }
 
-    const { error } = await supabase.from('produk').insert([{
+    const tempProd = {
+      id: Date.now(), // ID Sementara agar langsung muncul
       nama: newProduct.nama,
       barcode: newProduct.barcode || null,
       modal: newProduct.modal,
       jual: newProduct.jual,
       stok: newProduct.stok,
-      diskon: diskonRule
-    }]);
+      diskon: diskonRule,
+      tanggal_dibuat: new Date().toISOString()
+    };
 
-    setIsProcessing(false);
-    if (!error) {
-      setShowAddForm(false);
-      setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '' });
-      setUseDiskon(false);
-    } else { alert("Gagal menambah barang."); }
+    // 1. UPDATE UI LOKAL SEKETIKA
+    setProducts(prev => [...prev, tempProd]);
+    setShowAddForm(false);
+    setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '' });
+    setUseDiskon(false);
+
+    // 2. BACKGROUND SYNC KE DATABASE
+    if (supabase) {
+      supabase.from('produk').insert([{
+          nama: tempProd.nama,
+          barcode: tempProd.barcode,
+          modal: tempProd.modal,
+          jual: tempProd.jual,
+          stok: tempProd.stok,
+          diskon: tempProd.diskon
+      }]).then(({error}) => {
+          if (error) console.error("Error Tambah Produk:", error);
+          else fetchProducts(); // Tarik data lagi untuk mendapatkan ID asli dari Supabase
+      });
+    }
   };
 
   const handleDeleteProduct = async (id) => {
-    if (!supabase) return;
     if(confirm("Yakin hapus barang ini?")) {
-       await supabase.from('produk').delete().eq('id', id);
+       // Optimistic Delete
+       setProducts(prev => prev.filter(p => p.id !== id));
+       if (supabase) await supabase.from('produk').delete().eq('id', id);
     }
   };
 
   const handleSaveSettings = async () => {
-    if (!supabase) return;
     setIsProcessing(true);
-    await supabase.from('pengaturan').update(settings).eq('id', 1);
+    if (supabase) await supabase.from('pengaturan').update(settings).eq('id', 1);
     setIsProcessing(false);
     alert('Pengaturan Berhasil Disimpan!');
+  };
+
+  // --- EXPORT KE CSV EXCEL ---
+  const handleExportCSV = () => {
+    const filteredForExport = transactions.filter(t => {
+      if (!filterStart && !filterEnd) return true;
+      const tDate = new Date(t.isoDate);
+      const sDate = filterStart ? new Date(filterStart) : new Date(0);
+      let eDate = filterEnd ? new Date(filterEnd) : new Date('2100-01-01');
+      if (filterEnd) eDate.setHours(23, 59, 59, 999);
+      return tDate >= sDate && tDate <= eDate;
+    });
+
+    if (filteredForExport.length === 0) {
+      alert("Tidak ada data transaksi untuk diexport pada tanggal ini.");
+      return;
+    }
+
+    let csv = "ID Transaksi,Tanggal,Metode Pembayaran,Total Belanja (Rp),Total Modal (Rp),Keuntungan Bersih (Rp),Detail Barang\n";
+    filteredForExport.forEach(t => {
+      const items = t.items.map(i => `${i.qty}x ${i.nama}`).join(" & ");
+      csv += `"${t.id}","${t.tanggal}","${t.metode}","${t.total}","${t.modal}","${t.profit}","${items}"\n`;
+    });
+
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `Laporan_Toko_Kejujuran_${new Date().toISOString().slice(0,10)}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // =========================================================
@@ -491,7 +554,7 @@ export default function App() {
              disabled={!metodeBayar || isProcessing}
              className="w-full max-w-md mx-auto flex items-center justify-center gap-2 py-4 bg-slate-900 text-white rounded-xl font-bold text-lg disabled:opacity-30 transition-opacity"
            >
-             {isProcessing ? <><Loader2 className="animate-spin"/> Memproses...</> : 'Selesai & Cetak Struk'}
+             Selesai & Cetak Struk
            </button>
         </div>
       </div>
@@ -612,7 +675,7 @@ export default function App() {
             </button>
           </nav>
           <div className="p-4 border-t border-slate-800">
-            <button onClick={() => { setIsAdminLogged(false); setView('toko'); }} className="flex items-center gap-3 px-4 py-3 rounded-xl w-full text-left text-red-400 hover:bg-slate-800 hover:text-red-300 font-bold transition">
+            <button onClick={handleLogout} className="flex items-center gap-3 px-4 py-3 rounded-xl w-full text-left text-red-400 hover:bg-slate-800 hover:text-red-300 font-bold transition">
               <LogOut size={20} className="shrink-0" /> <span className="whitespace-nowrap">Keluar (Toko)</span>
             </button>
           </div>
@@ -624,12 +687,18 @@ export default function App() {
             <div className="animate-fade-in">
               <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
                 <h1 className="text-2xl font-bold text-slate-800">Ikhtisar Penjualan</h1>
-                <div className="flex items-center gap-2 bg-white p-2 rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
-                  <span className="text-xs font-bold text-gray-500 pl-2 uppercase tracking-wide">Filter:</span>
-                  <input type="date" value={filterStart} onChange={e => setFilterStart(e.target.value)} className="text-sm font-semibold border border-gray-100 bg-slate-50 rounded-lg px-2 py-1 outline-none text-slate-700 focus:border-emerald-500" />
-                  <span className="text-gray-400 font-bold">-</span>
-                  <input type="date" value={filterEnd} onChange={e => setFilterEnd(e.target.value)} className="text-sm font-semibold border border-gray-100 bg-slate-50 rounded-lg px-2 py-1 outline-none text-slate-700 focus:border-emerald-500" />
-                  {(filterStart || filterEnd) && (<button onClick={() => {setFilterStart(''); setFilterEnd('');}} className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg ml-1 transition" title="Reset Filter"><X size={16}/></button>)}
+                
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="flex items-center gap-2 bg-white p-2 rounded-xl shadow-sm border border-gray-200 overflow-x-auto">
+                    <span className="text-xs font-bold text-gray-500 pl-2 uppercase tracking-wide">Filter:</span>
+                    <input type="date" value={filterStart} onChange={e => setFilterStart(e.target.value)} className="text-sm font-semibold border border-gray-100 bg-slate-50 rounded-lg px-2 py-1 outline-none text-slate-700 focus:border-emerald-500" />
+                    <span className="text-gray-400 font-bold">-</span>
+                    <input type="date" value={filterEnd} onChange={e => setFilterEnd(e.target.value)} className="text-sm font-semibold border border-gray-100 bg-slate-50 rounded-lg px-2 py-1 outline-none text-slate-700 focus:border-emerald-500" />
+                    {(filterStart || filterEnd) && (<button onClick={() => {setFilterStart(''); setFilterEnd('');}} className="p-1.5 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg ml-1 transition" title="Reset Filter"><X size={16}/></button>)}
+                  </div>
+                  <button onClick={handleExportCSV} className="bg-slate-900 hover:bg-slate-800 text-white px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-2 shadow-sm transition ml-auto md:ml-0">
+                    <Download size={16}/> Export CSV
+                  </button>
                 </div>
               </div>
               
@@ -686,8 +755,8 @@ export default function App() {
                     <div className="lg:col-span-5 mt-2"><label className="flex items-center gap-2 cursor-pointer w-max"><input type="checkbox" checked={useDiskon} onChange={e => setUseDiskon(e.target.checked)} className="w-5 h-5 text-emerald-600 rounded border-slate-300" /><span className="text-sm font-extrabold text-slate-800">Beri Harga Grosir</span></label></div>
                     {useDiskon && (<div className="lg:col-span-5 grid grid-cols-1 md:grid-cols-2 gap-4 bg-orange-50 p-4 rounded-xl border border-orange-200"><div><label className="block text-xs font-extrabold text-orange-900 mb-1">Minimal Beli</label><input required type="number" value={newProduct.diskonQty} onChange={e => setNewProduct({...newProduct, diskonQty: e.target.value})} className="w-full bg-white border border-orange-300 rounded-lg px-3 py-2 font-extrabold" /></div><div><label className="block text-xs font-extrabold text-orange-900 mb-1">Harga Total Grosir (Rp)</label><input required type="number" value={newProduct.diskonHarga} onChange={e => setNewProduct({...newProduct, diskonHarga: e.target.value})} className="w-full bg-white border border-orange-300 rounded-lg px-3 py-2 font-extrabold" /></div></div>)}
                   </div>
-                  <button type="submit" disabled={isProcessing} className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-2.5 rounded-xl text-sm font-extrabold shadow-md transition flex items-center gap-2">
-                     {isProcessing ? <Loader2 size={16} className="animate-spin"/> : null} Simpan Data Barang
+                  <button type="submit" className="bg-slate-900 hover:bg-slate-800 text-white px-6 py-2.5 rounded-xl text-sm font-extrabold shadow-md transition flex items-center gap-2">
+                     Simpan Data Barang
                   </button>
                 </form>
               )}
