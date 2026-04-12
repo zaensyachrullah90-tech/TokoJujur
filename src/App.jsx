@@ -475,6 +475,23 @@ function MainApp() {
     }
   };
 
+  // FUNGSI MENGHAPUS SEMUA DATA TRANSAKSI (DATA UJI COBA)
+  const handleClearTransactions = async () => {
+    if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda benar-benar yakin ingin MENGHAPUS SELURUH RIWAYAT TRANSAKSI PENJUALAN (Data Uji Coba)?\n\nData yang dihapus TIDAK BISA DIKEMBALIKAN!")) {
+      setIsProcessing(true);
+      // Hapus secara lokal agar UI merespons seketika
+      setTransactions([]);
+      showToast('Seluruh riwayat transaksi telah dihapus!', 'success');
+      
+      // Hapus di Supabase (menggunakan filter neq '0' untuk menghapus semua row)
+      if (supabase) {
+         await supabase.from('transaksi').delete().neq('id', '0');
+         fetchTransactions();
+      }
+      setIsProcessing(false);
+    }
+  };
+
   const handleExportCSV = () => {
     const filteredForExport = transactions.filter(t => {
       if (!filterStart && !filterEnd) return true;
@@ -755,7 +772,10 @@ function MainApp() {
                           <input type="date" value={filterEnd} onChange={e => setFilterEnd(e.target.value)} className="bg-slate-50 px-3 py-2 rounded-xl text-sm font-bold outline-none text-slate-700 focus:ring-2 focus:ring-emerald-500 border border-slate-100 flex-1 md:flex-none"/>
                           {(filterStart || filterEnd) && <button onClick={() => {setFilterStart(''); setFilterEnd('');}} className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-500 rounded-xl transition-colors w-full md:w-auto mt-2 md:mt-0"><X size={16} className="mx-auto"/></button>}
                         </div>
-                        <button onClick={handleExportCSV} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl hover:bg-slate-800 active:scale-95 transition-all w-full md:w-auto"><Download size={20}/> EXPORT EXCEL</button>
+                        <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
+                          <button onClick={handleExportCSV} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl hover:bg-slate-800 active:scale-95 transition-all w-full md:w-auto"><Download size={20}/> EXPORT EXCEL</button>
+                          <button onClick={handleClearTransactions} disabled={isProcessing} className="bg-rose-600 text-white px-8 py-4 rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl hover:bg-rose-700 active:scale-95 transition-all w-full md:w-auto"><Trash2 size={20}/> HAPUS DATA UJI COBA</button>
+                        </div>
                       </div>
                     </div>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mb-8 md:mb-12">
