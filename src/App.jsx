@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { 
   Store, Search, Camera, X, ChevronRight, ArrowLeft, 
@@ -15,12 +15,21 @@ const formatRupiah = (angka) => {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka || 0);
 };
 
+// MENDUKUNG LINK GOOGLE DRIVE DAN GITHUB BLOB
 const formatImageUrl = (url) => {
   if (!url) return '';
+  
+  // Deteksi Google Drive URL
   const driveMatch = url.match(/(?:file\/d\/|id=)([a-zA-Z0-9_-]+)/);
   if (driveMatch && driveMatch[1]) {
     return `https://drive.google.com/uc?export=view&id=${driveMatch[1]}`;
   }
+  
+  // Deteksi GitHub Blob URL dan ubah menjadi Raw URL
+  if (url.includes('github.com') && url.includes('/blob/')) {
+    return url.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/');
+  }
+  
   return url;
 };
 
@@ -66,7 +75,7 @@ function MainApp() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' });
   
-  // STATE NAVIGASI: Menyimpan view di LocalStorage agar tahan refresh
+  // STATE NAVIGASI
   const [view, setView] = useState(() => {
     try {
       if (typeof window !== 'undefined') {
@@ -90,13 +99,18 @@ function MainApp() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [tempQty, setTempQty] = useState(0);
 
+  // STATE LIVE SCANNER
+  const [isScanningModalOpen, setIsScanningModalOpen] = useState(false);
+  const [scanTarget, setScanTarget] = useState(''); // 'toko' atau 'admin'
+  const videoRef = useRef(null);
+  const streamRef = useRef(null);
+
   const [isAdminLogged, setIsAdminLogged] = useState(() => {
     try {
       return typeof window !== 'undefined' && localStorage.getItem('tokojujur_admin') === 'true';
     } catch(e) { return false; }
   });
   
-  // Tab Admin anti-refresh
   const [adminTab, setAdminTab] = useState(() => {
     try {
       if (typeof window !== 'undefined') return localStorage.getItem('tokojujur_admintab') || 'analisa';
@@ -116,7 +130,7 @@ function MainApp() {
     setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 2500);
   };
 
-  // UBAH FAVICON OTOMATIS MENJADI TOKO (TANPA EDIT INDEX.HTML)
+  // PENGUBAH FAVICON
   useEffect(() => {
     if (typeof window !== 'undefined') {
       let link = document.querySelector("link[rel~='icon']");
@@ -129,7 +143,7 @@ function MainApp() {
     }
   }, []);
 
-  // Simpan View & AdminTab ke LocalStorage tiap ada perubahan
+  // PERSIST STATE NAVIGASI
   useEffect(() => {
     try { localStorage.setItem('tokojujur_view', view); } catch(e){}
   }, [view]);
@@ -138,7 +152,7 @@ function MainApp() {
     try { localStorage.setItem('tokojujur_admintab', adminTab); } catch(e){}
   }, [adminTab]);
 
-  // Inisialisasi Supabase
+  // INISIALISASI SUPABASE
   useEffect(() => {
     const initSupabase = () => {
       try {
@@ -224,67 +238,91 @@ function MainApp() {
     }
   };
 
-  // SCAN BARCODE: KHUSUS PEMBELI (LANGSUNG MUNCULKAN BARANG)
-  const handleScanBarcodeToko = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (!('BarcodeDetector' in window)) return showToast('Browser tidak mendukung', 'error');
+  // =========================================================================
+  // LOGIKA LIVE BARCODE SCANNER
+  // =========================================================================
+  const startScanner = async (target) => {
+    if (!('BarcodeDetector' in window)) {
+      showToast('Browser HP Anda belum mendukung fitur Live Scan. Masukkan angka manual.', 'error');
+      return;
+    }
+    
+    setScanTarget(target);
+    setIsScanningModalOpen(true);
     
     try {
-      const detector = new window.BarcodeDetector({ formats: ['qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39'] });
-      const imageBitmap = await createImageBitmap(file);
-      const barcodes = await detector.detect(imageBitmap);
-      
-      if (barcodes.length > 0) {
-        const code = barcodes[0].rawValue;
-        
-        // Cek apakah barang ada di database stok kita
-        const foundProduct = products.find(p => p.barcode === code);
-        if (foundProduct) {
-          setSearchQuery(''); // Kosongkan pencarian
-          openProductModal(foundProduct); // Langsung munculkan popup barang!
-          showToast(`Ditemukan: ${foundProduct.nama}`, 'success');
-        } else {
-          setSearchQuery(code); // Tampilkan hasil kosong
-          showToast('Barang belum terdaftar di toko', 'error');
-        }
-      } else { 
-        showToast('Barcode tidak jelas', 'error'); 
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
       }
-    } catch (err) { showToast('Gagal memproses kamera', 'error'); }
-    e.target.value = '';
+      streamRef.current = stream;
+    } catch (err) {
+      showToast('Akses kamera ditolak atau tidak tersedia', 'error');
+      setIsScanningModalOpen(false);
+    }
   };
 
-  // SCAN BARCODE: KHUSUS ADMIN (AMBIL NAMA DARI INTERNET)
-  const handleScanBarcodeAdmin = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (!('BarcodeDetector' in window)) return showToast('Browser tidak mendukung', 'error');
-    
-    try {
-      const detector = new window.BarcodeDetector({ formats: ['qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39'] });
-      const imageBitmap = await createImageBitmap(file);
-      const barcodes = await detector.detect(imageBitmap);
-      
-      if (barcodes.length > 0) {
-        const code = barcodes[0].rawValue;
-        setNewProduct(prev => ({ ...prev, barcode: code }));
-        showToast('Mencari database global...', 'success');
-        
-        try {
-          const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
-          const data = await res.json();
-          if (data.status === 1 && data.product && data.product.product_name) {
-            setNewProduct(prev => ({ ...prev, nama: data.product.product_name }));
-            showToast('Nama otomatis terisi!', 'success');
-          } else {
-            showToast('Barcode terbaca. Isi nama manual.', 'success');
-          }
-        } catch (err) {}
-      } else { showToast('Barcode tidak jelas', 'error'); }
-    } catch (err) { showToast('Gagal memproses gambar', 'error'); }
-    e.target.value = '';
+  const stopScanner = () => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(track => track.stop());
+    }
+    setIsScanningModalOpen(false);
   };
+
+  const handleBarcodeResultToko = (code) => {
+    const foundProduct = products.find(p => p.barcode === code);
+    if (foundProduct) {
+      setSearchQuery('');
+      openProductModal(foundProduct);
+      showToast(`Ditemukan: ${foundProduct.nama}`, 'success');
+    } else {
+      setSearchQuery(code);
+      showToast('Barang belum terdaftar di toko', 'error');
+    }
+  };
+
+  const handleBarcodeResultAdmin = async (code) => {
+    setNewProduct(prev => ({ ...prev, barcode: code }));
+    showToast('Mencari nama produk di internet...', 'success');
+    try {
+      const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
+      const data = await res.json();
+      if (data.status === 1 && data.product && data.product.product_name) {
+        setNewProduct(prev => ({ ...prev, nama: data.product.product_name }));
+        showToast('Nama otomatis terisi!', 'success');
+      } else {
+        showToast('Barcode terbaca. Silakan ketik nama manual.', 'success');
+      }
+    } catch (err) {}
+  };
+
+  useEffect(() => {
+    let interval;
+    if (isScanningModalOpen && videoRef.current) {
+      const detector = new window.BarcodeDetector({ formats: ['qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39'] });
+      interval = setInterval(async () => {
+        if (videoRef.current && videoRef.current.readyState >= 2) {
+          try {
+            const barcodes = await detector.detect(videoRef.current);
+            if (barcodes.length > 0) {
+              const code = barcodes[0].rawValue;
+              stopScanner();
+              if (scanTarget === 'toko') {
+                handleBarcodeResultToko(code);
+              } else {
+                handleBarcodeResultAdmin(code);
+              }
+            }
+          } catch (e) {
+            // Abaikan error saat pembacaan frame
+          }
+        }
+      }, 500); // Lakukan pembacaan tiap 0.5 detik agar tidak membebani HP
+    }
+    return () => clearInterval(interval);
+  }, [isScanningModalOpen, scanTarget, products]);
+
+  // =========================================================================
 
   const openProductModal = (product) => {
     setSelectedProduct(product);
@@ -358,8 +396,6 @@ function MainApp() {
       try {
         window.close();
       } catch (e) {}
-      
-      // Fallback jika window.close diblokir browser
       setTimeout(() => {
         showToast('Jika aplikasi tidak tertutup otomatis, silakan tutup tab/browser Anda secara manual.', 'success');
         setCart({});
@@ -474,6 +510,24 @@ function MainApp() {
 
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-emerald-100">
+      {/* MODAL LIVE SCANNER */}
+      {isScanningModalOpen && (
+        <div className="fixed inset-0 bg-black z-[999] flex flex-col animate-fade-in">
+          <div className="flex justify-between items-center p-4 bg-gradient-to-b from-black/80 to-transparent text-white absolute top-0 w-full z-10">
+            <span className="font-bold text-lg tracking-widest uppercase">Arahkan ke Barcode</span>
+            <button onClick={stopScanner} className="p-3 bg-red-500/80 hover:bg-red-500 rounded-full transition-colors backdrop-blur-sm"><X size={24}/></button>
+          </div>
+          <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+          <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+            {/* Kotak bidikan scanner */}
+            <div className="w-72 h-40 border-4 border-emerald-500 rounded-3xl shadow-[0_0_0_9999px_rgba(0,0,0,0.6)] relative">
+              <div className="absolute top-0 left-0 w-full h-0.5 bg-emerald-500 animate-[scan_2s_ease-in-out_infinite] opacity-70"></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* GLOBAL TOAST */}
       {toast.show && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-slate-900 text-white rounded-full shadow-2xl font-bold flex items-center gap-2 animate-slide-up border border-slate-700">
           {toast.type === 'success' ? <CheckCircle size={20} className="text-emerald-400"/> : <AlertTriangle size={20} className="text-rose-400"/>}
@@ -484,7 +538,7 @@ function MainApp() {
       {/* VIEW: TOKO (HALAMAN DEPAN) */}
       {view === 'toko' && (
         <div className="pb-28">
-          <header className="bg-white p-4 shadow-sm sticky top-0 z-50">
+          <header className="bg-white p-4 shadow-sm sticky top-0 z-40">
             <div className="flex justify-between items-center mb-4 max-w-5xl mx-auto">
               <div className="flex items-center gap-2 text-emerald-600 font-black text-xl"><Store/> {settings.nama_toko}</div>
               <div className="flex items-center gap-2">
@@ -495,12 +549,15 @@ function MainApp() {
             <div className="flex gap-2 max-w-5xl mx-auto">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-3 text-slate-400" size={20}/>
-                <input type="text" placeholder="Cari barang atau scan..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} className="w-full bg-slate-100 rounded-xl pl-10 pr-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500 font-medium transition-all border-none"/>
+                <input type="text" placeholder="Cari barang atau ketik barcode..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} className="w-full bg-slate-100 rounded-xl pl-10 pr-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500 font-medium transition-all border-none"/>
               </div>
-              <label className="bg-slate-800 text-white p-3 rounded-xl cursor-pointer hover:bg-slate-700 transition active:scale-95 flex items-center shadow-lg">
+              <button 
+                 onClick={() => startScanner('toko')} 
+                 className="bg-slate-800 text-white p-3 rounded-xl cursor-pointer hover:bg-slate-700 transition active:scale-95 flex items-center shadow-lg"
+                 title="Scan Langsung via Kamera"
+              >
                  <Camera size={24}/>
-                 <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleScanBarcodeToko}/>
-              </label>
+              </button>
             </div>
           </header>
 
@@ -623,7 +680,6 @@ function MainApp() {
         </div>
       )}
 
-      {/* VIEW: ADMIN LOGIN */}
       {view === 'admin' && !isAdminLogged && (
         <div className="min-h-screen flex items-center justify-center p-6 bg-slate-100">
           <form onSubmit={handleLogin} className="bg-white p-12 rounded-[50px] shadow-2xl w-full max-w-sm border-4 border-white text-center">
@@ -636,7 +692,6 @@ function MainApp() {
         </div>
       )}
 
-      {/* VIEW: ADMIN DASHBOARD */}
       {view === 'admin' && isAdminLogged && (() => {
         const filteredTransactions = transactions.filter(t => {
           if (!filterStart && !filterEnd) return true;
@@ -651,39 +706,40 @@ function MainApp() {
         const totalKeuntunganBersih = filteredTransactions.reduce((sum, t) => sum + (t.profit || 0), 0);
 
         return (
-          <div className="min-h-screen flex flex-col md:flex-row bg-white">
-            <aside className="w-full md:w-72 bg-slate-950 text-white p-8 flex flex-col gap-3 shadow-2xl">
-              <div className="flex items-center gap-3 mb-12">
+          <div className="min-h-screen flex flex-col md:flex-row bg-white relative">
+            {/* ADMIN SIDEBAR (STICKY/FROZEN UNTUK MOBILE & DESKTOP) */}
+            <aside className="w-full md:w-72 bg-slate-950 text-white p-4 md:p-8 flex flex-row md:flex-col gap-2 md:gap-3 shadow-2xl sticky top-0 z-40 overflow-x-auto md:overflow-x-visible md:overflow-y-auto md:h-screen md:sticky scrollbar-hide">
+              <div className="hidden md:flex items-center gap-3 mb-12 flex-shrink-0">
                  <div className="p-3 bg-emerald-500 rounded-2xl shadow-lg shadow-emerald-500/20"><Settings size={28}/></div>
                  <h2 className="font-black text-2xl tracking-tighter uppercase">Admin Panel</h2>
               </div>
-              <button onClick={() => setAdminTab('analisa')} className={`flex items-center gap-4 p-5 rounded-2xl font-black transition-all ${adminTab==='analisa' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-500 hover:bg-white/5 hover:text-white'}`}><BarChart3 size={24}/> Analisa Penjualan</button>
-              <button onClick={() => setAdminTab('barang')} className={`flex items-center gap-4 p-5 rounded-2xl font-black transition-all ${adminTab==='barang' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-500 hover:bg-white/5 hover:text-white'}`}><Package size={24}/> Daftar Barang</button>
-              <button onClick={() => setAdminTab('pengaturan')} className={`flex items-center gap-4 p-5 rounded-2xl font-black transition-all ${adminTab==='pengaturan' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-500 hover:bg-white/5 hover:text-white'}`}><Settings size={24}/> Pengaturan Toko</button>
-              <button onClick={handleLogout} className="mt-auto flex items-center gap-4 p-5 rounded-2xl font-black text-rose-500 hover:bg-rose-500/10 transition-all text-left"><LogOut size={24}/> Keluar (Logout)</button>
+              <button onClick={() => setAdminTab('analisa')} className={`flex items-center gap-3 p-4 md:p-5 rounded-2xl font-black transition-all whitespace-nowrap flex-shrink-0 ${adminTab==='analisa' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-500 hover:bg-white/5 hover:text-white'}`}><BarChart3 size={20} className="md:w-6 md:h-6"/> <span className="text-sm md:text-base">Analisa Penjualan</span></button>
+              <button onClick={() => setAdminTab('barang')} className={`flex items-center gap-3 p-4 md:p-5 rounded-2xl font-black transition-all whitespace-nowrap flex-shrink-0 ${adminTab==='barang' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-500 hover:bg-white/5 hover:text-white'}`}><Package size={20} className="md:w-6 md:h-6"/> <span className="text-sm md:text-base">Daftar Barang</span></button>
+              <button onClick={() => setAdminTab('pengaturan')} className={`flex items-center gap-3 p-4 md:p-5 rounded-2xl font-black transition-all whitespace-nowrap flex-shrink-0 ${adminTab==='pengaturan' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-500 hover:bg-white/5 hover:text-white'}`}><Settings size={20} className="md:w-6 md:h-6"/> <span className="text-sm md:text-base">Pengaturan Toko</span></button>
+              <button onClick={handleLogout} className="md:mt-auto flex items-center gap-3 p-4 md:p-5 rounded-2xl font-black text-rose-500 hover:bg-rose-500/10 transition-all text-left whitespace-nowrap flex-shrink-0"><LogOut size={20} className="md:w-6 md:h-6"/> <span className="text-sm md:text-base">Keluar (Logout)</span></button>
             </aside>
             
-            <main className="flex-1 p-8 md:p-12 overflow-y-auto">
+            <main className="flex-1 p-4 md:p-12 overflow-y-auto">
                
                {adminTab === 'analisa' && (
                  <div className="animate-fade-in max-w-6xl mx-auto">
-                    <div className="flex flex-col md:flex-row justify-between md:items-center mb-12 gap-6">
-                      <h1 className="text-4xl font-black tracking-tighter text-slate-800">Ikhtisar Penjualan</h1>
+                    <div className="flex flex-col md:flex-row justify-between md:items-center mb-8 md:mb-12 gap-6">
+                      <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-slate-800">Ikhtisar Penjualan</h1>
                       <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
-                        <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-100 shadow-sm">
+                        <div className="flex flex-wrap items-center gap-2 bg-slate-50 p-2 rounded-2xl border border-slate-100 shadow-sm w-full md:w-auto">
                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Filter:</span>
-                          <input type="date" value={filterStart} onChange={e => setFilterStart(e.target.value)} className="bg-white px-3 py-2 rounded-xl text-sm font-bold outline-none text-slate-700 focus:ring-2 focus:ring-emerald-500 border border-slate-100"/>
-                          <span className="text-slate-300 font-black">-</span>
-                          <input type="date" value={filterEnd} onChange={e => setFilterEnd(e.target.value)} className="bg-white px-3 py-2 rounded-xl text-sm font-bold outline-none text-slate-700 focus:ring-2 focus:ring-emerald-500 border border-slate-100"/>
-                          {(filterStart || filterEnd) && <button onClick={() => {setFilterStart(''); setFilterEnd('');}} className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-500 rounded-xl transition-colors"><X size={16}/></button>}
+                          <input type="date" value={filterStart} onChange={e => setFilterStart(e.target.value)} className="bg-white px-3 py-2 rounded-xl text-sm font-bold outline-none text-slate-700 focus:ring-2 focus:ring-emerald-500 border border-slate-100 flex-1 md:flex-none"/>
+                          <span className="text-slate-300 font-black hidden md:inline">-</span>
+                          <input type="date" value={filterEnd} onChange={e => setFilterEnd(e.target.value)} className="bg-white px-3 py-2 rounded-xl text-sm font-bold outline-none text-slate-700 focus:ring-2 focus:ring-emerald-500 border border-slate-100 flex-1 md:flex-none"/>
+                          {(filterStart || filterEnd) && <button onClick={() => {setFilterStart(''); setFilterEnd('');}} className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-500 rounded-xl transition-colors w-full md:w-auto"><X size={16} className="mx-auto"/></button>}
                         </div>
-                        <button onClick={handleExportCSV} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl hover:bg-slate-800 active:scale-95 transition-all"><Download size={20}/> EXPORT EXCEL</button>
+                        <button onClick={handleExportCSV} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl hover:bg-slate-800 active:scale-95 transition-all w-full md:w-auto"><Download size={20}/> EXPORT EXCEL</button>
                       </div>
                     </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
-                       <div className="bg-slate-50 p-8 rounded-[40px] border border-slate-100 shadow-sm"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Total Omset</p><p className="text-3xl font-black text-slate-800">{formatRupiah(totalPendapatanKotor)}</p></div>
-                       <div className="bg-emerald-600 p-8 rounded-[40px] text-white shadow-2xl shadow-emerald-200"><p className="text-[10px] font-black opacity-60 uppercase tracking-widest mb-3">Profit Bersih</p><p className="text-3xl font-black">{formatRupiah(totalKeuntunganBersih)}</p></div>
-                       <div className="bg-slate-50 p-8 rounded-[40px] border border-slate-100 shadow-sm"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Total Transaksi</p><p className="text-3xl font-black text-slate-800">{filteredTransactions.length}</p></div>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 md:gap-8 mb-8 md:mb-12">
+                       <div className="bg-slate-50 p-6 md:p-8 rounded-[40px] border border-slate-100 shadow-sm"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Total Omset</p><p className="text-3xl font-black text-slate-800">{formatRupiah(totalPendapatanKotor)}</p></div>
+                       <div className="bg-emerald-600 p-6 md:p-8 rounded-[40px] text-white shadow-2xl shadow-emerald-200"><p className="text-[10px] font-black opacity-60 uppercase tracking-widest mb-3">Profit Bersih</p><p className="text-3xl font-black">{formatRupiah(totalKeuntunganBersih)}</p></div>
+                       <div className="bg-slate-50 p-6 md:p-8 rounded-[40px] border border-slate-100 shadow-sm"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Total Transaksi</p><p className="text-3xl font-black text-slate-800">{filteredTransactions.length}</p></div>
                     </div>
                     <div className="bg-white rounded-[40px] border-2 border-slate-50 overflow-hidden shadow-xl">
                       <div className="overflow-x-auto">
@@ -703,23 +759,23 @@ function MainApp() {
 
                {adminTab === 'barang' && (
                  <div className="animate-fade-in max-w-6xl mx-auto">
-                    <div className="flex justify-between items-center mb-12">
-                      <h1 className="text-4xl font-black tracking-tighter text-slate-800">Daftar Barang</h1>
-                      <button onClick={() => setShowAddForm(!showAddForm)} className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black flex items-center gap-3 shadow-xl shadow-emerald-100 hover:bg-emerald-500 active:scale-95 transition-all uppercase">{showAddForm ? <X/> : <PlusCircle/>} {showAddForm ? 'Batal' : 'Barang Baru'}</button>
+                    <div className="flex flex-col md:flex-row justify-between md:items-center mb-8 md:mb-12 gap-4">
+                      <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-slate-800">Daftar Barang</h1>
+                      <button onClick={() => setShowAddForm(!showAddForm)} className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl shadow-emerald-100 hover:bg-emerald-500 active:scale-95 transition-all uppercase w-full md:w-auto">{showAddForm ? <X/> : <PlusCircle/>} {showAddForm ? 'Batal' : 'Barang Baru'}</button>
                     </div>
 
                     {showAddForm && (
-                      <form onSubmit={handleAddProduct} className="bg-slate-50 p-8 rounded-[40px] border border-slate-100 shadow-sm mb-12 grid grid-cols-1 md:grid-cols-4 gap-6 animate-slide-up">
+                      <form onSubmit={handleAddProduct} className="bg-slate-50 p-6 md:p-8 rounded-[40px] border border-slate-100 shadow-sm mb-8 md:mb-12 grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6 animate-slide-up">
                          <div className="md:col-span-2"><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest ml-1">Nama Produk</label><input required value={newProduct.nama} onChange={e => setNewProduct({...newProduct, nama: e.target.value})} className="w-full p-4 bg-white rounded-2xl font-bold border-none focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all shadow-sm"/></div>
-                         <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest ml-1">Barcode (Opsional)</label><div className="flex gap-2"><input value={newProduct.barcode} onChange={e => setNewProduct({...newProduct, barcode: e.target.value})} className="w-full p-4 bg-white rounded-2xl font-bold border-none focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all shadow-sm"/><label className="bg-slate-800 text-white p-4 rounded-2xl cursor-pointer hover:bg-slate-700 transition flex justify-center items-center"><Camera size={20}/><input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleScanBarcodeAdmin}/></label></div></div>
+                         <div className="md:col-span-2"><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest ml-1">Barcode (Pindai Otomatis)</label><div className="flex gap-2"><input value={newProduct.barcode} onChange={e => setNewProduct({...newProduct, barcode: e.target.value})} className="w-full p-4 bg-white rounded-2xl font-bold border-none focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all shadow-sm" placeholder="Otomatis terisi jika pakai kamera"/><button type="button" onClick={() => startScanner('admin')} className="bg-slate-800 text-white p-4 rounded-2xl cursor-pointer hover:bg-slate-700 transition flex justify-center items-center shadow-md active:scale-95"><Camera size={20}/></button></div></div>
                          <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest ml-1">Modal Beli (Rp)</label><input required type="number" value={newProduct.modal || ''} onChange={e => setNewProduct({...newProduct, modal: parseInt(e.target.value)})} className="w-full p-4 bg-white rounded-2xl font-bold border-none focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all shadow-sm"/></div>
                          <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest ml-1">Harga Jual (Rp)</label><input required type="number" value={newProduct.jual || ''} onChange={e => setNewProduct({...newProduct, jual: parseInt(e.target.value)})} className="w-full p-4 bg-white rounded-2xl font-bold border-none focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all shadow-sm"/></div>
-                         <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest ml-1">Stok Fisik</label><input required type="number" value={newProduct.stok || ''} onChange={e => setNewProduct({...newProduct, stok: parseInt(e.target.value)})} className="w-full p-4 bg-white rounded-2xl font-bold border-none focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all shadow-sm"/></div>
-                         <div className="flex items-center gap-3 pt-6 ml-1 md:col-span-2"><input type="checkbox" checked={useDiskon} onChange={e => setUseDiskon(e.target.checked)} className="w-6 h-6 accent-emerald-600 rounded-lg"/><span className="font-black text-xs text-slate-500 uppercase tracking-widest">Ada Harga Grosir?</span></div>
+                         <div className="md:col-span-2"><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest ml-1">Stok Fisik Awal</label><input required type="number" value={newProduct.stok || ''} onChange={e => setNewProduct({...newProduct, stok: parseInt(e.target.value)})} className="w-full p-4 bg-white rounded-2xl font-bold border-none focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all shadow-sm"/></div>
+                         <div className="flex items-center gap-3 pt-4 md:pt-6 ml-1 md:col-span-4"><input type="checkbox" checked={useDiskon} onChange={e => setUseDiskon(e.target.checked)} className="w-6 h-6 accent-emerald-600 rounded-lg"/><span className="font-black text-xs text-slate-500 uppercase tracking-widest">Ada Harga Grosir?</span></div>
                          {useDiskon && (
-                           <div className="flex gap-4 md:col-span-4 animate-fade-in bg-white p-6 rounded-3xl shadow-sm">
-                             <div className="w-1/2"><label className="text-[10px] font-black uppercase text-orange-400 mb-2 block tracking-widest ml-1">Minimal Beli Qty</label><input type="number" value={newProduct.diskonQty} onChange={e => setNewProduct({...newProduct, diskonQty: e.target.value})} className="w-full p-4 bg-slate-50 rounded-2xl border border-orange-100 outline-none font-bold text-orange-900 focus:ring-2 focus:ring-orange-200"/></div>
-                             <div className="w-1/2"><label className="text-[10px] font-black uppercase text-orange-400 mb-2 block tracking-widest ml-1">Total Harga Grosir (Bukan Satuan)</label><input type="number" value={newProduct.diskonHarga} onChange={e => setNewProduct({...newProduct, diskonHarga: e.target.value})} className="w-full p-4 bg-slate-50 rounded-2xl border border-orange-100 outline-none font-bold text-orange-900 focus:ring-2 focus:ring-orange-200"/></div>
+                           <div className="flex flex-col md:flex-row gap-4 md:col-span-4 animate-fade-in bg-white p-6 rounded-3xl shadow-sm">
+                             <div className="w-full md:w-1/2"><label className="text-[10px] font-black uppercase text-orange-400 mb-2 block tracking-widest ml-1">Minimal Beli Qty</label><input type="number" value={newProduct.diskonQty} onChange={e => setNewProduct({...newProduct, diskonQty: e.target.value})} className="w-full p-4 bg-slate-50 rounded-2xl border border-orange-100 outline-none font-bold text-orange-900 focus:ring-2 focus:ring-orange-200"/></div>
+                             <div className="w-full md:w-1/2"><label className="text-[10px] font-black uppercase text-orange-400 mb-2 block tracking-widest ml-1">Total Harga Grosir (Bukan Satuan)</label><input type="number" value={newProduct.diskonHarga} onChange={e => setNewProduct({...newProduct, diskonHarga: e.target.value})} className="w-full p-4 bg-slate-50 rounded-2xl border border-orange-100 outline-none font-bold text-orange-900 focus:ring-2 focus:ring-orange-200"/></div>
                            </div>
                          )}
                          <button className="bg-slate-900 text-white py-5 rounded-[24px] font-black text-lg md:col-span-4 mt-2 hover:bg-slate-800 transition-all active:scale-[0.98] shadow-xl">SIMPAN DATA BARANG</button>
@@ -749,13 +805,13 @@ function MainApp() {
 
              {adminTab === 'pengaturan' && (
                <div className="max-w-2xl animate-fade-in mx-auto md:mx-0">
-                  <h1 className="text-4xl font-black tracking-tighter text-slate-800 mb-12">Konfigurasi Toko</h1>
-                  <div className="bg-slate-50 p-10 rounded-[50px] border border-slate-100 shadow-sm space-y-8">
-                     <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Nama Toko Digital</label><input value={settings.nama_toko || ''} onChange={e => setSettings({...settings, nama_toko: e.target.value})} className="w-full p-5 bg-white rounded-3xl font-black border-none focus:ring-4 focus:ring-emerald-500/20 outline-none shadow-sm transition-all text-xl"/></div>
-                     <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">URL Foto QRIS (G-Drive Link)</label><input value={settings.qris_url || ''} onChange={e => setSettings({...settings, qris_url: e.target.value})} className="w-full p-5 bg-white rounded-3xl font-bold border-none focus:ring-4 focus:ring-emerald-500/20 outline-none shadow-sm transition-all text-sm"/></div>
-                     <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Info Rekening Transfer</label><input value={settings.rekening || ''} onChange={e => setSettings({...settings, rekening: e.target.value})} className="w-full p-5 bg-white rounded-3xl font-bold border-none focus:ring-4 focus:ring-emerald-500/20 outline-none shadow-sm transition-all text-sm"/></div>
-                     <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Sandi Rahasia Admin</label><input type="text" value={settings.admin_password || ''} onChange={e => setSettings({...settings, admin_password: e.target.value})} className="w-full p-5 bg-white rounded-3xl font-black border-none focus:ring-4 focus:ring-emerald-500/20 outline-none shadow-sm transition-all tracking-[0.5em] text-xl text-center"/></div>
-                     <button onClick={handleSaveSettings} className="w-full py-6 bg-emerald-600 text-white rounded-[32px] font-black text-xl shadow-2xl shadow-emerald-100 hover:bg-emerald-500 transition-all active:scale-95 mt-4 shadow-xl">SIMPAN KE DATABASE SEKARANG</button>
+                  <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-slate-800 mb-8 md:mb-12">Konfigurasi Toko</h1>
+                  <div className="bg-slate-50 p-6 md:p-10 rounded-[40px] md:rounded-[50px] border border-slate-100 shadow-sm space-y-8">
+                     <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Nama Toko Digital</label><input value={settings.nama_toko || ''} onChange={e => setSettings({...settings, nama_toko: e.target.value})} className="w-full p-4 md:p-5 bg-white rounded-3xl font-black border-none focus:ring-4 focus:ring-emerald-500/20 outline-none shadow-sm transition-all text-lg md:text-xl"/></div>
+                     <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">URL Foto QRIS (Link G-Drive/GitHub)</label><input value={settings.qris_url || ''} onChange={e => setSettings({...settings, qris_url: e.target.value})} className="w-full p-4 md:p-5 bg-white rounded-3xl font-bold border-none focus:ring-4 focus:ring-emerald-500/20 outline-none shadow-sm transition-all text-sm"/></div>
+                     <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Info Rekening Transfer</label><input value={settings.rekening || ''} onChange={e => setSettings({...settings, rekening: e.target.value})} className="w-full p-4 md:p-5 bg-white rounded-3xl font-bold border-none focus:ring-4 focus:ring-emerald-500/20 outline-none shadow-sm transition-all text-sm"/></div>
+                     <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Sandi Rahasia Admin</label><input type="text" value={settings.admin_password || ''} onChange={e => setSettings({...settings, admin_password: e.target.value})} className="w-full p-4 md:p-5 bg-white rounded-3xl font-black border-none focus:ring-4 focus:ring-emerald-500/20 outline-none shadow-sm transition-all tracking-[0.5em] text-lg md:text-xl text-center"/></div>
+                     <button onClick={handleSaveSettings} className="w-full py-5 md:py-6 bg-emerald-600 text-white rounded-[32px] font-black text-lg md:text-xl shadow-2xl shadow-emerald-100 hover:bg-emerald-500 transition-all active:scale-95 mt-4">SIMPAN KE DATABASE</button>
                   </div>
                </div>
              )}
@@ -767,7 +823,6 @@ function MainApp() {
   );
 }
 
-// BUNGKUS DENGAN ERROR BOUNDARY AGAR TIDAK BLANK PAGE
 export default class AppErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, errorInfo: null }; }
   static getDerivedStateFromError(error) { return { hasError: true }; }
