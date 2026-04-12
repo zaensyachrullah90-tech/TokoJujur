@@ -5,7 +5,7 @@ import {
   Store, QrCode, CreditCard, ChevronRight, ArrowLeft,
   Search, X, Lock, LogOut, TrendingUp, Edit, Trash2, List, TrendingDown,
   Fish, Carrot, Apple, Beef, Soup, Cookie, Pill, Sparkles, Flame, ShoppingBasket, Camera, Barcode,
-  AlertTriangle, Loader2, Download
+  AlertTriangle, Loader2, Download, Croissant, Copy
 } from 'lucide-react';
 
 // =========================================================================
@@ -14,34 +14,47 @@ import {
 // PENTING: Di VS Code Anda, tambahkan 4 baris kode di bawah ini 
 // (hapus tanda komentar //) dan hapus baris "const supabase = null;"
 //
-import { createClient } from '@supabase/supabase-js';
-const env = typeof import.meta !== 'undefined' ? import.meta.env : {};
-const supabaseUrl = env.VITE_SUPABASE_URL;
-const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY;
-const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+  import { createClient } from '@supabase/supabase-js';
+  const env = typeof import.meta !== 'undefined' ? import.meta.env : {};
+  const supabaseUrl = env.VITE_SUPABASE_URL;
+  const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY;
+  const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 // =========================================================================
 
 // Mock fallback untuk Canvas agar kompilasi tidak error/blank screen
 
+
 // --- LOGIKA BANTUAN ---
 const formatRupiah = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka || 0);
 
+// SOLUSI GOOGLE DRIVE: Mengubah URL Sharing biasa menjadi URL Image Raw
+const formatImageUrl = (url) => {
+  if (!url) return '';
+  const driveMatch = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (driveMatch && driveMatch[1]) {
+    return `https://drive.google.com/uc?export=view&id=${driveMatch[1]}`;
+  }
+  return url;
+};
+
+// PENYEMPURNAAN IKON BARANG
 const getDynamicIcon = (namaBarang) => {
   const name = (namaBarang || '').toLowerCase();
-  if (name.match(/kopi|minum|teh|coca|susu/)) return <Coffee className="w-10 h-10 text-amber-700" />;
-  if (name.match(/air|mineral|aqua|le minerale/)) return <Droplet className="w-10 h-10 text-blue-500" />;
-  if (name.match(/nasi|mie|roti|makan|lontong/)) return <Utensils className="w-10 h-10 text-orange-600" />;
-  if (name.match(/daging|sapi|ayam|kambing/)) return <Beef className="w-10 h-10 text-rose-700" />;
-  if (name.match(/ikan|lele|nila|udang/)) return <Fish className="w-10 h-10 text-sky-500" />;
-  if (name.match(/sayur|bayam|kangkung|wortel|tomat/)) return <Carrot className="w-10 h-10 text-orange-500" />;
-  if (name.match(/buah|apel|jeruk|pisang|mangga/)) return <Apple className="w-10 h-10 text-red-500" />;
-  if (name.match(/terasi|garam|gula|merica|micin|bumbu|kecap|saus/)) return <Soup className="w-10 h-10 text-amber-800" />;
-  if (name.match(/es|ice|krim/)) return <IceCream className="w-10 h-10 text-pink-500" />;
-  if (name.match(/permen|candy|yupi/)) return <Candy className="w-10 h-10 text-purple-500" />;
-  if (name.match(/snack|chiki|keripik|biskuit|kue/)) return <Cookie className="w-10 h-10 text-yellow-600" />;
-  if (name.match(/obat|panadol|paramex|bodrex/)) return <Pill className="w-10 h-10 text-red-600" />;
-  if (name.match(/sabun|shampo|rinso|sunlight|cuci|odol|pasta gigi|deterjen/)) return <Sparkles className="w-10 h-10 text-teal-400" />;
-  if (name.match(/rokok|korek|mancis/)) return <Flame className="w-10 h-10 text-orange-500" />;
+  if (name.match(/kopi|minum|teh|coca|susu|sirup|nutrisari|milo|jus/)) return <Coffee className="w-10 h-10 text-amber-700" />;
+  if (name.match(/air|mineral|aqua|le minerale|cleo|vit/)) return <Droplet className="w-10 h-10 text-blue-500" />;
+  if (name.match(/roti|bread|donat|bolu|brownies|bakpao|kue/)) return <Croissant className="w-10 h-10 text-amber-600" />;
+  if (name.match(/nasi|mie|makan|lontong|soto|bakso|indomie|sedap/)) return <Utensils className="w-10 h-10 text-orange-600" />;
+  if (name.match(/daging|sapi|ayam|kambing|nugget|sosis/)) return <Beef className="w-10 h-10 text-rose-700" />;
+  if (name.match(/ikan|lele|nila|udang|seafood|sarden/)) return <Fish className="w-10 h-10 text-sky-500" />;
+  if (name.match(/sayur|bayam|kangkung|wortel|tomat|cabe|bawang/)) return <Carrot className="w-10 h-10 text-orange-500" />;
+  if (name.match(/buah|apel|jeruk|pisang|mangga|melon/)) return <Apple className="w-10 h-10 text-red-500" />;
+  if (name.match(/terasi|garam|gula|merica|micin|bumbu|kecap|saus|royco|masako|kaldu/)) return <Soup className="w-10 h-10 text-amber-800" />;
+  if (name.match(/es|ice|krim|gelato/)) return <IceCream className="w-10 h-10 text-pink-500" />;
+  if (name.match(/permen|candy|yupi|kopiko/)) return <Candy className="w-10 h-10 text-purple-500" />;
+  if (name.match(/snack|chiki|keripik|biskuit|wafer|oreo|taro|bengbeng|coklat|camilan|kacang/)) return <Cookie className="w-10 h-10 text-yellow-600" />;
+  if (name.match(/obat|panadol|paramex|bodrex|tolak angin|antangin|vitamin/)) return <Pill className="w-10 h-10 text-red-600" />;
+  if (name.match(/sabun|shampo|rinso|sunlight|cuci|odol|pasta gigi|deterjen|sikat|soklin|pewangi/)) return <Sparkles className="w-10 h-10 text-teal-400" />;
+  if (name.match(/rokok|korek|mancis|sampoerna|gudang garam|djarum/)) return <Flame className="w-10 h-10 text-orange-500" />;
   return <ShoppingBasket className="w-10 h-10 text-slate-800" />;
 };
 
@@ -129,6 +142,25 @@ export default function App() {
     if (!supabase) return;
     const { data } = await supabase.from('pengaturan').select('*').eq('id', 1).single();
     if (data) setSettings(data);
+  };
+
+  // --- LOGIKA COPY REKENING M-BANKING ---
+  const handleCopyRekening = () => {
+    const textArea = document.createElement("textarea");
+    // Mencari hanya angka dari string panjang agar mbanking tidak error
+    const matchAngka = settings.rekening.match(/\d+/);
+    const textToCopy = matchAngka ? matchAngka[0] : settings.rekening;
+    
+    textArea.value = textToCopy;
+    document.body.appendChild(textArea);
+    textArea.select();
+    try {
+      document.execCommand('copy');
+      alert(`✅ Nomor Rekening (${textToCopy}) berhasil disalin!\nSilakan paste di aplikasi M-Banking Anda.`);
+    } catch (err) {
+      console.error('Gagal copy', err);
+    }
+    document.body.removeChild(textArea);
   };
 
   // --- LOGIKA SCAN BARCODE ---
@@ -534,16 +566,25 @@ export default function App() {
               <div className="text-left"><p className="font-bold text-gray-800">Transfer Bank</p><p className="text-xs text-gray-500">Transfer manual ke rekening</p></div>
             </button>
           </div>
+          
           {metodeBayar === 'qris' && (
              <div className="mt-6 p-6 bg-white rounded-2xl flex flex-col items-center animate-fade-in border shadow-sm">
-               <img src={settings.qris_url} alt="QRIS" className="w-56 h-56 rounded-xl border p-2 mb-4" />
+               <img src={formatImageUrl(settings.qris_url)} alt="QRIS" className="w-56 h-56 rounded-xl border p-2 mb-4 object-contain" />
                <p className="text-sm text-gray-500 text-center">Silakan scan QR Code di atas. Kejujuran Anda adalah kebanggaan kami.</p>
              </div>
           )}
+          
           {metodeBayar === 'transfer' && (
              <div className="mt-6 p-6 bg-white rounded-2xl flex flex-col items-center animate-fade-in border shadow-sm">
                <p className="text-sm text-gray-500 mb-2">Transfer ke Rekening Resmi:</p>
-               <p className="font-bold text-xl text-slate-800 tracking-wider mb-1">{settings.rekening.split(' ')[1]}</p>
+               <div className="flex items-center gap-3 mb-2">
+                 <p className="font-bold text-2xl text-slate-800 tracking-wider">
+                   {settings.rekening.match(/\d+/) ? settings.rekening.match(/\d+/)[0] : settings.rekening.split(' ')[1]}
+                 </p>
+                 <button onClick={handleCopyRekening} className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-600 rounded-lg transition" title="Salin Nomor Rekening">
+                   <Copy size={18} />
+                 </button>
+               </div>
                <p className="text-sm text-gray-600 font-medium">{settings.rekening.split(' ')[0]} - {settings.rekening.split('a.n')[1]}</p>
              </div>
           )}
@@ -802,7 +843,12 @@ export default function App() {
                 <div>
                   <h3 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><CreditCard size={18}/> Metode Pembayaran</h3>
                   <div className="space-y-4">
-                    <div><label className="block text-sm font-semibold text-gray-600 mb-2">URL Gambar QRIS</label><input type="text" value={settings.qris_url} onChange={e => setSettings({...settings, qris_url: e.target.value})} className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-emerald-500 focus:bg-white text-sm font-mono" /></div>
+                    <div>
+                      <label className="block text-sm font-semibold text-gray-600 mb-2">
+                        URL Gambar QRIS <span className="text-xs text-emerald-600 font-normal ml-2">(Mendukung link Google Drive)</span>
+                      </label>
+                      <input type="text" value={settings.qris_url} onChange={e => setSettings({...settings, qris_url: e.target.value})} className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-emerald-500 focus:bg-white text-sm font-mono" />
+                    </div>
                     <div><label className="block text-sm font-semibold text-gray-600 mb-2">Info Rekening Transfer</label><input type="text" value={settings.rekening} onChange={e => setSettings({...settings, rekening: e.target.value})} className="w-full bg-slate-50 border border-gray-200 rounded-xl px-4 py-3 focus:outline-none focus:border-emerald-500 focus:bg-white" /></div>
                   </div>
                 </div>
