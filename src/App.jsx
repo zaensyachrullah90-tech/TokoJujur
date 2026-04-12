@@ -11,20 +11,19 @@ import {
 } from 'lucide-react';
 
 // =========================================================================
-// PENGATURAN KONEKSI SUPABASE (FINAL & CLEAN)
+// PENGATURAN KONEKSI SUPABASE (BERSIH & FINAL)
 // =========================================================================
 // PENTING UNTUK DI VS CODE: Hapus tanda komentar (//) pada 3 baris di bawah ini
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
 const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
-// Baris ini HANYA untuk preview agar tidak error, hapus baris ini saat di VS Code:
-const supabase = null;
+// Baris ini HANYA untuk preview web agar tidak error, hapus baris ini saat di VS Code:
 
 // --- LOGIKA BANTUAN ---
 const formatRupiah = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka || 0);
 
-// SOLUSI GOOGLE DRIVE: Mengubah URL Sharing biasa menjadi URL Image Raw Lebih Kuat
+// SOLUSI GOOGLE DRIVE
 const formatImageUrl = (url) => {
   if (!url) return '';
   const driveMatch = url.match(/(?:file\/d\/|id=)([a-zA-Z0-9_-]+)/);
@@ -49,7 +48,6 @@ const getDynamicIcon = (namaBarang) => {
   if (name.match(/es|ice|krim|gelato/)) return <IceCream className="w-10 h-10 text-pink-500" />;
   if (name.match(/permen|candy|yupi|kopiko/)) return <Candy className="w-10 h-10 text-purple-500" />;
   
-  // Penyempurnaan Camilan / Snack
   if (name.match(/wafer|tango|nabati|nissin|krispi|bengbeng/)) return <Layers className="w-10 h-10 text-orange-500" />;
   if (name.match(/oreo|slai olai|biskuat|biskuit|malkist/)) return <Disc className="w-10 h-10 text-slate-800" />;
   if (name.match(/kacang|garuda|sukro|peanuts|atom/)) return <Bean className="w-10 h-10 text-amber-700" />;
@@ -76,7 +74,6 @@ export default function App() {
   const [isLoadingDB, setIsLoadingDB] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // Custom Toast Popup State
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' });
 
   const [view, setView] = useState('toko'); 
@@ -92,7 +89,6 @@ export default function App() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [tempQty, setTempQty] = useState(0);
 
-  // Sesi Admin Tersimpan Permanen di Browser
   const [isAdminLogged, setIsAdminLogged] = useState(() => {
     return localStorage.getItem('tokojujur_admin') === 'true';
   });
@@ -106,13 +102,11 @@ export default function App() {
   const [newProduct, setNewProduct] = useState({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '' });
   const [useDiskon, setUseDiskon] = useState(false);
 
-  // Helper Custom Toast Popup
   const showToast = (msg, type = 'success') => {
     setToast({ show: true, msg, type });
     setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 2500);
   };
 
-  // --- FETCH DATA & REAL-TIME LISTENER ---
   useEffect(() => {
     if (!supabase) {
       setIsLoadingDB(false);
@@ -157,7 +151,6 @@ export default function App() {
     if (data) setSettings(data);
   };
 
-  // --- LOGIKA COPY REKENING M-BANKING ---
   const handleCopyRekening = () => {
     const textArea = document.createElement("textarea");
     const matchAngka = settings.rekening.match(/\d+/);
@@ -175,7 +168,6 @@ export default function App() {
     document.body.removeChild(textArea);
   };
 
-  // --- LOGIKA SCAN BARCODE DENGAN AUTO-FILL NAMA ---
   const handleScanBarcode = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -191,13 +183,11 @@ export default function App() {
         if (barcodes.length > 0) {
             const scannedCode = barcodes[0].rawValue;
             
-            // Isi state barcode & kolom pencarian
             setNewProduct(prev => ({ ...prev, barcode: scannedCode }));
             setSearchQuery(scannedCode); 
             
             showToast('Mencari database produk...', 'success');
             
-            // AUTO-FILL NAMA BARANG DARI INTERNET (OpenFoodFacts API)
             try {
               const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${scannedCode}.json`);
               const data = await res.json();
@@ -218,8 +208,6 @@ export default function App() {
         console.error(error); 
         showToast('Gagal memproses gambar', 'error');
     }
-    
-    // Reset file input agar bisa scan gambar yang sama lagi
     e.target.value = '';
   };
 
@@ -250,7 +238,6 @@ export default function App() {
 
   const jumlahItem = Object.values(cart).reduce((a, b) => a + b, 0);
 
-  // --- PROSES PEMBAYARAN OPTIMISTIS (ZERO LOADING) ---
   const handleSelesaiBayar = async () => {
     setIsProcessing(true);
     
@@ -282,7 +269,6 @@ export default function App() {
       metode: metodeBayar
     };
 
-    // 1. UPDATE UI LOKAL SEKETIKA
     setTransactions(prev => [newTransaction, ...prev]);
     setProducts(prev => prev.map(p => {
       const boughtItem = detailPesanan.find(i => i.id === p.id);
@@ -293,7 +279,6 @@ export default function App() {
     setView('struk');
     setIsProcessing(false);
 
-    // 2. BACKGROUND SYNC KE DATABASE
     if (supabase) {
       supabase.from('transaksi').insert([newTransaction]).then(({error}) => {
          if(error) showToast('Gagal sinkron data bayar', 'error');
@@ -329,7 +314,6 @@ export default function App() {
     setView('toko');
   };
 
-  // --- TAMBAH BARANG OPTIMISTIS (ZERO LOADING) ---
   const handleAddProduct = async (e) => {
     e.preventDefault();
     let diskonRule = null;
@@ -348,14 +332,12 @@ export default function App() {
       tanggal_dibuat: new Date().toISOString()
     };
 
-    // 1. UPDATE UI LOKAL SEKETIKA
     setProducts(prev => [...prev, tempProd]);
     setShowAddForm(false);
     setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '' });
     setUseDiskon(false);
     showToast('Barang Disimpan', 'success');
 
-    // 2. BACKGROUND SYNC KE DATABASE
     if (supabase) {
       supabase.from('produk').insert([{
           nama: tempProd.nama,
@@ -386,7 +368,6 @@ export default function App() {
     showToast('Pengaturan Disimpan', 'success');
   };
 
-  // --- EXPORT KE CSV EXCEL ---
   const handleExportCSV = () => {
     const filteredForExport = transactions.filter(t => {
       if (!filterStart && !filterEnd) return true;
@@ -424,7 +405,6 @@ export default function App() {
 
   return (
     <>
-      {/* GLOBAL TOAST POPUP (Singkat & Menarik) */}
       {toast.show && (
         <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-[9999] px-6 py-3 rounded-full shadow-2xl font-bold text-sm flex items-center gap-2 transform transition-all duration-300 ease-out animate-slide-up ${toast.type === 'error' ? 'bg-rose-600 text-white' : 'bg-emerald-600 text-white'}`}>
           {toast.type === 'error' ? <AlertTriangle size={18} /> : <CheckCircle size={18} />}
@@ -432,35 +412,32 @@ export default function App() {
         </div>
       )}
 
-      {/* TAMPILAN JIKA ENV VARIABLES BELUM DIISI */}
       {!supabase && (
         <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-white">
           <AlertTriangle size={72} className="text-rose-500 mb-6 animate-pulse" />
-          <h1 className="text-3xl font-extrabold mb-3">Siap Dipindahkan ke VS Code</h1>
+          <h1 className="text-3xl font-extrabold mb-3">Koneksi Database Belum Terbaca!</h1>
           <p className="text-slate-300 max-w-lg mb-8 text-sm leading-relaxed">
-            Untuk mencegah error kompilasi pada pratinjau ini, fungsi import Supabase dinonaktifkan sementara. 
+            Sistem tidak dapat menemukan kredensial API Supabase Anda. Anda dapat mengabaikan layar ini jika Anda melihatnya di pratinjau Canvas/Web ini.
           </p>
-          
           <div className="bg-slate-900 p-6 rounded-2xl border border-slate-700 text-left max-w-xl w-full shadow-2xl">
-            <p className="font-bold text-sky-400 mb-3 text-lg flex items-center gap-2">💻 Langkah Mengaktifkan di VS Code:</p>
+            <p className="font-bold text-sky-400 mb-3 text-lg flex items-center gap-2">🌐 Jika Error Terjadi di Cloudflare Pages:</p>
             <ol className="list-decimal pl-5 space-y-2 text-slate-300 text-sm mb-6">
-              <li>Jalankan <code className="bg-slate-800 text-emerald-300 px-1 rounded">npm install @supabase/supabase-js</code>.</li>
-              <li>Di file <code className="bg-slate-800 text-emerald-300 px-1 rounded">App.jsx</code> ini, cari bagian PENGATURAN KONEKSI SUPABASE (paling atas).</li>
-              <li>Hapus tanda komentar <code className="bg-slate-800 text-slate-400 px-1 rounded">//</code> pada baris import dan inisialisasi supabase.</li>
-              <li>Hapus baris <code className="bg-slate-800 text-rose-400 px-1 rounded">const supabase = null;</code>.</li>
+              <li>Buka Dashboard Cloudflare &gt; Pages &gt; Proyek Anda &gt; <strong>Settings</strong>.</li>
+              <li>Klik menu <strong>Environment variables</strong>.</li>
+              <li>Tambahkan <code className="bg-slate-800 text-emerald-300 px-1 rounded">VITE_SUPABASE_URL</code> dan <code className="bg-slate-800 text-emerald-300 px-1 rounded">VITE_SUPABASE_ANON_KEY</code>.</li>
+              <li>PENTING: Masuk ke tab <strong>Deployments</strong>, lalu klik <strong>Retry deployment</strong>.</li>
             </ol>
             <hr className="border-slate-800 mb-6"/>
-            <p className="font-bold text-sky-400 mb-3 text-lg flex items-center gap-2">🌐 Jika Error di Cloudflare Pages:</p>
+            <p className="font-bold text-sky-400 mb-3 text-lg flex items-center gap-2">💻 Jika Error Terjadi di VS Code Lokal Anda:</p>
             <ol className="list-decimal pl-5 space-y-2 text-slate-300 text-sm">
-              <li>Dashboard Cloudflare &gt; Pages &gt; Proyek Anda &gt; <strong>Settings &gt; Environment variables</strong>.</li>
-              <li>Tambahkan <code className="bg-slate-800 text-emerald-300 px-1 rounded">VITE_SUPABASE_URL</code> dan <code className="bg-slate-800 text-emerald-300 px-1 rounded">VITE_SUPABASE_ANON_KEY</code>.</li>
-              <li>Masuk ke tab <strong>Deployments</strong>, lalu klik <strong>Retry deployment</strong>.</li>
+              <li>Pastikan Anda telah membuat file <code className="bg-slate-800 text-white px-1 rounded">.env.local</code>.</li>
+              <li>Isi dengan nilai URL dan ANON_KEY yang benar.</li>
+              <li>Restart server lokal Anda dengan menekan <kbd>Ctrl+C</kbd> lalu jalankan <code className="bg-slate-800 text-white px-1 rounded">npm run dev</code> kembali.</li>
             </ol>
           </div>
         </div>
       )}
 
-      {/* LOADING MEWAH */}
       {supabase && isLoadingDB && (
         <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-center">
           <div className="relative mb-6">
@@ -472,7 +449,6 @@ export default function App() {
         </div>
       )}
 
-      {/* RENDER TOKO UTAMA */}
       {supabase && !isLoadingDB && view === 'toko' && (
         <div className="min-h-screen bg-slate-50 pb-24 relative">
           <header className="bg-white shadow-sm p-4 sticky top-0 z-10">
@@ -485,7 +461,6 @@ export default function App() {
                 <Lock size={18} />
               </button>
             </div>
-            
             <div className="relative flex gap-2">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-3 text-gray-400" size={20} />
@@ -619,7 +594,6 @@ export default function App() {
             )}
             
             {metodeBayar === 'transfer' && (() => {
-               // SMART PARSER REKENING OTOMATIS
                const rekStr = settings.rekening || '';
                const noRek = rekStr.match(/\d+/) ? rekStr.match(/\d+/)[0] : '-';
                const bank = rekStr.split(' ')[0] || 'Bank';
