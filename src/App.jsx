@@ -1,4 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
+// PENTING UNTUK DI VS CODE: Hapus tanda komentar (//) pada baris import di bawah ini
+// import { createClient } from '@supabase/supabase-js';
 import { 
   Coffee, Utensils, Package, IceCream, Droplet, Candy, 
   CheckCircle, Settings, BarChart3, PlusCircle, 
@@ -9,19 +11,14 @@ import {
 } from 'lucide-react';
 
 // =========================================================================
-// PENGATURAN KONEKSI SUPABASE (UNTUK DI VS CODE LOKAL)
+// PENGATURAN KONEKSI SUPABASE
 // =========================================================================
-// PENTING: Di VS Code Anda, tambahkan 4 baris kode di bawah ini 
-// (hapus tanda komentar //) dan hapus baris "const supabase = null;"
-//
-import { createClient } from '@supabase/supabase-js';
-const env = typeof import.meta !== 'undefined' ? import.meta.env : {};
-const supabaseUrl = env.VITE_SUPABASE_URL;
-const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY;
+// PENTING UNTUK DI VS CODE: Hapus tanda komentar (//) pada 3 baris di bawah ini
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
 const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
-// =========================================================================
 
-// Mock fallback untuk Canvas agar kompilasi tidak error/blank screen
+// Baris ini HANYA untuk preview agar tidak error, hapus baris ini saat di VS Code:
 
 
 // --- LOGIKA BANTUAN ---
