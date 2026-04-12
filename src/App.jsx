@@ -12,8 +12,6 @@ import {
 // PENGATURAN KONEKSI SUPABASE (SUPER AMAN, BEBAS BLANK PAGE)
 // Menggunakan injeksi skrip otomatis untuk mencegah error kompilasi Vite/Esbuild
 // =========================================================================
-let supabase = null;
-
 // --- LOGIKA BANTUAN ---
 const formatRupiah = (angka) => {
   return new Intl.NumberFormat('id-ID', { 
