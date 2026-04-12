@@ -164,7 +164,6 @@ function MainApp() {
     if (!supabase) return;
     const { data } = await supabase.from('pengaturan').select('*').eq('id', 1).single();
     if (data) {
-      // Keamanan Ekstra: Mencegah Null dari Database agar aplikasi tidak blank screen
       setSettings({
         nama_toko: data.nama_toko || 'Toko Kejujuran',
         qris_url: data.qris_url || '',
@@ -276,6 +275,7 @@ function MainApp() {
     }
   };
 
+  // FUNGSI ADMIN YANG DITAMBAHKAN KEMBALI
   const handleLogin = (e) => {
     e.preventDefault();
     if (loginInput === settings.admin_password) {
@@ -284,6 +284,27 @@ function MainApp() {
       setLoginInput('');
       showToast('Login Berhasil', 'success');
     } else showToast('Password Salah', 'error');
+  };
+
+  const handleLogout = () => {
+    setIsAdminLogged(false);
+    try { localStorage.removeItem('tokojujur_admin'); } catch(err){}
+    setView('toko');
+    showToast('Berhasil Keluar', 'success');
+  };
+
+  const handleSaveSettings = async () => {
+    setIsProcessing(true);
+    if (supabase) {
+      await supabase.from('pengaturan').update({
+        nama_toko: settings.nama_toko,
+        qris_url: settings.qris_url,
+        rekening: settings.rekening,
+        admin_password: settings.admin_password
+      }).eq('id', 1);
+    }
+    setIsProcessing(false);
+    showToast('Pengaturan Disimpan', 'success');
   };
 
   const handleAddProduct = async (e) => {
@@ -328,6 +349,13 @@ function MainApp() {
     link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
     link.download = `Laporan_Toko_Kejujuran_${new Date().toISOString().split('T')[0]}.csv`;
     link.click();
+  };
+
+  const handleTutupStruk = () => {
+    setCart({});
+    setMetodeBayar(null);
+    setStrukTerakhir(null);
+    setView('toko');
   };
 
   // --- RENDER UI AMAN ---
@@ -387,7 +415,7 @@ function MainApp() {
 
           <main className="p-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 max-w-5xl mx-auto">
             {searchFilteredProducts.map(p => (
-              <div key={p.id} onClick={() => openProductModal(p)} className="bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col items-center text-center relative active:scale-95 transition-all group hover:shadow-md cursor-pointer">
+              <div key={p.id} onClick={() => openProductModal(p)} className="bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col items-center text-center relative active:scale-95 transition-all group hover:shadow-md cursor-pointer border-b-4 border-b-slate-100">
                 {cart[p.id] > 0 && <div className="absolute top-2 right-2 bg-emerald-500 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow-lg">{cart[p.id]}</div>}
                 <div className="mb-4 bg-slate-50 p-3 rounded-2xl text-4xl group-hover:bg-emerald-50 transition-colors">{getDynamicEmoji(p.nama)}</div>
                 <h3 className="font-bold text-sm mb-1 line-clamp-2 h-10 text-slate-700">{p.nama}</h3>
@@ -624,7 +652,7 @@ function MainApp() {
                      <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">URL Foto QRIS (G-Drive Link)</label><input value={settings.qris_url || ''} onChange={e => setSettings({...settings, qris_url: e.target.value})} className="w-full p-5 bg-white rounded-3xl font-bold border-none focus:ring-4 focus:ring-emerald-500/20 outline-none shadow-sm transition-all text-sm"/></div>
                      <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Info Rekening Transfer</label><input value={settings.rekening || ''} onChange={e => setSettings({...settings, rekening: e.target.value})} className="w-full p-5 bg-white rounded-3xl font-bold border-none focus:ring-4 focus:ring-emerald-500/20 outline-none shadow-sm transition-all text-sm"/></div>
                      <div className="space-y-3"><label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2">Sandi Rahasia Admin</label><input type="text" value={settings.admin_password || ''} onChange={e => setSettings({...settings, admin_password: e.target.value})} className="w-full p-5 bg-white rounded-3xl font-black border-none focus:ring-4 focus:ring-emerald-500/20 outline-none shadow-sm transition-all tracking-[0.5em] text-xl text-center"/></div>
-                     <button onClick={handleSaveSettings} className="w-full py-6 bg-emerald-600 text-white rounded-[32px] font-black text-xl shadow-2xl shadow-emerald-100 hover:bg-emerald-500 transition-all active:scale-95 mt-4">SIMPAN KE DATABASE SEKARANG</button>
+                     <button onClick={handleSaveSettings} className="w-full py-6 bg-emerald-600 text-white rounded-[32px] font-black text-xl shadow-2xl shadow-emerald-100 hover:bg-emerald-500 transition-all active:scale-95 mt-4 shadow-xl">SIMPAN KE DATABASE SEKARANG</button>
                   </div>
                </div>
              )}
