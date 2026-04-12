@@ -14,15 +14,15 @@ import {
 // PENTING: Di VS Code Anda, tambahkan 4 baris kode di bawah ini 
 // (hapus tanda komentar //) dan hapus baris "const supabase = null;"
 //
-// import { createClient } from '@supabase/supabase-js';
-// const env = typeof import.meta !== 'undefined' ? import.meta.env : {};
-// const supabaseUrl = env.VITE_SUPABASE_URL;
-// const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY;
-// const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+import { createClient } from '@supabase/supabase-js';
+const env = typeof import.meta !== 'undefined' ? import.meta.env : {};
+const supabaseUrl = env.VITE_SUPABASE_URL;
+const supabaseAnonKey = env.VITE_SUPABASE_ANON_KEY;
+const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
 // =========================================================================
 
 // Mock fallback untuk Canvas agar kompilasi tidak error/blank screen
-const supabase = null; 
+
 
 // --- LOGIKA BANTUAN ---
 const formatRupiah = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka || 0);
@@ -178,7 +178,7 @@ export default function App() {
     document.body.removeChild(textArea);
   };
 
-  // --- LOGIKA SCAN BARCODE ---
+  // --- LOGIKA SCAN BARCODE DENGAN AUTO-FILL NAMA ---
   const handleScanBarcode = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -190,14 +190,40 @@ export default function App() {
         const barcodeDetector = new window.BarcodeDetector({ formats: ['qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39'] });
         const imageBitmap = await createImageBitmap(file);
         const barcodes = await barcodeDetector.detect(imageBitmap);
+        
         if (barcodes.length > 0) {
-            setNewProduct(prev => ({ ...prev, barcode: barcodes[0].rawValue }));
-            setSearchQuery(barcodes[0].rawValue); 
-            showToast('Barcode Terbaca!', 'success');
+            const scannedCode = barcodes[0].rawValue;
+            
+            // Isi state barcode & kolom pencarian
+            setNewProduct(prev => ({ ...prev, barcode: scannedCode }));
+            setSearchQuery(scannedCode); 
+            
+            showToast('Mencari database produk...', 'success');
+            
+            // AUTO-FILL NAMA BARANG DARI INTERNET (OpenFoodFacts API)
+            try {
+              const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${scannedCode}.json`);
+              const data = await res.json();
+              if (data.status === 1 && data.product && data.product.product_name) {
+                setNewProduct(prev => ({ ...prev, nama: data.product.product_name }));
+                showToast(`Ditemukan: ${data.product.product_name}`, 'success');
+              } else {
+                showToast('Barcode terbaca! Isi nama manual.', 'success');
+              }
+            } catch (err) {
+              showToast('Barcode terbaca!', 'success');
+            }
+            
         } else {
             showToast('Barcode blur/tidak jelas', 'error');
         }
-    } catch (error) { console.error(error); }
+    } catch (error) { 
+        console.error(error); 
+        showToast('Gagal memproses gambar', 'error');
+    }
+    
+    // Reset file input agar bisa scan gambar yang sama lagi
+    e.target.value = '';
   };
 
   const openProductModal = (product) => {
