@@ -10,10 +10,6 @@ import {
 
 // =========================================================================
 // PENGATURAN KONEKSI SUPABASE (UNTUK DI VS CODE LOKAL)
-// =========================================================================
-// PENTING: Di VS Code Anda, tambahkan 4 baris kode di bawah ini 
-// (hapus tanda komentar //) dan hapus baris "const supabase = null;"
-//
 import { createClient } from '@supabase/supabase-js';
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
