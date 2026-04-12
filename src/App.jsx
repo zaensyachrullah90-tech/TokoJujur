@@ -1,17 +1,16 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import { 
   Store, Search, Camera, X, ChevronRight, ArrowLeft, 
   CreditCard, QrCode, Copy, CheckCircle, AlertTriangle, 
-  Lock, BarChart3, Package, Settings, LogOut, PlusCircle, Trash2, Download 
+  Lock, BarChart3, Package, Settings, LogOut, PlusCircle, Trash2, Download, Power 
 } from 'lucide-react';
 
 // =========================================================================
 // PENGATURAN KONEKSI SUPABASE (ANTI-CRASH & BEBAS ERROR BUILD)
-// Menggunakan skrip dinamis agar tidak membutuhkan package npm eksternal
 // =========================================================================
 let supabase = null;
 
-// --- LOGIKA BANTUAN ---
 const formatRupiah = (angka) => {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka || 0);
 };
@@ -66,7 +65,16 @@ function MainApp() {
   const [isLoadingDB, setIsLoadingDB] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' });
-  const [view, setView] = useState('toko'); 
+  
+  // STATE NAVIGASI: Menyimpan view di LocalStorage agar tahan refresh
+  const [view, setView] = useState(() => {
+    try {
+      if (typeof window !== 'undefined') {
+        return localStorage.getItem('tokojujur_view') || 'toko';
+      }
+    } catch(e) {}
+    return 'toko';
+  }); 
   
   const [products, setProducts] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -88,7 +96,13 @@ function MainApp() {
     } catch(e) { return false; }
   });
   
-  const [adminTab, setAdminTab] = useState('analisa'); 
+  // Tab Admin anti-refresh
+  const [adminTab, setAdminTab] = useState(() => {
+    try {
+      if (typeof window !== 'undefined') return localStorage.getItem('tokojujur_admintab') || 'analisa';
+    } catch(e){}
+    return 'analisa';
+  }); 
   const [loginInput, setLoginInput] = useState('');
   const [filterStart, setFilterStart] = useState('');
   const [filterEnd, setFilterEnd] = useState('');
@@ -102,6 +116,29 @@ function MainApp() {
     setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 2500);
   };
 
+  // UBAH FAVICON OTOMATIS MENJADI TOKO (TANPA EDIT INDEX.HTML)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      let link = document.querySelector("link[rel~='icon']");
+      if (!link) {
+        link = document.createElement('link');
+        link.rel = 'icon';
+        document.head.appendChild(link);
+      }
+      link.href = "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏪</text></svg>";
+    }
+  }, []);
+
+  // Simpan View & AdminTab ke LocalStorage tiap ada perubahan
+  useEffect(() => {
+    try { localStorage.setItem('tokojujur_view', view); } catch(e){}
+  }, [view]);
+
+  useEffect(() => {
+    try { localStorage.setItem('tokojujur_admintab', adminTab); } catch(e){}
+  }, [adminTab]);
+
+  // Inisialisasi Supabase
   useEffect(() => {
     const initSupabase = () => {
       try {
@@ -127,11 +164,7 @@ function MainApp() {
 
   useEffect(() => {
     if (!isSupabaseReady) return;
-
-    if (!supabase) {
-      setIsLoadingDB(false);
-      return;
-    }
+    if (!supabase) { setIsLoadingDB(false); return; }
     
     fetchData();
     const channel = supabase.channel('realtime-toko')
@@ -191,7 +224,39 @@ function MainApp() {
     }
   };
 
-  const handleScanBarcode = async (e) => {
+  // SCAN BARCODE: KHUSUS PEMBELI (LANGSUNG MUNCULKAN BARANG)
+  const handleScanBarcodeToko = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!('BarcodeDetector' in window)) return showToast('Browser tidak mendukung', 'error');
+    
+    try {
+      const detector = new window.BarcodeDetector({ formats: ['qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39'] });
+      const imageBitmap = await createImageBitmap(file);
+      const barcodes = await detector.detect(imageBitmap);
+      
+      if (barcodes.length > 0) {
+        const code = barcodes[0].rawValue;
+        
+        // Cek apakah barang ada di database stok kita
+        const foundProduct = products.find(p => p.barcode === code);
+        if (foundProduct) {
+          setSearchQuery(''); // Kosongkan pencarian
+          openProductModal(foundProduct); // Langsung munculkan popup barang!
+          showToast(`Ditemukan: ${foundProduct.nama}`, 'success');
+        } else {
+          setSearchQuery(code); // Tampilkan hasil kosong
+          showToast('Barang belum terdaftar di toko', 'error');
+        }
+      } else { 
+        showToast('Barcode tidak jelas', 'error'); 
+      }
+    } catch (err) { showToast('Gagal memproses kamera', 'error'); }
+    e.target.value = '';
+  };
+
+  // SCAN BARCODE: KHUSUS ADMIN (AMBIL NAMA DARI INTERNET)
+  const handleScanBarcodeAdmin = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     if (!('BarcodeDetector' in window)) return showToast('Browser tidak mendukung', 'error');
@@ -204,20 +269,26 @@ function MainApp() {
       if (barcodes.length > 0) {
         const code = barcodes[0].rawValue;
         setNewProduct(prev => ({ ...prev, barcode: code }));
-        setSearchQuery(code);
-        showToast('Mencari database...', 'success');
+        showToast('Mencari database global...', 'success');
         
         try {
           const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
           const data = await res.json();
           if (data.status === 1 && data.product && data.product.product_name) {
             setNewProduct(prev => ({ ...prev, nama: data.product.product_name }));
-            showToast('Ditemukan: ' + data.product.product_name, 'success');
+            showToast('Nama otomatis terisi!', 'success');
+          } else {
+            showToast('Barcode terbaca. Isi nama manual.', 'success');
           }
         } catch (err) {}
       } else { showToast('Barcode tidak jelas', 'error'); }
-    } catch (err) { showToast('Gagal memproses', 'error'); }
+    } catch (err) { showToast('Gagal memproses gambar', 'error'); }
     e.target.value = '';
+  };
+
+  const openProductModal = (product) => {
+    setSelectedProduct(product);
+    setTempQty(cart[product.id] || 0);
   };
 
   const saveToCart = () => {
@@ -275,7 +346,30 @@ function MainApp() {
     }
   };
 
-  // FUNGSI ADMIN YANG DITAMBAHKAN KEMBALI
+  const handleTutupStruk = () => {
+    setCart({});
+    setMetodeBayar(null);
+    setStrukTerakhir(null);
+    setView('toko');
+  };
+
+  const handleExitApp = () => {
+    if (window.confirm('Keluar dari aplikasi Toko Kejujuran?')) {
+      try {
+        window.close();
+      } catch (e) {}
+      
+      // Fallback jika window.close diblokir browser
+      setTimeout(() => {
+        showToast('Jika aplikasi tidak tertutup otomatis, silakan tutup tab/browser Anda secara manual.', 'success');
+        setCart({});
+        setView('toko');
+        setIsAdminLogged(false);
+      }, 500);
+    }
+  };
+
+  // ADMIN FUNCTIONS
   const handleLogin = (e) => {
     e.preventDefault();
     if (loginInput === settings.admin_password) {
@@ -351,13 +445,6 @@ function MainApp() {
     link.click();
   };
 
-  const handleTutupStruk = () => {
-    setCart({});
-    setMetodeBayar(null);
-    setStrukTerakhir(null);
-    setView('toko');
-  };
-
   // --- RENDER UI AMAN ---
 
   if (!isSupabaseReady) {
@@ -394,21 +481,25 @@ function MainApp() {
         </div>
       )}
 
+      {/* VIEW: TOKO (HALAMAN DEPAN) */}
       {view === 'toko' && (
         <div className="pb-28">
           <header className="bg-white p-4 shadow-sm sticky top-0 z-50">
             <div className="flex justify-between items-center mb-4 max-w-5xl mx-auto">
               <div className="flex items-center gap-2 text-emerald-600 font-black text-xl"><Store/> {settings.nama_toko}</div>
-              <button onClick={() => setView('admin')} className="p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition"><Lock size={18}/></button>
+              <div className="flex items-center gap-2">
+                <button onClick={() => setView('admin')} className="p-2 bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200 transition" title="Masuk Mode Admin"><Lock size={18}/></button>
+                <button onClick={handleExitApp} className="p-2 bg-rose-100 text-rose-500 rounded-full hover:bg-rose-200 transition" title="Keluar Aplikasi"><Power size={18}/></button>
+              </div>
             </div>
             <div className="flex gap-2 max-w-5xl mx-auto">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-3 text-slate-400" size={20}/>
-                <input type="text" placeholder="Cari barang atau scan..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} className="w-full bg-slate-100 rounded-xl pl-10 pr-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500 font-medium border-none"/>
+                <input type="text" placeholder="Cari barang atau scan..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} className="w-full bg-slate-100 rounded-xl pl-10 pr-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500 font-medium transition-all border-none"/>
               </div>
               <label className="bg-slate-800 text-white p-3 rounded-xl cursor-pointer hover:bg-slate-700 transition active:scale-95 flex items-center shadow-lg">
                  <Camera size={24}/>
-                 <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleScanBarcode}/>
+                 <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleScanBarcodeToko}/>
               </label>
             </div>
           </header>
@@ -435,6 +526,13 @@ function MainApp() {
                    </div>
                    <button onClick={() => setSelectedProduct(null)} className="p-2 bg-slate-100 rounded-full"><X/></button>
                 </div>
+                
+                {selectedProduct.diskon && (
+                  <div className="bg-orange-50 text-orange-700 p-4 rounded-2xl text-sm mb-6 border border-orange-200 text-center font-black">
+                    🔥 Beli {selectedProduct.diskon.min_qty} bayar {formatRupiah(selectedProduct.diskon.harga_total)}
+                  </div>
+                )}
+                
                 <div className="flex items-center justify-between bg-slate-50 p-5 rounded-3xl mb-8 border border-slate-100">
                    <button onClick={() => setTempQty(Math.max(0, tempQty-1))} className="w-14 h-14 bg-white rounded-2xl shadow-sm font-black text-2xl border active:bg-slate-100 transition">-</button>
                    <input type="number" value={tempQty || ''} onChange={e => setTempQty(Math.min(selectedProduct.stok||0, Math.max(0, parseInt(e.target.value)||0)))} className="bg-transparent text-center font-black text-4xl w-24 outline-none text-slate-800" placeholder="0"/>
@@ -456,6 +554,7 @@ function MainApp() {
         </div>
       )}
 
+      {/* VIEW: CHECKOUT */}
       {view === 'checkout' && (
         <div className="max-w-md mx-auto p-6 min-h-screen flex flex-col">
           <button onClick={() => setView('toko')} className="flex items-center gap-2 font-black mb-8 text-slate-400 hover:text-slate-600 transition"><ArrowLeft/> Kembali Belanja</button>
@@ -502,6 +601,7 @@ function MainApp() {
         </div>
       )}
 
+      {/* VIEW: STRUK */}
       {view === 'struk' && (
         <div className="min-h-screen bg-emerald-600 flex flex-col items-center justify-center p-8 text-white text-center">
            <div className="w-24 h-24 bg-white/20 rounded-full flex items-center justify-center mb-6 backdrop-blur-sm animate-bounce"><CheckCircle size={56}/></div>
@@ -523,6 +623,7 @@ function MainApp() {
         </div>
       )}
 
+      {/* VIEW: ADMIN LOGIN */}
       {view === 'admin' && !isAdminLogged && (
         <div className="min-h-screen flex items-center justify-center p-6 bg-slate-100">
           <form onSubmit={handleLogin} className="bg-white p-12 rounded-[50px] shadow-2xl w-full max-w-sm border-4 border-white text-center">
@@ -535,6 +636,7 @@ function MainApp() {
         </div>
       )}
 
+      {/* VIEW: ADMIN DASHBOARD */}
       {view === 'admin' && isAdminLogged && (() => {
         const filteredTransactions = transactions.filter(t => {
           if (!filterStart && !filterEnd) return true;
@@ -562,6 +664,7 @@ function MainApp() {
             </aside>
             
             <main className="flex-1 p-8 md:p-12 overflow-y-auto">
+               
                {adminTab === 'analisa' && (
                  <div className="animate-fade-in max-w-6xl mx-auto">
                     <div className="flex flex-col md:flex-row justify-between md:items-center mb-12 gap-6">
@@ -608,7 +711,7 @@ function MainApp() {
                     {showAddForm && (
                       <form onSubmit={handleAddProduct} className="bg-slate-50 p-8 rounded-[40px] border border-slate-100 shadow-sm mb-12 grid grid-cols-1 md:grid-cols-4 gap-6 animate-slide-up">
                          <div className="md:col-span-2"><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest ml-1">Nama Produk</label><input required value={newProduct.nama} onChange={e => setNewProduct({...newProduct, nama: e.target.value})} className="w-full p-4 bg-white rounded-2xl font-bold border-none focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all shadow-sm"/></div>
-                         <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest ml-1">Barcode (Opsional)</label><input value={newProduct.barcode} onChange={e => setNewProduct({...newProduct, barcode: e.target.value})} className="w-full p-4 bg-white rounded-2xl font-bold border-none focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all shadow-sm"/></div>
+                         <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest ml-1">Barcode (Opsional)</label><div className="flex gap-2"><input value={newProduct.barcode} onChange={e => setNewProduct({...newProduct, barcode: e.target.value})} className="w-full p-4 bg-white rounded-2xl font-bold border-none focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all shadow-sm"/><label className="bg-slate-800 text-white p-4 rounded-2xl cursor-pointer hover:bg-slate-700 transition flex justify-center items-center"><Camera size={20}/><input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleScanBarcodeAdmin}/></label></div></div>
                          <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest ml-1">Modal Beli (Rp)</label><input required type="number" value={newProduct.modal || ''} onChange={e => setNewProduct({...newProduct, modal: parseInt(e.target.value)})} className="w-full p-4 bg-white rounded-2xl font-bold border-none focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all shadow-sm"/></div>
                          <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest ml-1">Harga Jual (Rp)</label><input required type="number" value={newProduct.jual || ''} onChange={e => setNewProduct({...newProduct, jual: parseInt(e.target.value)})} className="w-full p-4 bg-white rounded-2xl font-bold border-none focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all shadow-sm"/></div>
                          <div><label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest ml-1">Stok Fisik</label><input required type="number" value={newProduct.stok || ''} onChange={e => setNewProduct({...newProduct, stok: parseInt(e.target.value)})} className="w-full p-4 bg-white rounded-2xl font-bold border-none focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all shadow-sm"/></div>
