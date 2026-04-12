@@ -3,11 +3,11 @@ import { createClient } from '@supabase/supabase-js';
 import { 
   Store, Search, Camera, X, ChevronRight, ArrowLeft, 
   CreditCard, QrCode, Copy, CheckCircle, AlertTriangle, 
-  Lock, BarChart3, Package, Settings, LogOut, PlusCircle, Trash2, Download, Power, UploadCloud
+  Lock, BarChart3, Package, Settings, LogOut, PlusCircle, Trash2, Download, Power, UploadCloud, Edit
 } from 'lucide-react';
 
 // =========================================================================
-// PENGATURAN KONEKSI SUPABASE (ANTI-CRASH & FULL SECURITY)
+// PENGATURAN KONEKSI SUPABASE (ANTI-CRASH & FULL SECURITY BLUEPRINT)
 // =========================================================================
 let supabase = null;
 
@@ -18,7 +18,7 @@ const formatRupiah = (angka) => {
 // MENDUKUNG GAMBAR BASE64 (UPLOAD LANGSUNG) DAN FALLBACK URL
 const formatImageUrl = (url) => {
   if (!url) return '';
-  if (url.startsWith('data:image')) return url; // Jika dari hasil upload langsung
+  if (url.startsWith('data:image') || url.startsWith('blob:')) return url; 
   
   const driveMatch = url.match(/(?:file\/d\/|id=)([a-zA-Z0-9_-]+)/);
   if (driveMatch && driveMatch[1]) {
@@ -66,7 +66,7 @@ const hitungTotalHargaItem = (item, qty) => {
 };
 
 // =========================================================================
-// KOMPONEN UTAMA APLIKASI
+// KOMPONEN UTAMA APLIKASI (BLUEPRINT TERKUNCI)
 // =========================================================================
 function MainApp() {
   const [isSupabaseReady, setIsSupabaseReady] = useState(false);
@@ -112,7 +112,9 @@ function MainApp() {
   const [filterStart, setFilterStart] = useState('');
   const [filterEnd, setFilterEnd] = useState('');
   
+  // STATE CRUD BARANG (TAMBAH & EDIT)
   const [showAddForm, setShowAddForm] = useState(false);
+  const [editingId, setEditingId] = useState(null); // State baru untuk menyimpan ID barang yang diedit
   const [newProduct, setNewProduct] = useState({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '' });
   const [useDiskon, setUseDiskon] = useState(false);
 
@@ -121,12 +123,35 @@ function MainApp() {
     setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 2500);
   };
 
-  // PENGUBAH FAVICON
+  // SYSTEM PWA & NOTIFIKASI & FAVICON
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      // 1. Meminta Izin Notifikasi
+      if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+        Notification.requestPermission();
+      }
+
+      // 2. Ubah Favicon Toko
       let link = document.querySelector("link[rel~='icon']");
       if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
       link.href = "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏪</text></svg>";
+
+      // 3. Injeksi Web App Manifest (PWA) agar bisa di-install jadi App HP
+      if (!document.querySelector('link[rel="manifest"]')) {
+        const manifest = {
+          name: "Toko Kejujuran",
+          short_name: "Toko",
+          display: "standalone",
+          background_color: "#f8fafc",
+          theme_color: "#059669",
+          icons: [{ src: "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏪</text></svg>", sizes: "192x192", type: "image/svg+xml", purpose: "any maskable" }]
+        };
+        const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+        const manifestLink = document.createElement('link');
+        manifestLink.rel = 'manifest';
+        manifestLink.href = URL.createObjectURL(blob);
+        document.head.appendChild(manifestLink);
+      }
     }
   }, []);
 
@@ -302,9 +327,7 @@ function MainApp() {
                 handleBarcodeResultAdmin(code);
               }
             }
-          } catch (e) {
-            // Abaikan error saat pembacaan frame
-          }
+          } catch (e) {}
         }
       }, 400); // Lakukan pembacaan sangat cepat tiap 0.4 detik
     }
@@ -410,11 +433,11 @@ function MainApp() {
     showToast('Berhasil Keluar', 'success');
   };
 
-  // FUNGSI UPLOAD QRIS (MENGUBAH GAMBAR MENJADI TEXT BASE64)
+  // FUNGSI UPLOAD & DOWNLOAD QRIS
   const handleUploadQRIS = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 1048576) { // Batas 1MB agar database tidak penuh
+      if (file.size > 1048576) { 
         showToast('Ukuran gambar terlalu besar. Maksimal 1MB.', 'error');
         return;
       }
@@ -425,6 +448,18 @@ function MainApp() {
       };
       reader.readAsDataURL(file);
     }
+  };
+
+  const handleDownloadQRIS = () => {
+    if (!settings.qris_url) return showToast('Belum ada gambar QRIS', 'error');
+    
+    const link = document.createElement('a');
+    link.href = formatImageUrl(settings.qris_url);
+    link.download = 'QRIS_Toko_Kejujuran.png';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('Mendownload QRIS...', 'success');
   };
 
   const handleSaveSettings = async () => {
@@ -441,37 +476,102 @@ function MainApp() {
     showToast('Pengaturan Disimpan', 'success');
   };
 
+  // SYSTEM TOLAK BARANG GANDA & CRUD LENGKAP (ADD / EDIT)
+  const handleEditClick = (product) => {
+    setNewProduct({
+      nama: product.nama,
+      modal: product.modal || 0,
+      jual: product.jual || 0,
+      stok: product.stok || 0,
+      barcode: product.barcode || '',
+      diskonQty: product.diskon ? product.diskon.min_qty : '',
+      diskonHarga: product.diskon ? product.diskon.harga_total : ''
+    });
+    setUseDiskon(!!product.diskon);
+    setEditingId(product.id);
+    setShowAddForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' }); // Gulir otomatis ke form atas
+  };
+
   const handleAddProduct = async (e) => {
     e.preventDefault();
+    
+    // Cek Toleransi Barang Ganda (Anti-Duplicate)
+    const isDuplicate = products.some(p => {
+      const isNameSame = p.nama.toLowerCase().trim() === newProduct.nama.toLowerCase().trim();
+      const isBarcodeSame = newProduct.barcode && p.barcode === newProduct.barcode;
+      // Jika mode Edit, abaikan barang yang sedang di-edit itu sendiri
+      if (editingId && p.id === editingId) return false;
+      
+      return isNameSame || isBarcodeSame;
+    });
+
+    if (isDuplicate) {
+      showToast('GAGAL: Nama Barang atau Barcode sudah terdaftar!', 'error');
+      return;
+    }
+
     let disc = null;
     if (useDiskon) disc = { min_qty: parseInt(newProduct.diskonQty) || 1, harga_total: parseInt(newProduct.diskonHarga) || 0 };
     
-    // Gunakan ID unik
-    const newId = Date.now();
+    const targetId = editingId ? editingId : Date.now();
     const tempProd = { 
       ...newProduct, modal: newProduct.modal||0, jual: newProduct.jual||0, stok: newProduct.stok||0,
-      id: newId, diskon: disc, tanggal_dibuat: new Date().toISOString() 
+      id: targetId, diskon: disc, tanggal_dibuat: new Date().toISOString() 
     };
     
-    // Tampilkan di UI secara Optimistic (sebelum fetch dari DB)
-    setProducts(p => [...p, tempProd]);
+    // Tampilkan di UI secara Optimistic
+    if (editingId) {
+       setProducts(p => p.map(item => item.id === editingId ? tempProd : item));
+       showToast('Barang Diperbarui', 'success');
+    } else {
+       setProducts(p => [...p, tempProd]);
+       showToast('Barang Ditambahkan', 'success');
+    }
+
+    // Reset Form
     setShowAddForm(false);
+    setEditingId(null);
     setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '' });
     setUseDiskon(false);
-    showToast('Barang Disimpan', 'success');
     
     if (supabase) {
-      // Simpan ke DB, lalu FETCH ULANG untuk menjamin sinkronisasi tanpa refresh manual
-      const { error } = await supabase.from('produk').insert([{ 
-        nama: tempProd.nama, barcode: tempProd.barcode, modal: tempProd.modal, 
-        jual: tempProd.jual, stok: tempProd.stok, diskon: tempProd.diskon 
-      }]);
-      
-      if (!error) {
-        await fetchProducts(); // Tarik data terbaru dari server
+      if (editingId) {
+        const { error } = await supabase.from('produk').update({
+          nama: tempProd.nama, barcode: tempProd.barcode, modal: tempProd.modal, 
+          jual: tempProd.jual, stok: tempProd.stok, diskon: tempProd.diskon 
+        }).eq('id', editingId);
+        if (!error) fetchProducts();
       } else {
-        showToast('Gagal sinkronisasi ke server', 'error');
+        const { error } = await supabase.from('produk').insert([{ 
+          nama: tempProd.nama, barcode: tempProd.barcode, modal: tempProd.modal, 
+          jual: tempProd.jual, stok: tempProd.stok, diskon: tempProd.diskon 
+        }]);
+        if (!error) fetchProducts(); 
       }
+    }
+  };
+
+  const handleDeleteProduct = async (id) => {
+    if(window.confirm("Yakin ingin menghapus barang ini secara permanen?")) {
+       setProducts(prev => prev.filter(item => item.id !== id));
+       showToast('Barang Dihapus', 'success');
+       if(supabase) {
+         await supabase.from('produk').delete().eq('id', id);
+       }
+    }
+  };
+
+  const handleClearAllProducts = async () => {
+    if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda benar-benar yakin ingin MENGHAPUS SELURUH BARANG TOKO?\n\nData yang dihapus TIDAK BISA DIKEMBALIKAN!")) {
+      setIsProcessing(true);
+      setProducts([]);
+      showToast('Seluruh daftar barang telah dihapus!', 'success');
+      if (supabase) {
+         await supabase.from('produk').delete().neq('id', '0');
+         fetchProducts();
+      }
+      setIsProcessing(false);
     }
   };
 
@@ -479,11 +579,8 @@ function MainApp() {
   const handleClearTransactions = async () => {
     if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda benar-benar yakin ingin MENGHAPUS SELURUH RIWAYAT TRANSAKSI PENJUALAN (Data Uji Coba)?\n\nData yang dihapus TIDAK BISA DIKEMBALIKAN!")) {
       setIsProcessing(true);
-      // Hapus secara lokal agar UI merespons seketika
       setTransactions([]);
       showToast('Seluruh riwayat transaksi telah dihapus!', 'success');
-      
-      // Hapus di Supabase (menggunakan filter neq '0' untuk menghapus semua row)
       if (supabase) {
          await supabase.from('transaksi').delete().neq('id', '0');
          fetchTransactions();
@@ -550,7 +647,6 @@ function MainApp() {
           </div>
           <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
           <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-            {/* Kotak bidikan scanner */}
             <div className="w-64 h-40 border-4 border-emerald-500 rounded-3xl shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] relative flex items-center justify-center">
               <div className="absolute w-full h-0.5 bg-emerald-400 animate-[scan_2s_ease-in-out_infinite] shadow-[0_0_10px_#34d399]"></div>
               <p className="absolute -bottom-10 text-white font-bold tracking-widest opacity-80 text-xs">Pindai Otomatis...</p>
@@ -751,9 +847,9 @@ function MainApp() {
                  <div className="p-3 bg-emerald-500 rounded-2xl shadow-lg shadow-emerald-500/20"><Settings size={28}/></div>
                  <h2 className="font-black text-2xl tracking-tighter uppercase">Admin Panel</h2>
               </div>
-              <button onClick={() => setAdminTab('analisa')} className={`flex items-center gap-3 p-4 md:p-5 rounded-2xl font-black transition-all whitespace-nowrap flex-shrink-0 ${adminTab==='analisa' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-500 hover:bg-slate-800 hover:text-white'}`}><BarChart3 size={20} className="md:w-6 md:h-6"/> <span className="text-sm md:text-base">Analisa Penjualan</span></button>
-              <button onClick={() => setAdminTab('barang')} className={`flex items-center gap-3 p-4 md:p-5 rounded-2xl font-black transition-all whitespace-nowrap flex-shrink-0 ${adminTab==='barang' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-500 hover:bg-slate-800 hover:text-white'}`}><Package size={20} className="md:w-6 md:h-6"/> <span className="text-sm md:text-base">Daftar Barang</span></button>
-              <button onClick={() => setAdminTab('pengaturan')} className={`flex items-center gap-3 p-4 md:p-5 rounded-2xl font-black transition-all whitespace-nowrap flex-shrink-0 ${adminTab==='pengaturan' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-500 hover:bg-slate-800 hover:text-white'}`}><Settings size={20} className="md:w-6 md:h-6"/> <span className="text-sm md:text-base">Pengaturan Toko</span></button>
+              <button onClick={() => {setAdminTab('analisa'); setEditingId(null); setShowAddForm(false);}} className={`flex items-center gap-3 p-4 md:p-5 rounded-2xl font-black transition-all whitespace-nowrap flex-shrink-0 ${adminTab==='analisa' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-500 hover:bg-slate-800 hover:text-white'}`}><BarChart3 size={20} className="md:w-6 md:h-6"/> <span className="text-sm md:text-base">Analisa Penjualan</span></button>
+              <button onClick={() => {setAdminTab('barang'); setEditingId(null); setShowAddForm(false);}} className={`flex items-center gap-3 p-4 md:p-5 rounded-2xl font-black transition-all whitespace-nowrap flex-shrink-0 ${adminTab==='barang' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-500 hover:bg-slate-800 hover:text-white'}`}><Package size={20} className="md:w-6 md:h-6"/> <span className="text-sm md:text-base">Manajemen Barang</span></button>
+              <button onClick={() => {setAdminTab('pengaturan'); setEditingId(null); setShowAddForm(false);}} className={`flex items-center gap-3 p-4 md:p-5 rounded-2xl font-black transition-all whitespace-nowrap flex-shrink-0 ${adminTab==='pengaturan' ? 'bg-emerald-600 text-white shadow-lg shadow-emerald-600/20' : 'text-slate-500 hover:bg-slate-800 hover:text-white'}`}><Settings size={20} className="md:w-6 md:h-6"/> <span className="text-sm md:text-base">Pengaturan Toko</span></button>
               <button onClick={handleLogout} className="md:mt-auto flex items-center gap-3 p-4 md:p-5 rounded-2xl font-black text-rose-500 hover:bg-rose-500/10 transition-all text-left whitespace-nowrap flex-shrink-0"><LogOut size={20} className="md:w-6 md:h-6"/> <span className="text-sm md:text-base">Keluar (Logout)</span></button>
             </aside>
             
@@ -807,16 +903,22 @@ function MainApp() {
                  </div>
                )}
 
-               {/* TAB: MANAJEMEN BARANG */}
+               {/* TAB: MANAJEMEN BARANG (CRUD FULL) */}
                {adminTab === 'barang' && (
                  <div className="animate-fade-in max-w-6xl mx-auto">
                     <div className="flex flex-col md:flex-row justify-between md:items-center mb-8 md:mb-12 gap-4">
                       <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-slate-800">Daftar Barang</h1>
-                      <button onClick={() => setShowAddForm(!showAddForm)} className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl shadow-emerald-100 hover:bg-emerald-500 active:scale-95 transition-all uppercase w-full md:w-auto">{showAddForm ? <X/> : <PlusCircle/>} {showAddForm ? 'Batal Tambah' : 'Barang Baru'}</button>
+                      <div className="flex flex-col md:flex-row gap-2">
+                        <button onClick={handleClearAllProducts} className="bg-rose-100 text-rose-600 px-6 py-4 rounded-2xl font-black flex items-center justify-center gap-3 shadow-sm hover:bg-rose-200 active:scale-95 transition-all uppercase w-full md:w-auto"><Trash2 size={20}/> Hapus Semua</button>
+                        <button onClick={() => { setEditingId(null); setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '' }); setUseDiskon(false); setShowAddForm(!showAddForm); }} className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl shadow-emerald-100 hover:bg-emerald-500 active:scale-95 transition-all uppercase w-full md:w-auto">{showAddForm ? <X/> : <PlusCircle/>} {showAddForm ? 'Tutup Form' : 'Tambah Barang'}</button>
+                      </div>
                     </div>
 
                     {showAddForm && (
-                      <form onSubmit={handleAddProduct} className="bg-white p-6 md:p-8 rounded-[40px] border border-slate-100 shadow-sm mb-8 md:mb-12 grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6 animate-slide-up">
+                      <form onSubmit={handleAddProduct} className={`p-6 md:p-8 rounded-[40px] border shadow-sm mb-8 md:mb-12 grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6 animate-slide-up ${editingId ? 'bg-blue-50 border-blue-100' : 'bg-white border-slate-100'}`}>
+                         <h3 className="md:col-span-4 font-black text-slate-800 mb-2 flex items-center gap-2">
+                           {editingId ? <><Edit className="text-blue-600"/> Edit Data Barang</> : <><PlusCircle className="text-emerald-600"/> Input Barang Baru</>}
+                         </h3>
                          <div className="md:col-span-2">
                            <label className="text-[10px] font-black uppercase text-slate-400 mb-2 block tracking-widest ml-1">Nama Produk</label>
                            <input required value={newProduct.nama} onChange={e => setNewProduct({...newProduct, nama: e.target.value})} className="w-full p-4 bg-slate-50 rounded-2xl font-bold border-none focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all shadow-inner"/>
@@ -851,12 +953,14 @@ function MainApp() {
                                <input type="number" value={newProduct.diskonQty} onChange={e => setNewProduct({...newProduct, diskonQty: e.target.value})} className="w-full p-4 bg-white rounded-2xl border-none outline-none font-bold text-orange-900 focus:ring-4 focus:ring-orange-500/20 shadow-sm" placeholder="Contoh: 3"/>
                              </div>
                              <div className="w-full md:w-1/2">
-                               <label className="text-[10px] font-black uppercase text-orange-600 mb-2 block tracking-widest ml-1">Total Bayar (Rp) Bukan Satuan</label>
+                               <label className="text-[10px] font-black uppercase text-orange-600 mb-2 block tracking-widest ml-1">Total Harga Grosir (Bukan Satuan)</label>
                                <input type="number" value={newProduct.diskonHarga} onChange={e => setNewProduct({...newProduct, diskonHarga: e.target.value})} className="w-full p-4 bg-white rounded-2xl border-none outline-none font-bold text-orange-900 focus:ring-4 focus:ring-orange-500/20 shadow-sm" placeholder="Contoh: 10000"/>
                              </div>
                            </div>
                          )}
-                         <button className="bg-slate-900 text-white py-5 rounded-[24px] font-black text-lg md:col-span-4 mt-2 hover:bg-slate-800 transition-all active:scale-[0.98] shadow-xl">SIMPAN BARANG & SINKRONISASI</button>
+                         <button className={`text-white py-5 rounded-[24px] font-black text-lg md:col-span-4 mt-2 transition-all active:scale-[0.98] shadow-xl ${editingId ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-900 hover:bg-slate-800'}`}>
+                           {editingId ? 'UPDATE BARANG & SINKRONISASI' : 'SIMPAN BARANG & SINKRONISASI'}
+                         </button>
                     </form>
                   )}
 
@@ -868,13 +972,13 @@ function MainApp() {
                              <th className="p-6">Data Produk</th>
                              <th className="p-6 text-center">Stok</th>
                              <th className="p-6">Harga Jual</th>
-                             <th className="p-6 text-center">Aksi</th>
+                             <th className="p-6 text-center">Aksi (CRUD)</th>
                            </tr>
                          </thead>
                          <tbody className="divide-y divide-slate-50">
                            {products.length === 0 && <tr><td colSpan="4" className="p-6 text-center text-slate-400 font-bold">Barang masih kosong.</td></tr>}
                            {products.map(p => (
-                             <tr key={p.id} className="text-sm font-bold text-slate-700 hover:bg-slate-50 transition-colors">
+                             <tr key={p.id} className={`text-sm font-bold transition-colors ${editingId === p.id ? 'bg-blue-50' : 'hover:bg-slate-50 text-slate-700'}`}>
                                <td className="p-6 flex items-center gap-4">
                                  <div className="p-3 bg-white rounded-2xl border shadow-sm text-2xl flex items-center justify-center shrink-0">{getDynamicEmoji(p.nama)}</div>
                                  <div className="min-w-0">
@@ -890,7 +994,10 @@ function MainApp() {
                                  {p.diskon && <div className="text-[10px] text-orange-500 font-black mt-1 bg-orange-50 px-2 py-1 rounded w-max border border-orange-100">Grosir: {p.diskon.min_qty} = {formatRupiah(p.diskon.harga_total)}</div>}
                                </td>
                                <td className="p-6 text-center">
-                                 <button onClick={() => { if(confirm('Yakin ingin menghapus barang ini secara permanen?')){ setProducts(prev => prev.filter(item => item.id !== p.id)); if(supabase) supabase.from('produk').delete().eq('id', p.id).then(fetchProducts); showToast('Barang terhapus dari sistem', 'success'); } }} className="p-3 text-rose-400 hover:bg-rose-100 hover:text-rose-600 rounded-2xl transition-all" title="Hapus Barang"><Trash2 size={20}/></button>
+                                 <div className="flex items-center justify-center gap-2">
+                                   <button onClick={() => handleEditClick(p)} className="p-3 text-blue-500 hover:bg-blue-100 hover:text-blue-700 rounded-2xl transition-all" title="Edit Barang"><Edit size={20}/></button>
+                                   <button onClick={() => handleDeleteProduct(p.id)} className="p-3 text-rose-400 hover:bg-rose-100 hover:text-rose-600 rounded-2xl transition-all" title="Hapus Barang"><Trash2 size={20}/></button>
+                                 </div>
                                </td>
                              </tr>
                            ))}
@@ -914,18 +1021,26 @@ function MainApp() {
 
                      <hr className="border-slate-100"/>
                      
-                     {/* FITUR BARU: UPLOAD QRIS LANGSUNG DARI PERANGKAT */}
+                     {/* FITUR BARU: UPLOAD & DOWNLOAD QRIS */}
                      <div className="space-y-3">
                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 flex items-center gap-2"><QrCode size={14}/> Foto QRIS Pembayaran</label>
-                       <div className="flex flex-col sm:flex-row items-center gap-6 bg-slate-50 p-6 rounded-3xl shadow-inner">
-                         {/* Preview Gambar */}
-                         <div className="w-40 h-40 shrink-0 bg-white rounded-3xl border-2 border-dashed border-emerald-200 flex items-center justify-center p-2 overflow-hidden shadow-sm relative">
-                           {settings.qris_url ? (
-                             <img src={formatImageUrl(settings.qris_url)} className="w-full h-full object-contain" alt="QRIS Preview"/>
-                           ) : (
-                             <span className="text-xs text-slate-400 font-bold text-center">Belum ada QRIS</span>
-                           )}
+                       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 bg-slate-50 p-6 rounded-3xl shadow-inner">
+                         
+                         {/* Kolom Preview */}
+                         <div className="flex flex-col items-center gap-3">
+                           <div className="w-40 h-40 shrink-0 bg-white rounded-3xl border-2 border-dashed border-emerald-200 flex items-center justify-center p-2 overflow-hidden shadow-sm relative">
+                             {settings.qris_url ? (
+                               <img src={formatImageUrl(settings.qris_url)} className="w-full h-full object-contain" alt="QRIS Preview"/>
+                             ) : (
+                               <span className="text-xs text-slate-400 font-bold text-center">Belum ada QRIS</span>
+                             )}
+                           </div>
+                           <button onClick={handleDownloadQRIS} className="text-[10px] font-black bg-slate-200 hover:bg-slate-300 text-slate-700 px-4 py-2 rounded-full transition-colors uppercase tracking-widest flex items-center gap-2">
+                             <Download size={14}/> Simpan QRIS
+                           </button>
                          </div>
+
+                         {/* Kolom Input */}
                          <div className="flex-1 w-full space-y-4">
                            <label className="w-full flex items-center justify-center gap-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 hover:text-emerald-800 p-4 rounded-2xl font-bold cursor-pointer transition-all active:scale-95 border border-emerald-200">
                              <UploadCloud size={20}/> Upload dari Galeri/File
