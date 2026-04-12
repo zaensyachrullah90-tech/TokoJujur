@@ -11,14 +11,15 @@ import {
 } from 'lucide-react';
 
 // =========================================================================
-// PENGATURAN KONEKSI SUPABASE
+// PENGATURAN KONEKSI SUPABASE (DIJAMIN BEBAS BLANK PAGE)
 // =========================================================================
-// PENTING UNTUK DI VS CODE: Hapus tanda komentar (//) pada 3 baris di bawah ini:
-  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-  const supabase = (supabaseUrl !== '' && supabaseAnonKey !== '') ? createClient(supabaseUrl, supabaseAnonKey) : null;
+// PENTING UNTUK DI VS CODE: Hapus tanda komentar (//) pada baris-baris di bawah ini:
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+const supabase = (supabaseUrl !== '' && supabaseAnonKey !== '') ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 // Baris ini HANYA untuk preview web agar tidak error, hapus baris ini saat di VS Code:
+
 
 // --- LOGIKA BANTUAN ---
 const formatRupiah = (angka) => new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka || 0);
@@ -415,26 +416,10 @@ export default function App() {
       {!supabase && (
         <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-6 text-center text-white">
           <AlertTriangle size={72} className="text-rose-500 mb-6 animate-pulse" />
-          <h1 className="text-3xl font-extrabold mb-3">Koneksi Database Belum Terbaca!</h1>
+          <h1 className="text-3xl font-extrabold mb-3">Siap Dipindahkan ke VS Code</h1>
           <p className="text-slate-300 max-w-lg mb-8 text-sm leading-relaxed">
-            Sistem tidak dapat menemukan kredensial API Supabase Anda. Anda dapat mengabaikan layar ini jika Anda melihatnya di pratinjau Canvas/Web ini.
+            Sistem tidak mendeteksi API Key Supabase. Pastikan file <code className="text-emerald-400 bg-slate-800 px-1 rounded">.env.local</code> Anda sudah diatur dengan benar di VS Code atau Cloudflare Pages.
           </p>
-          <div className="bg-slate-900 p-6 rounded-2xl border border-slate-700 text-left max-w-xl w-full shadow-2xl">
-            <p className="font-bold text-sky-400 mb-3 text-lg flex items-center gap-2">🌐 Jika Error Terjadi di Cloudflare Pages:</p>
-            <ol className="list-decimal pl-5 space-y-2 text-slate-300 text-sm mb-6">
-              <li>Buka Dashboard Cloudflare &gt; Pages &gt; Proyek Anda &gt; <strong>Settings</strong>.</li>
-              <li>Klik menu <strong>Environment variables</strong>.</li>
-              <li>Tambahkan <code className="bg-slate-800 text-emerald-300 px-1 rounded">VITE_SUPABASE_URL</code> dan <code className="bg-slate-800 text-emerald-300 px-1 rounded">VITE_SUPABASE_ANON_KEY</code>.</li>
-              <li>PENTING: Masuk ke tab <strong>Deployments</strong>, lalu klik <strong>Retry deployment</strong>.</li>
-            </ol>
-            <hr className="border-slate-800 mb-6"/>
-            <p className="font-bold text-sky-400 mb-3 text-lg flex items-center gap-2">💻 Jika Error Terjadi di VS Code Lokal Anda:</p>
-            <ol className="list-decimal pl-5 space-y-2 text-slate-300 text-sm">
-              <li>Pastikan Anda telah membuat file <code className="bg-slate-800 text-white px-1 rounded">.env.local</code>.</li>
-              <li>Isi dengan nilai URL dan ANON_KEY yang benar.</li>
-              <li>Restart server lokal Anda dengan menekan <kbd>Ctrl+C</kbd> lalu jalankan <code className="bg-slate-800 text-white px-1 rounded">npm run dev</code> kembali.</li>
-            </ol>
-          </div>
         </div>
       )}
 
