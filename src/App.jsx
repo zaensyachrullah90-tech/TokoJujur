@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-// PENTING UNTUK DI VS CODE: Hapus tanda komentar (//) pada baris import di bawah ini
+// PENTING UNTUK DI VS CODE: Hapus tanda komentar (//) pada baris import di bawah ini:
 // import { createClient } from '@supabase/supabase-js';
 import { 
   Coffee, Utensils, Package, IceCream, Droplet, Candy, 
@@ -11,12 +11,12 @@ import {
 } from 'lucide-react';
 
 // =========================================================================
-// PENGATURAN KONEKSI SUPABASE (BERSIH & FINAL)
+// PENGATURAN KONEKSI SUPABASE
 // =========================================================================
-// PENTING UNTUK DI VS CODE: Hapus tanda komentar (//) pada 3 baris di bawah ini
-const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
-const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
-const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+// PENTING UNTUK DI VS CODE: Hapus tanda komentar (//) pada 3 baris di bawah ini:
+  const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+  const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || '';
+  const supabase = (supabaseUrl !== '' && supabaseAnonKey !== '') ? createClient(supabaseUrl, supabaseAnonKey) : null;
 
 // Baris ini HANYA untuk preview web agar tidak error, hapus baris ini saat di VS Code:
 
@@ -562,7 +562,6 @@ export default function App() {
         </div>
       )}
 
-      {/* RENDER CHECKOUT & STRUK */}
       {supabase && !isLoadingDB && view === 'checkout' && (
         <div className="min-h-screen bg-slate-50 flex flex-col">
           <header className="bg-white p-4 flex items-center gap-4 border-b">
@@ -670,7 +669,6 @@ export default function App() {
         </div>
       )}
 
-      {/* RENDER ADMIN AREA */}
       {supabase && !isLoadingDB && view === 'admin' && !isAdminLogged && (
         <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
           <form onSubmit={handleLogin} className="bg-white p-8 rounded-3xl shadow-lg w-full max-w-sm">
