@@ -162,7 +162,6 @@ function MainApp() {
     if (!dbReady) return;
     if (!supabaseClient) { setIsLoadingDB(false); return; }
     
-    // Load awal
     const loadInitialData = async () => {
       setIsLoadingDB(true);
       const [prodRes, trxRes, setRes] = await Promise.all([
@@ -177,11 +176,10 @@ function MainApp() {
     };
     loadInitialData();
 
-    // Subscribe Realtime Langsung Ubah State Tanpa Fetch Ulang!
     const channel = supabaseClient.channel('toko-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'produk' }, (payload) => {
         setProducts(prev => {
-          if (prev.some(p => p.id === payload.new.id)) return prev; // Hindari duplikat jika device ini yg kirim
+          if (prev.some(p => p.id === payload.new.id)) return prev;
           return [...prev, payload.new];
         });
       })
@@ -194,11 +192,10 @@ function MainApp() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transaksi' }, (payload) => {
         setTransactions(prev => {
           if (prev.some(t => t.id === payload.new.id)) return prev;
-          return [payload.new, ...prev]; // Tambah ke paling atas
+          return [payload.new, ...prev]; 
         });
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'transaksi' }, (payload) => {
-        // Jika trx dihapus (saat clear history)
         setTransactions(prev => prev.filter(t => t.id !== payload.old.id));
       })
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pengaturan' }, (payload) => {
@@ -277,7 +274,7 @@ function MainApp() {
             }
           } catch (e) {}
         }
-      }, 300); // 300ms super cepat
+      }, 300);
     }
     return () => clearInterval(interval);
   }, [isScanningModalOpen, scanTarget, products]);
@@ -337,7 +334,7 @@ function MainApp() {
       metode: metodeBayar 
     };
 
-    // OPTIMISTIC UI: Langsung ubah layar sebelum tunggu server agar sekejap mata
+    // OPTIMISTIC UI
     setTransactions(prev => [newTransaction, ...prev]);
     setProducts(prev => prev.map(prod => {
       const boughtItem = detailPesanan.find(i => i.id === prod.id);
@@ -353,10 +350,8 @@ function MainApp() {
     const { error: trxError } = await supabaseClient.from('transaksi').insert([newTransaction]);
     if (trxError) {
        showToast(`Data gagal masuk ke server. Peringatan: ${trxError.message}`, 'error');
-       // Realtime rollback is complex, but the error toast alerts the admin.
     }
     
-    // Update stok satu per satu di background
     for (const item of detailPesanan) {
       const prod = products.find(p => p.id === item.id);
       if (prod) {
@@ -432,7 +427,6 @@ function MainApp() {
     if (!supabaseClient) return showToast('Database belum terhubung', 'error');
     setIsProcessing(true);
     
-    // Optimistic
     setSettings(settings);
     
     const { error } = await supabaseClient.from('pengaturan').update({
@@ -506,7 +500,7 @@ function MainApp() {
   const handleDeleteProduct = async (id) => {
     if (!supabaseClient) return;
     if(window.confirm("Yakin ingin menghapus barang ini secara permanen?")) {
-       setProducts(prev => prev.filter(item => item.id !== id)); // Optimistic
+       setProducts(prev => prev.filter(item => item.id !== id)); 
        const { error } = await supabaseClient.from('produk').delete().eq('id', id);
        if (error) showToast(`Gagal Hapus Server: ${error.message}`, 'error');
        else showToast('Dihapus dari server', 'success');
@@ -516,7 +510,7 @@ function MainApp() {
   const handleClearAllProducts = async () => {
     if (!supabaseClient) return;
     if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda benar-benar yakin ingin MENGHAPUS SELURUH BARANG TOKO?\n\nData yang dihapus TIDAK BISA DIKEMBALIKAN!")) {
-      setProducts([]); // Optimistic
+      setProducts([]); 
       const { error } = await supabaseClient.from('produk').delete().neq('id', 0); 
       if (error) showToast(`Gagal Server: ${error.message}`, 'error');
       else showToast('Seluruh daftar barang dihapus!', 'success');
@@ -526,7 +520,7 @@ function MainApp() {
   const handleClearTransactions = async () => {
     if (!supabaseClient) return;
     if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda benar-benar yakin MENGHAPUS SELURUH RIWAYAT TRANSAKSI PENJUALAN?\n\nData yang dihapus TIDAK BISA DIKEMBALIKAN!")) {
-      setTransactions([]); // Optimistic
+      setTransactions([]); 
       const { error } = await supabaseClient.from('transaksi').delete().neq('id', '0'); 
       if (error) showToast(`Gagal Server: ${error.message}`, 'error');
       else showToast('Seluruh riwayat transaksi dihapus!', 'success');
@@ -900,7 +894,7 @@ function MainApp() {
                       <h1 className="text-3xl font-black tracking-tighter text-slate-800">Ikhtisar Penjualan</h1>
                       <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto">
                         <div className="flex flex-wrap items-center gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm w-full md:w-auto">
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Filter:</span>
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Filter Waktu:</span>
                           <input type="date" value={filterStart} onChange={e => setFilterStart(e.target.value)} className="bg-slate-50 px-3 py-2 rounded-xl text-sm font-bold outline-none text-slate-700 focus:ring-2 focus:ring-emerald-500 border border-slate-100 flex-1 md:flex-none"/>
                           <span className="text-slate-300 font-black hidden md:inline">-</span>
                           <input type="date" value={filterEnd} onChange={e => setFilterEnd(e.target.value)} className="bg-slate-50 px-3 py-2 rounded-xl text-sm font-bold outline-none text-slate-700 focus:ring-2 focus:ring-emerald-500 border border-slate-100 flex-1 md:flex-none"/>
