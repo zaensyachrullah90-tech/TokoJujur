@@ -7,10 +7,23 @@ import {
 } from 'lucide-react';
 
 // =========================================================================
-// PENGATURAN KONEKSI SUPABASE (ANTI-CRASH & FULL SECURITY BLUEPRINT)
+// PENGATURAN KONEKSI SUPABASE (INSTANT INIT & FULL SECURITY BLUEPRINT)
 // =========================================================================
 let supabase = null;
+try {
+  // Mengambil variabel lingkungan langsung secara sinkron agar koneksi tidak terlambat
+  const env = typeof import.meta !== 'undefined' ? import.meta.env : {};
+  const supabaseUrl = env.VITE_SUPABASE_URL || '';
+  const supabaseKey = env.VITE_SUPABASE_ANON_KEY || '';
+  
+  if (supabaseUrl && supabaseKey) {
+    supabase = createClient(supabaseUrl, supabaseKey);
+  }
+} catch (error) {
+  console.warn("Gagal membaca variabel lingkungan Supabase.");
+}
 
+// --- LOGIKA BANTUAN ---
 const formatRupiah = (angka) => {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka || 0);
 };
@@ -69,7 +82,6 @@ const hitungTotalHargaItem = (item, qty) => {
 // KOMPONEN UTAMA APLIKASI (BLUEPRINT TERKUNCI)
 // =========================================================================
 function MainApp() {
-  const [isSupabaseReady, setIsSupabaseReady] = useState(false);
   const [isLoadingDB, setIsLoadingDB] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' });
@@ -120,7 +132,7 @@ function MainApp() {
 
   const showToast = (msg, type = 'success') => {
     setToast({ show: true, msg, type });
-    setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 2500);
+    setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 4000); // Diperpanjang agar pesan error terbaca
   };
 
   // SYSTEM PWA & NOTIFIKASI & FAVICON
@@ -158,42 +170,24 @@ function MainApp() {
   useEffect(() => { try { localStorage.setItem('tokojujur_view', view); } catch(e){} }, [view]);
   useEffect(() => { try { localStorage.setItem('tokojujur_admintab', adminTab); } catch(e){} }, [adminTab]);
 
-  // INISIALISASI SUPABASE
+  // SINKRONISASI DATABASE & REALTIME
   useEffect(() => {
-    const initSupabase = () => {
-      try {
-        const env = typeof import.meta !== 'undefined' ? import.meta.env : {};
-        const url = env.VITE_SUPABASE_URL || '';
-        const key = env.VITE_SUPABASE_ANON_KEY || '';
-        if (url && key && window.supabase && !supabase) {
-          supabase = window.supabase.createClient(url, key);
-        }
-      } catch(e) {}
-      setIsSupabaseReady(true);
-    };
-
-    if (!window.supabase) {
-      const script = document.createElement('script');
-      script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
-      script.onload = initSupabase;
-      document.head.appendChild(script);
-    } else {
-      initSupabase();
+    if (!supabase) {
+      setIsLoadingDB(false);
+      return;
     }
-  }, []);
-
-  useEffect(() => {
-    if (!isSupabaseReady) return;
-    if (!supabase) { setIsLoadingDB(false); return; }
     
     fetchData();
+    
+    // Subscribe ke Realtime Channel Supabase
     const channel = supabase.channel('realtime-toko')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'produk' }, fetchProducts)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transaksi' }, fetchTransactions)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transaksi' }, fetchTransactions)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pengaturan' }, fetchSettings)
       .subscribe();
       
     return () => { supabase.removeChannel(channel); }
-  }, [isSupabaseReady]);
+  }, []);
 
   const fetchData = async () => {
     setIsLoadingDB(true);
@@ -203,19 +197,22 @@ function MainApp() {
 
   const fetchProducts = async () => {
     if (!supabase) return;
-    const { data } = await supabase.from('produk').select('*').order('id', { ascending: true });
+    const { data, error } = await supabase.from('produk').select('*').order('id', { ascending: true });
+    if (error) console.error("Error fetch products:", error);
     if (data) setProducts(data);
   };
 
   const fetchTransactions = async () => {
     if (!supabase) return;
-    const { data } = await supabase.from('transaksi').select('*').order('isoDate', { ascending: false });
+    const { data, error } = await supabase.from('transaksi').select('*').order('isoDate', { ascending: false });
+    if (error) console.error("Error fetch transactions:", error);
     if (data) setTransactions(data);
   };
 
   const fetchSettings = async () => {
     if (!supabase) return;
-    const { data } = await supabase.from('pengaturan').select('*').eq('id', 1).single();
+    const { data, error } = await supabase.from('pengaturan').select('*').eq('id', 1).single();
+    if (error) console.error("Error fetch settings:", error);
     if (data) {
       setSettings({
         nama_toko: data.nama_toko || 'Toko Kejujuran',
@@ -257,7 +254,6 @@ function MainApp() {
     setIsScanningModalOpen(true);
     
     try {
-      // Meminta resolusi HD & Continuous Focus untuk akurasi tinggi
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
           facingMode: 'environment',
@@ -329,7 +325,7 @@ function MainApp() {
             }
           } catch (e) {}
         }
-      }, 400); // Lakukan pembacaan sangat cepat tiap 0.4 detik
+      }, 400); 
     }
     return () => clearInterval(interval);
   }, [isScanningModalOpen, scanTarget, products]);
@@ -359,6 +355,7 @@ function MainApp() {
     }, 0);
   }, [cart, products]);
 
+  // LOGIKA TRANSAKSI YANG DIPERKUAT (SYNC DATABASE DIJAMIN MASUK)
   const handleSelesaiBayar = async () => {
     setIsProcessing(true);
     const detailPesanan = Object.entries(cart).map(([id, qty]) => {
@@ -377,6 +374,7 @@ function MainApp() {
       profit: totalBelanja - totalModal, metode: metodeBayar 
     };
     
+    // UI Berubah Cepat (Optimistic UI)
     setTransactions(prev => [newTransaction, ...prev]);
     setProducts(prev => prev.map(prod => {
       const boughtItem = detailPesanan.find(i => i.id === prod.id);
@@ -385,14 +383,30 @@ function MainApp() {
     
     setStrukTerakhir(newTransaction);
     setView('struk');
+    setCart({});
     setIsProcessing(false);
 
+    // KUNCI: MENGIRIM KE SUPABASE DENGAN PENGECEKAN ERROR (AWAIT)
     if (supabase) {
-      supabase.from('transaksi').insert([newTransaction]).then();
-      detailPesanan.forEach(item => {
+      const { error: trxError } = await supabase.from('transaksi').insert([newTransaction]);
+      if (trxError) {
+         showToast(`Gagal menyimpan transaksi ke server: ${trxError.message}`, 'error');
+         console.error("Supabase Error (Transaksi):", trxError);
+      } else {
+         fetchTransactions(); // Paksa tarik data terbaru dari server
+      }
+      
+      // Update stok barang satu per satu
+      for (const item of detailPesanan) {
         const prod = products.find(p => p.id === item.id);
-        if (prod) supabase.from('produk').update({ stok: (prod.stok || 0) - item.qty }).eq('id', item.id).then();
-      });
+        if (prod) {
+          const { error: stockError } = await supabase.from('produk').update({ stok: (prod.stok || 0) - item.qty }).eq('id', item.id);
+          if (stockError) console.error("Supabase Error (Update Stok):", stockError);
+        }
+      }
+      fetchProducts(); // Paksa tarik stok terbaru
+    } else {
+      showToast('Anda sedang menggunakan mode Offline (Database belum terhubung).', 'error');
     }
   };
 
@@ -465,15 +479,21 @@ function MainApp() {
   const handleSaveSettings = async () => {
     setIsProcessing(true);
     if (supabase) {
-      await supabase.from('pengaturan').update({
+      const { error } = await supabase.from('pengaturan').update({
         nama_toko: settings.nama_toko,
         qris_url: settings.qris_url,
         rekening: settings.rekening,
         admin_password: settings.admin_password
       }).eq('id', 1);
+      
+      if (error) {
+        showToast(`Gagal menyimpan pengaturan: ${error.message}`, 'error');
+      } else {
+        showToast('Pengaturan Disimpan ke Database', 'success');
+        fetchSettings();
+      }
     }
     setIsProcessing(false);
-    showToast('Pengaturan Disimpan', 'success');
   };
 
   // SYSTEM TOLAK BARANG GANDA & CRUD LENGKAP (ADD / EDIT)
@@ -490,7 +510,7 @@ function MainApp() {
     setUseDiskon(!!product.diskon);
     setEditingId(product.id);
     setShowAddForm(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' }); // Gulir otomatis ke form atas
+    window.scrollTo({ top: 0, behavior: 'smooth' }); 
   };
 
   const handleAddProduct = async (e) => {
@@ -500,9 +520,7 @@ function MainApp() {
     const isDuplicate = products.some(p => {
       const isNameSame = p.nama.toLowerCase().trim() === newProduct.nama.toLowerCase().trim();
       const isBarcodeSame = newProduct.barcode && p.barcode === newProduct.barcode;
-      // Jika mode Edit, abaikan barang yang sedang di-edit itu sendiri
       if (editingId && p.id === editingId) return false;
-      
       return isNameSame || isBarcodeSame;
     });
 
@@ -523,13 +541,12 @@ function MainApp() {
     // Tampilkan di UI secara Optimistic
     if (editingId) {
        setProducts(p => p.map(item => item.id === editingId ? tempProd : item));
-       showToast('Barang Diperbarui', 'success');
+       showToast('Menyimpan perubahan...', 'success');
     } else {
        setProducts(p => [...p, tempProd]);
-       showToast('Barang Ditambahkan', 'success');
+       showToast('Menambahkan barang...', 'success');
     }
 
-    // Reset Form
     setShowAddForm(false);
     setEditingId(null);
     setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '' });
@@ -541,13 +558,17 @@ function MainApp() {
           nama: tempProd.nama, barcode: tempProd.barcode, modal: tempProd.modal, 
           jual: tempProd.jual, stok: tempProd.stok, diskon: tempProd.diskon 
         }).eq('id', editingId);
-        if (!error) fetchProducts();
+        
+        if (error) showToast(`Gagal update server: ${error.message}`, 'error');
+        else fetchProducts();
       } else {
         const { error } = await supabase.from('produk').insert([{ 
           nama: tempProd.nama, barcode: tempProd.barcode, modal: tempProd.modal, 
           jual: tempProd.jual, stok: tempProd.stok, diskon: tempProd.diskon 
         }]);
-        if (!error) fetchProducts(); 
+        
+        if (error) showToast(`Gagal simpan server: ${error.message}`, 'error');
+        else fetchProducts(); 
       }
     }
   };
@@ -555,9 +576,11 @@ function MainApp() {
   const handleDeleteProduct = async (id) => {
     if(window.confirm("Yakin ingin menghapus barang ini secara permanen?")) {
        setProducts(prev => prev.filter(item => item.id !== id));
-       showToast('Barang Dihapus', 'success');
+       showToast('Menghapus barang...', 'success');
        if(supabase) {
-         await supabase.from('produk').delete().eq('id', id);
+         const { error } = await supabase.from('produk').delete().eq('id', id);
+         if (error) showToast(`Gagal hapus server: ${error.message}`, 'error');
+         else fetchProducts();
        }
     }
   };
@@ -566,10 +589,11 @@ function MainApp() {
     if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda benar-benar yakin ingin MENGHAPUS SELURUH BARANG TOKO?\n\nData yang dihapus TIDAK BISA DIKEMBALIKAN!")) {
       setIsProcessing(true);
       setProducts([]);
-      showToast('Seluruh daftar barang telah dihapus!', 'success');
+      showToast('Menghapus seluruh daftar barang...', 'success');
       if (supabase) {
-         await supabase.from('produk').delete().neq('id', '0');
-         fetchProducts();
+         const { error } = await supabase.from('produk').delete().neq('id', '0');
+         if (error) showToast(`Gagal: ${error.message}`, 'error');
+         else fetchProducts();
       }
       setIsProcessing(false);
     }
@@ -580,10 +604,11 @@ function MainApp() {
     if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda benar-benar yakin ingin MENGHAPUS SELURUH RIWAYAT TRANSAKSI PENJUALAN (Data Uji Coba)?\n\nData yang dihapus TIDAK BISA DIKEMBALIKAN!")) {
       setIsProcessing(true);
       setTransactions([]);
-      showToast('Seluruh riwayat transaksi telah dihapus!', 'success');
+      showToast('Menghapus seluruh riwayat transaksi...', 'success');
       if (supabase) {
-         await supabase.from('transaksi').delete().neq('id', '0');
-         fetchTransactions();
+         const { error } = await supabase.from('transaksi').delete().neq('id', '0');
+         if (error) showToast(`Gagal hapus di server: ${error.message}`, 'error');
+         else fetchTransactions();
       }
       setIsProcessing(false);
     }
@@ -610,10 +635,6 @@ function MainApp() {
   };
 
   // --- RENDER UI AMAN ---
-
-  if (!isSupabaseReady) {
-    return <div className="min-h-screen bg-slate-900 flex items-center justify-center font-sans"></div>;
-  }
 
   if (!supabase) {
     return (
@@ -1084,12 +1105,10 @@ function MainApp() {
 
                      <hr className="border-slate-100"/>
                      
-                     {/* FITUR BARU: UPLOAD & DOWNLOAD QRIS */}
                      <div className="space-y-3">
                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 flex items-center gap-2"><QrCode size={14}/> Foto QRIS Pembayaran</label>
                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 bg-slate-50 p-6 rounded-3xl shadow-inner">
                          
-                         {/* Kolom Preview */}
                          <div className="flex flex-col items-center gap-3">
                            <div className="w-40 h-40 shrink-0 bg-white rounded-3xl border-2 border-dashed border-emerald-200 flex items-center justify-center p-2 overflow-hidden shadow-sm relative">
                              {settings.qris_url ? (
@@ -1103,7 +1122,6 @@ function MainApp() {
                            </button>
                          </div>
 
-                         {/* Kolom Input */}
                          <div className="flex-1 w-full space-y-4">
                            <label className="w-full flex items-center justify-center gap-2 bg-emerald-100 text-emerald-700 hover:bg-emerald-200 hover:text-emerald-800 p-4 rounded-2xl font-bold cursor-pointer transition-all active:scale-95 border border-emerald-200">
                              <UploadCloud size={20}/> Upload dari Galeri/File
