@@ -179,19 +179,32 @@ function MainApp() {
     }
   }, []);
 
-  // SINKRONISASI DATABASE & REALTIME SUBSCRIBE
+  // SINKRONISASI DATABASE & AGRESIVE REALTIME SUBSCRIBE (PERBAIKAN)
   useEffect(() => {
     if (!isSupabaseReady) return;
     if (!supabase) { setIsLoadingDB(false); return; }
     
     fetchData();
-    const channel = supabase.channel('realtime-toko')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'produk' }, fetchProducts)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'transaksi' }, fetchTransactions)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pengaturan' }, fetchSettings)
-      .subscribe();
+
+    // Pastikan Realtime diaktifkan melalui Supabase Dashboard (Database -> Replication)
+    const myChannel = supabase.channel('toko-realtime-channel')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'produk' }, (payload) => {
+        console.log('Realtime Update Produk:', payload);
+        fetchProducts(); // Tarik data terbaru secara paksa
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transaksi' }, (payload) => {
+        console.log('Realtime Update Transaksi:', payload);
+        fetchTransactions(); // Tarik data terbaru secara paksa
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pengaturan' }, (payload) => {
+        console.log('Realtime Update Pengaturan:', payload);
+        fetchSettings(); // Tarik data terbaru secara paksa
+      })
+      .subscribe((status) => {
+        console.log('Status Realtime Supabase:', status);
+      });
       
-    return () => { supabase.removeChannel(channel); }
+    return () => { supabase.removeChannel(myChannel); }
   }, [isSupabaseReady]);
 
   const fetchData = async () => {
