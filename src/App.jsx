@@ -7,21 +7,23 @@ import {
 } from 'lucide-react';
 
 // =========================================================================
-// PENGATURAN KONEKSI SUPABASE (INSTANT INIT & FULL SECURITY BLUEPRINT)
+// PENGATURAN KONEKSI SUPABASE (STRICT REALTIME SYNC)
 // =========================================================================
-let supabase = null;
-try {
-  // Mengambil variabel lingkungan langsung secara sinkron agar koneksi tidak terlambat
-  const env = typeof import.meta !== 'undefined' ? import.meta.env : {};
-  const supabaseUrl = env.VITE_SUPABASE_URL || '';
-  const supabaseKey = env.VITE_SUPABASE_ANON_KEY || '';
-  
-  if (supabaseUrl && supabaseKey) {
-    supabase = createClient(supabaseUrl, supabaseKey);
+const getSupabaseInstance = () => {
+  try {
+    const env = typeof import.meta !== 'undefined' ? import.meta.env : {};
+    const url = env.VITE_SUPABASE_URL || '';
+    const key = env.VITE_SUPABASE_ANON_KEY || '';
+    if (url && key) {
+      return createClient(url, key);
+    }
+  } catch (error) {
+    console.warn("Gagal inisialisasi database.");
   }
-} catch (error) {
-  console.warn("Gagal membaca variabel lingkungan Supabase.");
-}
+  return null;
+};
+
+const supabase = getSupabaseInstance();
 
 // --- LOGIKA BANTUAN ---
 const formatRupiah = (angka) => {
@@ -82,6 +84,7 @@ const hitungTotalHargaItem = (item, qty) => {
 // KOMPONEN UTAMA APLIKASI (BLUEPRINT TERKUNCI)
 // =========================================================================
 function MainApp() {
+  const [isSupabaseReady, setIsSupabaseReady] = useState(false);
   const [isLoadingDB, setIsLoadingDB] = useState(true);
   const [isProcessing, setIsProcessing] = useState(false);
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' });
@@ -132,23 +135,21 @@ function MainApp() {
 
   const showToast = (msg, type = 'success') => {
     setToast({ show: true, msg, type });
-    setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 4000); // Diperpanjang agar pesan error terbaca
+    // Tahan lebih lama agar pesan error dari database bisa dibaca pengguna
+    setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 4500); 
   };
 
   // SYSTEM PWA & NOTIFIKASI & FAVICON
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // 1. Meminta Izin Notifikasi
       if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') {
         Notification.requestPermission();
       }
 
-      // 2. Ubah Favicon Toko
       let link = document.querySelector("link[rel~='icon']");
       if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
       link.href = "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏪</text></svg>";
 
-      // 3. Injeksi Web App Manifest (PWA) agar bisa di-install jadi App HP
       if (!document.querySelector('link[rel="manifest"]')) {
         const manifest = {
           name: "Toko Kejujuran",
@@ -170,16 +171,36 @@ function MainApp() {
   useEffect(() => { try { localStorage.setItem('tokojujur_view', view); } catch(e){} }, [view]);
   useEffect(() => { try { localStorage.setItem('tokojujur_admintab', adminTab); } catch(e){} }, [adminTab]);
 
-  // SINKRONISASI DATABASE & REALTIME
+  // INISIALISASI SUPABASE KLIEN (AMAN)
   useEffect(() => {
-    if (!supabase) {
-      setIsLoadingDB(false);
-      return;
+    const initSupabase = () => {
+      try {
+        const env = typeof import.meta !== 'undefined' ? import.meta.env : {};
+        const url = env.VITE_SUPABASE_URL || '';
+        const key = env.VITE_SUPABASE_ANON_KEY || '';
+        if (url && key && window.supabase && !supabase) {
+          supabase = window.supabase.createClient(url, key);
+        }
+      } catch(e) {}
+      setIsSupabaseReady(true);
+    };
+
+    if (!window.supabase) {
+      const script = document.createElement('script');
+      script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+      script.onload = initSupabase;
+      document.head.appendChild(script);
+    } else {
+      initSupabase();
     }
+  }, []);
+
+  // SINKRONISASI DATABASE & REALTIME SUBSCRIBE
+  useEffect(() => {
+    if (!isSupabaseReady) return;
+    if (!supabase) { setIsLoadingDB(false); return; }
     
     fetchData();
-    
-    // Subscribe ke Realtime Channel Supabase
     const channel = supabase.channel('realtime-toko')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'produk' }, fetchProducts)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transaksi' }, fetchTransactions)
@@ -187,7 +208,7 @@ function MainApp() {
       .subscribe();
       
     return () => { supabase.removeChannel(channel); }
-  }, []);
+  }, [isSupabaseReady]);
 
   const fetchData = async () => {
     setIsLoadingDB(true);
@@ -198,21 +219,21 @@ function MainApp() {
   const fetchProducts = async () => {
     if (!supabase) return;
     const { data, error } = await supabase.from('produk').select('*').order('id', { ascending: true });
-    if (error) console.error("Error fetch products:", error);
+    if (error) console.error("Error products:", error);
     if (data) setProducts(data);
   };
 
   const fetchTransactions = async () => {
     if (!supabase) return;
     const { data, error } = await supabase.from('transaksi').select('*').order('isoDate', { ascending: false });
-    if (error) console.error("Error fetch transactions:", error);
+    if (error) console.error("Error transactions:", error);
     if (data) setTransactions(data);
   };
 
   const fetchSettings = async () => {
     if (!supabase) return;
     const { data, error } = await supabase.from('pengaturan').select('*').eq('id', 1).single();
-    if (error) console.error("Error fetch settings:", error);
+    if (error) console.error("Error settings:", error);
     if (data) {
       setSettings({
         nama_toko: data.nama_toko || 'Toko Kejujuran',
@@ -355,9 +376,13 @@ function MainApp() {
     }, 0);
   }, [cart, products]);
 
-  // LOGIKA TRANSAKSI YANG DIPERKUAT (SYNC DATABASE DIJAMIN MASUK)
+  // =========================================================================
+  // STRICT SERVER-FIRST SYNC TRANSACTIONS
+  // =========================================================================
   const handleSelesaiBayar = async () => {
+    if (!supabase) return showToast('Koneksi Database Terputus!', 'error');
     setIsProcessing(true);
+
     const detailPesanan = Object.entries(cart).map(([id, qty]) => {
       const p = products.find(prod => prod.id === parseInt(id));
       const subTotal = hitungTotalHargaItem(p, qty);
@@ -374,40 +399,33 @@ function MainApp() {
       profit: totalBelanja - totalModal, metode: metodeBayar 
     };
     
-    // UI Berubah Cepat (Optimistic UI)
-    setTransactions(prev => [newTransaction, ...prev]);
-    setProducts(prev => prev.map(prod => {
-      const boughtItem = detailPesanan.find(i => i.id === prod.id);
-      return boughtItem ? { ...prod, stok: (prod.stok || 0) - boughtItem.qty } : prod;
-    }));
+    // KUNCI: TUNGGU DATABASE SUPABASE MENJAWAB OK SEBELUM MENGUBAH LAYAR
+    const { error: trxError } = await supabase.from('transaksi').insert([newTransaction]);
     
+    if (trxError) {
+       // JIKA DATABASE MENOLAK (MISAL: KARENA RLS SUPABASE)
+       showToast(`Gagal: ${trxError.message}. Tolong matikan RLS di Supabase!`, 'error');
+       setIsProcessing(false);
+       return; // Transaksi digagalkan
+    }
+    
+    // JIKA BERHASIL: Update stok barang satu per satu di Database
+    for (const item of detailPesanan) {
+      const prod = products.find(p => p.id === item.id);
+      if (prod) {
+        await supabase.from('produk').update({ stok: (prod.stok || 0) - item.qty }).eq('id', item.id);
+      }
+    }
+
+    // Tarik data terbaru dari Server agar sinkron dengan perangkat lain
+    await fetchTransactions();
+    await fetchProducts();
+
+    // Pindah Tampilan ke Struk setelah dijamin masuk DB
     setStrukTerakhir(newTransaction);
     setView('struk');
     setCart({});
     setIsProcessing(false);
-
-    // KUNCI: MENGIRIM KE SUPABASE DENGAN PENGECEKAN ERROR (AWAIT)
-    if (supabase) {
-      const { error: trxError } = await supabase.from('transaksi').insert([newTransaction]);
-      if (trxError) {
-         showToast(`Gagal menyimpan transaksi ke server: ${trxError.message}`, 'error');
-         console.error("Supabase Error (Transaksi):", trxError);
-      } else {
-         fetchTransactions(); // Paksa tarik data terbaru dari server
-      }
-      
-      // Update stok barang satu per satu
-      for (const item of detailPesanan) {
-        const prod = products.find(p => p.id === item.id);
-        if (prod) {
-          const { error: stockError } = await supabase.from('produk').update({ stok: (prod.stok || 0) - item.qty }).eq('id', item.id);
-          if (stockError) console.error("Supabase Error (Update Stok):", stockError);
-        }
-      }
-      fetchProducts(); // Paksa tarik stok terbaru
-    } else {
-      showToast('Anda sedang menggunakan mode Offline (Database belum terhubung).', 'error');
-    }
   };
 
   const handleTutupStruk = () => {
@@ -477,34 +495,31 @@ function MainApp() {
   };
 
   const handleSaveSettings = async () => {
+    if (!supabase) return showToast('Database belum terhubung', 'error');
     setIsProcessing(true);
-    if (supabase) {
-      const { error } = await supabase.from('pengaturan').update({
-        nama_toko: settings.nama_toko,
-        qris_url: settings.qris_url,
-        rekening: settings.rekening,
-        admin_password: settings.admin_password
-      }).eq('id', 1);
-      
-      if (error) {
-        showToast(`Gagal menyimpan pengaturan: ${error.message}`, 'error');
-      } else {
-        showToast('Pengaturan Disimpan ke Database', 'success');
-        fetchSettings();
-      }
+    
+    const { error } = await supabase.from('pengaturan').update({
+      nama_toko: settings.nama_toko,
+      qris_url: settings.qris_url,
+      rekening: settings.rekening,
+      admin_password: settings.admin_password
+    }).eq('id', 1);
+    
+    if (error) {
+      showToast(`Gagal: ${error.message} (Cek RLS Supabase)`, 'error');
+    } else {
+      showToast('Pengaturan Disimpan ke Database', 'success');
+      await fetchSettings();
     }
+    
     setIsProcessing(false);
   };
 
-  // SYSTEM TOLAK BARANG GANDA & CRUD LENGKAP (ADD / EDIT)
+  // SYSTEM TOLAK BARANG GANDA & CRUD LENGKAP (ADD / EDIT) DENGAN STRICT SYNC
   const handleEditClick = (product) => {
     setNewProduct({
-      nama: product.nama,
-      modal: product.modal || 0,
-      jual: product.jual || 0,
-      stok: product.stok || 0,
-      barcode: product.barcode || '',
-      diskonQty: product.diskon ? product.diskon.min_qty : '',
+      nama: product.nama, modal: product.modal || 0, jual: product.jual || 0, stok: product.stok || 0,
+      barcode: product.barcode || '', diskonQty: product.diskon ? product.diskon.min_qty : '',
       diskonHarga: product.diskon ? product.diskon.harga_total : ''
     });
     setUseDiskon(!!product.diskon);
@@ -515,6 +530,7 @@ function MainApp() {
 
   const handleAddProduct = async (e) => {
     e.preventDefault();
+    if (!supabase) return showToast('Database belum terhubung', 'error');
     
     // Cek Toleransi Barang Ganda (Anti-Duplicate)
     const isDuplicate = products.some(p => {
@@ -529,71 +545,68 @@ function MainApp() {
       return;
     }
 
+    setIsProcessing(true);
     let disc = null;
     if (useDiskon) disc = { min_qty: parseInt(newProduct.diskonQty) || 1, harga_total: parseInt(newProduct.diskonHarga) || 0 };
     
     const targetId = editingId ? editingId : Date.now();
     const tempProd = { 
-      ...newProduct, modal: newProduct.modal||0, jual: newProduct.jual||0, stok: newProduct.stok||0,
-      id: targetId, diskon: disc, tanggal_dibuat: new Date().toISOString() 
+      nama: newProduct.nama, barcode: newProduct.barcode, modal: newProduct.modal||0, 
+      jual: newProduct.jual||0, stok: newProduct.stok||0, diskon: disc
     };
     
-    // Tampilkan di UI secara Optimistic
     if (editingId) {
-       setProducts(p => p.map(item => item.id === editingId ? tempProd : item));
-       showToast('Menyimpan perubahan...', 'success');
-    } else {
-       setProducts(p => [...p, tempProd]);
-       showToast('Menambahkan barang...', 'success');
-    }
-
-    setShowAddForm(false);
-    setEditingId(null);
-    setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '' });
-    setUseDiskon(false);
-    
-    if (supabase) {
-      if (editingId) {
-        const { error } = await supabase.from('produk').update({
-          nama: tempProd.nama, barcode: tempProd.barcode, modal: tempProd.modal, 
-          jual: tempProd.jual, stok: tempProd.stok, diskon: tempProd.diskon 
-        }).eq('id', editingId);
-        
-        if (error) showToast(`Gagal update server: ${error.message}`, 'error');
-        else fetchProducts();
+      const { error } = await supabase.from('produk').update(tempProd).eq('id', editingId);
+      if (error) {
+        showToast(`Gagal Edit: ${error.message}`, 'error');
       } else {
-        const { error } = await supabase.from('produk').insert([{ 
-          nama: tempProd.nama, barcode: tempProd.barcode, modal: tempProd.modal, 
-          jual: tempProd.jual, stok: tempProd.stok, diskon: tempProd.diskon 
-        }]);
-        
-        if (error) showToast(`Gagal simpan server: ${error.message}`, 'error');
-        else fetchProducts(); 
+        showToast('Barang Diperbarui di Server!', 'success');
+        await fetchProducts();
+        setShowAddForm(false);
+        setEditingId(null);
+        setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '' });
+      }
+    } else {
+      const { error } = await supabase.from('produk').insert([{ ...tempProd, id: targetId, tanggal_dibuat: new Date().toISOString() }]);
+      if (error) {
+        showToast(`Gagal Tambah: ${error.message} (Matikan RLS!)`, 'error');
+      } else {
+        showToast('Barang Tersimpan di Server!', 'success');
+        await fetchProducts();
+        setShowAddForm(false);
+        setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '' });
       }
     }
+    
+    setUseDiskon(false);
+    setIsProcessing(false);
   };
 
   const handleDeleteProduct = async (id) => {
+    if (!supabase) return;
     if(window.confirm("Yakin ingin menghapus barang ini secara permanen?")) {
-       setProducts(prev => prev.filter(item => item.id !== id));
-       showToast('Menghapus barang...', 'success');
-       if(supabase) {
-         const { error } = await supabase.from('produk').delete().eq('id', id);
-         if (error) showToast(`Gagal hapus server: ${error.message}`, 'error');
-         else fetchProducts();
+       setIsProcessing(true);
+       const { error } = await supabase.from('produk').delete().eq('id', id);
+       if (error) {
+         showToast(`Gagal Hapus: ${error.message}`, 'error');
+       } else {
+         showToast('Barang Dihapus dari Server', 'success');
+         await fetchProducts();
        }
+       setIsProcessing(false);
     }
   };
 
   const handleClearAllProducts = async () => {
+    if (!supabase) return;
     if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda benar-benar yakin ingin MENGHAPUS SELURUH BARANG TOKO?\n\nData yang dihapus TIDAK BISA DIKEMBALIKAN!")) {
       setIsProcessing(true);
-      setProducts([]);
-      showToast('Menghapus seluruh daftar barang...', 'success');
-      if (supabase) {
-         const { error } = await supabase.from('produk').delete().neq('id', '0');
-         if (error) showToast(`Gagal: ${error.message}`, 'error');
-         else fetchProducts();
+      const { error } = await supabase.from('produk').delete().neq('id', '0');
+      if (error) {
+        showToast(`Gagal: ${error.message}`, 'error');
+      } else {
+        showToast('Seluruh daftar barang telah dihapus!', 'success');
+        await fetchProducts();
       }
       setIsProcessing(false);
     }
@@ -601,14 +614,15 @@ function MainApp() {
 
   // FUNGSI MENGHAPUS SEMUA DATA TRANSAKSI (DATA UJI COBA)
   const handleClearTransactions = async () => {
+    if (!supabase) return;
     if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda benar-benar yakin ingin MENGHAPUS SELURUH RIWAYAT TRANSAKSI PENJUALAN (Data Uji Coba)?\n\nData yang dihapus TIDAK BISA DIKEMBALIKAN!")) {
       setIsProcessing(true);
-      setTransactions([]);
-      showToast('Menghapus seluruh riwayat transaksi...', 'success');
-      if (supabase) {
-         const { error } = await supabase.from('transaksi').delete().neq('id', '0');
-         if (error) showToast(`Gagal hapus di server: ${error.message}`, 'error');
-         else fetchTransactions();
+      const { error } = await supabase.from('transaksi').delete().neq('id', '0');
+      if (error) {
+        showToast(`Gagal Hapus: ${error.message}`, 'error');
+      } else {
+        showToast('Seluruh riwayat transaksi telah dihapus!', 'success');
+        await fetchTransactions();
       }
       setIsProcessing(false);
     }
@@ -635,6 +649,10 @@ function MainApp() {
   };
 
   // --- RENDER UI AMAN ---
+
+  if (!isSupabaseReady) {
+    return <div className="min-h-screen bg-slate-900 flex items-center justify-center font-sans"></div>;
+  }
 
   if (!supabase) {
     return (
@@ -813,7 +831,9 @@ function MainApp() {
              );
           })()}
 
-          <button onClick={handleSelesaiBayar} disabled={!metodeBayar || isProcessing} className="mt-auto w-full py-6 bg-slate-900 text-white rounded-3xl font-black text-2xl shadow-xl disabled:opacity-30 active:scale-95 transition-all">Selesai Membayar</button>
+          <button onClick={handleSelesaiBayar} disabled={!metodeBayar || isProcessing} className="mt-auto w-full py-6 bg-slate-900 text-white rounded-3xl font-black text-2xl shadow-xl disabled:opacity-30 active:scale-95 transition-all">
+            {isProcessing ? 'MENYIMPAN KE SERVER...' : 'Selesai Membayar'}
+          </button>
         </div>
       )}
 
@@ -915,7 +935,7 @@ function MainApp() {
                         </div>
                         <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
                           <button onClick={handleExportCSV} className="bg-slate-900 text-white px-8 py-4 rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl hover:bg-slate-800 active:scale-95 transition-all w-full md:w-auto"><Download size={20}/> EXPORT EXCEL</button>
-                          <button onClick={handleClearTransactions} disabled={isProcessing} className="bg-rose-600 text-white px-8 py-4 rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl hover:bg-rose-700 active:scale-95 transition-all w-full md:w-auto"><Trash2 size={20}/> HAPUS DATA UJI COBA</button>
+                          <button onClick={handleClearTransactions} disabled={isProcessing} className="bg-rose-600 text-white px-8 py-4 rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl hover:bg-rose-700 active:scale-95 transition-all w-full md:w-auto"><Trash2 size={20}/> {isProcessing ? 'MENGHAPUS...' : 'HAPUS DATA UJI COBA'}</button>
                         </div>
                       </div>
                     </div>
@@ -925,7 +945,7 @@ function MainApp() {
                        <div className="bg-white p-6 md:p-8 rounded-[40px] border border-slate-100 shadow-sm"><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3">Total Transaksi</p><p className="text-3xl font-black text-slate-800">{filteredTransactions.length}</p></div>
                     </div>
 
-                    {/* FITUR BARU: TABEL PERINGKAT BARANG & RIWAYAT TRANSAKSI */}
+                    {/* TABEL PERINGKAT BARANG & RIWAYAT TRANSAKSI */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8 mb-8 md:mb-12">
                         {/* Tabel Peringkat Barang */}
                         <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
@@ -993,7 +1013,7 @@ function MainApp() {
                     <div className="flex flex-col md:flex-row justify-between md:items-center mb-8 md:mb-12 gap-4">
                       <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-slate-800">Daftar Barang</h1>
                       <div className="flex flex-col md:flex-row gap-2">
-                        <button onClick={handleClearAllProducts} className="bg-rose-100 text-rose-600 px-6 py-4 rounded-2xl font-black flex items-center justify-center gap-3 shadow-sm hover:bg-rose-200 active:scale-95 transition-all uppercase w-full md:w-auto"><Trash2 size={20}/> Hapus Semua</button>
+                        <button onClick={handleClearAllProducts} disabled={isProcessing} className="bg-rose-100 text-rose-600 px-6 py-4 rounded-2xl font-black flex items-center justify-center gap-3 shadow-sm hover:bg-rose-200 active:scale-95 transition-all uppercase w-full md:w-auto"><Trash2 size={20}/> {isProcessing ? 'MENGHAPUS...' : 'Hapus Semua'}</button>
                         <button onClick={() => { setEditingId(null); setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '' }); setUseDiskon(false); setShowAddForm(!showAddForm); }} className="bg-emerald-600 text-white px-8 py-4 rounded-2xl font-black flex items-center justify-center gap-3 shadow-xl shadow-emerald-100 hover:bg-emerald-500 active:scale-95 transition-all uppercase w-full md:w-auto">{showAddForm ? <X/> : <PlusCircle/>} {showAddForm ? 'Tutup Form' : 'Tambah Barang'}</button>
                       </div>
                     </div>
@@ -1042,8 +1062,8 @@ function MainApp() {
                              </div>
                            </div>
                          )}
-                         <button className={`text-white py-5 rounded-[24px] font-black text-lg md:col-span-4 mt-2 transition-all active:scale-[0.98] shadow-xl ${editingId ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-900 hover:bg-slate-800'}`}>
-                           {editingId ? 'UPDATE BARANG & SINKRONISASI' : 'SIMPAN BARANG & SINKRONISASI'}
+                         <button disabled={isProcessing} className={`text-white py-5 rounded-[24px] font-black text-lg md:col-span-4 mt-2 transition-all active:scale-[0.98] shadow-xl disabled:opacity-50 ${editingId ? 'bg-blue-600 hover:bg-blue-700' : 'bg-slate-900 hover:bg-slate-800'}`}>
+                           {isProcessing ? 'MENYIMPAN KE SERVER...' : (editingId ? 'UPDATE BARANG & SINKRONISASI' : 'SIMPAN BARANG & SINKRONISASI')}
                          </button>
                     </form>
                   )}
@@ -1080,7 +1100,7 @@ function MainApp() {
                                <td className="p-6 text-center">
                                  <div className="flex items-center justify-center gap-2">
                                    <button onClick={() => handleEditClick(p)} className="p-3 text-blue-500 hover:bg-blue-100 hover:text-blue-700 rounded-2xl transition-all" title="Edit Barang"><Edit size={20}/></button>
-                                   <button onClick={() => handleDeleteProduct(p.id)} className="p-3 text-rose-400 hover:bg-rose-100 hover:text-rose-600 rounded-2xl transition-all" title="Hapus Barang"><Trash2 size={20}/></button>
+                                   <button disabled={isProcessing} onClick={() => handleDeleteProduct(p.id)} className="p-3 text-rose-400 hover:bg-rose-100 hover:text-rose-600 rounded-2xl transition-all disabled:opacity-50" title="Hapus Barang"><Trash2 size={20}/></button>
                                  </div>
                                </td>
                              </tr>
@@ -1152,7 +1172,9 @@ function MainApp() {
                        <input type="text" value={settings.admin_password || ''} onChange={e => setSettings({...settings, admin_password: e.target.value})} className="w-full p-4 md:p-5 bg-rose-50/30 text-rose-900 rounded-3xl font-black border-2 border-rose-100 focus:border-rose-400 outline-none shadow-sm transition-all tracking-[0.5em] text-lg md:text-xl text-center"/>
                      </div>
                      
-                     <button onClick={handleSaveSettings} className="w-full py-5 md:py-6 bg-emerald-600 text-white rounded-[32px] font-black text-lg md:text-xl shadow-2xl shadow-emerald-100 hover:bg-emerald-500 transition-all active:scale-95 mt-8">SIMPAN KE DATABASE</button>
+                     <button disabled={isProcessing} onClick={handleSaveSettings} className="w-full py-5 md:py-6 bg-emerald-600 text-white rounded-[32px] font-black text-lg md:text-xl shadow-2xl shadow-emerald-100 hover:bg-emerald-500 transition-all active:scale-95 mt-8 disabled:opacity-50">
+                       {isProcessing ? 'MENYIMPAN...' : 'SIMPAN KE DATABASE'}
+                     </button>
                   </div>
                </div>
              )}
