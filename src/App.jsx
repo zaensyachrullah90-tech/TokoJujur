@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createClient } from '@supabase/supabase-js';
 import { 
   Store, Search, Camera, X, ChevronRight, ArrowLeft, 
   CreditCard, QrCode, Copy, CheckCircle, AlertTriangle, 
@@ -6,12 +7,10 @@ import {
 } from 'lucide-react';
 
 // =========================================================================
-// PENGATURAN KONEKSI SUPABASE (STRICT REALTIME SYNC & ANTI-CRASH)
+// PENGATURAN KONEKSI SUPABASE (ANTI-CRASH & FULL SECURITY BLUEPRINT)
 // =========================================================================
-// Kita menggunakan 'let' dan menghapus import statis agar bebas dari error kompilasi
 let supabase = null;
 
-// --- LOGIKA BANTUAN ---
 const formatRupiah = (angka) => {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka || 0);
 };
@@ -121,7 +120,6 @@ function MainApp() {
 
   const showToast = (msg, type = 'success') => {
     setToast({ show: true, msg, type });
-    // Tahan lebih lama agar pesan error dari database bisa dibaca pengguna
     setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 4500); 
   };
 
@@ -211,7 +209,8 @@ function MainApp() {
 
   const fetchTransactions = async () => {
     if (!supabase) return;
-    const { data, error } = await supabase.from('transaksi').select('*').order('isoDate', { ascending: false });
+    // Menggunakan kolom id (yang berisi TRX-Timestamp) untuk sorting agar tidak error isoDate
+    const { data, error } = await supabase.from('transaksi').select('*').order('id', { ascending: false });
     if (error) console.error("Error transactions:", error);
     if (data) setTransactions(data);
   };
@@ -363,7 +362,7 @@ function MainApp() {
   }, [cart, products]);
 
   // =========================================================================
-  // STRICT SERVER-FIRST SYNC TRANSACTIONS
+  // STRICT SERVER-FIRST SYNC TRANSACTIONS (ANTI ERROR ISODATE)
   // =========================================================================
   const handleSelesaiBayar = async () => {
     if (!supabase) return showToast('Koneksi Database Terputus!', 'error');
@@ -379,21 +378,28 @@ function MainApp() {
     });
     
     const totalModal = detailPesanan.reduce((s, i) => s + (i.modal * i.qty), 0);
+    
+    // FIX PENTING: Dihapusnya isoDate dari payload agar tidak error di Supabase Anda
     const newTransaction = { 
-      id: `TRX-${Date.now()}`, tanggal: new Date().toLocaleString('id-ID'), isoDate: new Date().toISOString(), 
-      items: detailPesanan, total: totalBelanja, modal: totalModal, 
-      profit: totalBelanja - totalModal, metode: metodeBayar 
+      id: `TRX-${Date.now()}`, 
+      tanggal: new Date().toLocaleString('id-ID'), 
+      items: detailPesanan, 
+      total: totalBelanja, 
+      modal: totalModal, 
+      profit: totalBelanja - totalModal, 
+      metode: metodeBayar 
     };
     
-    // KUNCI: TUNGGU DATABASE SUPABASE MENJAWAB OK SEBELUM MENGUBAH LAYAR
+    // TUNGGU DATABASE SUPABASE MENJAWAB OK SEBELUM MENGUBAH LAYAR
     const { error: trxError } = await supabase.from('transaksi').insert([newTransaction]);
     
     if (trxError) {
-       showToast(`Gagal: ${trxError.message}. Tolong matikan RLS di Supabase!`, 'error');
+       showToast(`Gagal Server: ${trxError.message}. Cek RLS di Supabase Anda!`, 'error');
        setIsProcessing(false);
        return; 
     }
     
+    // Update stok satu per satu
     for (const item of detailPesanan) {
       const prod = products.find(p => p.id === item.id);
       if (prod) {
@@ -537,12 +543,14 @@ function MainApp() {
     if (useDiskon) disc = { min_qty: parseInt(newProduct.diskonQty) || 1, harga_total: parseInt(newProduct.diskonHarga) || 0 };
     
     const targetId = editingId ? editingId : Date.now();
+    // FIX PENTING: Dihapusnya tanggal_dibuat dari payload agar tidak error schema
     const tempProd = { 
       nama: newProduct.nama, barcode: newProduct.barcode, modal: newProduct.modal||0, 
       jual: newProduct.jual||0, stok: newProduct.stok||0, diskon: disc
     };
     
     if (editingId) {
+      // Edit
       const { error } = await supabase.from('produk').update(tempProd).eq('id', editingId);
       if (error) {
         showToast(`Gagal Edit: ${error.message}`, 'error');
@@ -555,7 +563,8 @@ function MainApp() {
         setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '' });
       }
     } else {
-      const { error } = await supabase.from('produk').insert([{ ...tempProd, id: targetId, tanggal_dibuat: new Date().toISOString() }]);
+      // Tambah
+      const { error } = await supabase.from('produk').insert([{ ...tempProd, id: targetId }]);
       if (error) {
         showToast(`Gagal Tambah: ${error.message} (Matikan RLS!)`, 'error');
       } else {
@@ -591,7 +600,7 @@ function MainApp() {
     if (!supabase) return;
     if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda benar-benar yakin ingin MENGHAPUS SELURUH BARANG TOKO?\n\nData yang dihapus TIDAK BISA DIKEMBALIKAN!")) {
       setIsProcessing(true);
-      const { error } = await supabase.from('produk').delete().neq('id', '0');
+      const { error } = await supabase.from('produk').delete().neq('id', 0); // .neq 0 aman
       if (error) {
         showToast(`Gagal: ${error.message}`, 'error');
       } else {
@@ -607,7 +616,7 @@ function MainApp() {
     if (!supabase) return;
     if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda benar-benar yakin ingin MENGHAPUS SELURUH RIWAYAT TRANSAKSI PENJUALAN (Data Uji Coba)?\n\nData yang dihapus TIDAK BISA DIKEMBALIKAN!")) {
       setIsProcessing(true);
-      const { error } = await supabase.from('transaksi').delete().neq('id', '0');
+      const { error } = await supabase.from('transaksi').delete().neq('id', '0'); // TRX-... is string
       if (error) {
         showToast(`Gagal Hapus: ${error.message}`, 'error');
       } else {
@@ -622,7 +631,11 @@ function MainApp() {
   const handleExportCSV = () => {
     const filteredForExport = transactions.filter(t => {
       if (!filterStart && !filterEnd) return true;
-      const tDate = new Date(t.isoDate);
+      
+      let tDate;
+      const match = t.id.match(/\d+/);
+      tDate = match ? new Date(parseInt(match[0])) : new Date();
+
       const sDate = filterStart ? new Date(filterStart) : new Date(0);
       let eDate = filterEnd ? new Date(filterEnd) : new Date('2100-01-01');
       if (filterEnd) eDate.setHours(23, 59, 59, 999);
@@ -867,7 +880,11 @@ function MainApp() {
       {view === 'admin' && isAdminLogged && (() => {
         const filteredTransactions = transactions.filter(t => {
           if (!filterStart && !filterEnd) return true;
-          const tDate = new Date(t.isoDate);
+          
+          let tDate;
+          const match = t.id.match(/\d+/);
+          tDate = match ? new Date(parseInt(match[0])) : new Date();
+
           const sDate = filterStart ? new Date(filterStart) : new Date(0);
           let eDate = filterEnd ? new Date(filterEnd) : new Date('2100-01-01');
           if (filterEnd) eDate.setHours(23, 59, 59, 999);
@@ -877,7 +894,7 @@ function MainApp() {
         const totalPendapatanKotor = filteredTransactions.reduce((sum, t) => sum + (t.total || 0), 0);
         const totalKeuntunganBersih = filteredTransactions.reduce((sum, t) => sum + (t.profit || 0), 0);
 
-        // --- FITUR BARU: LOGIKA PERINGKAT BARANG ---
+        // --- LOGIKA PERINGKAT BARANG ---
         const itemSalesMap = {};
         filteredTransactions.forEach(t => {
           t.items.forEach(item => {
@@ -887,13 +904,12 @@ function MainApp() {
           });
         });
 
-        // Gabungkan dengan semua daftar produk agar barang dengan penjualan 0 tetap muncul
         const productRankings = products.map(p => ({
           id: p.id,
           nama: p.nama,
           qty: itemSalesMap[p.id]?.qty || 0,
           revenue: itemSalesMap[p.id]?.revenue || 0
-        })).sort((a, b) => b.qty - a.qty); // Urutkan dari terjual paling banyak
+        })).sort((a, b) => b.qty - a.qty); 
 
         return (
           <div className="min-h-screen flex flex-col md:flex-row bg-slate-50 relative">
@@ -1116,7 +1132,6 @@ function MainApp() {
 
                      <hr className="border-slate-100"/>
                      
-                     {/* FITUR BARU: UPLOAD & DOWNLOAD QRIS */}
                      <div className="space-y-3">
                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 flex items-center gap-2"><QrCode size={14}/> Foto QRIS Pembayaran</label>
                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 bg-slate-50 p-6 rounded-3xl shadow-inner">
