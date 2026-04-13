@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { 
   Store, Search, Camera, X, ChevronRight, ArrowLeft, 
   CreditCard, QrCode, Copy, CheckCircle, AlertTriangle, 
@@ -8,6 +7,7 @@ import {
 
 // =========================================================================
 // PENGATURAN KONEKSI SUPABASE (ANTI-CRASH & FULL SECURITY BLUEPRINT)
+// Baris import statis dihapus total agar lolos kompilasi (Bebas Error Build)
 // =========================================================================
 let supabase = null;
 
@@ -209,7 +209,6 @@ function MainApp() {
 
   const fetchTransactions = async () => {
     if (!supabase) return;
-    // Menggunakan kolom id (yang berisi TRX-Timestamp) untuk sorting agar tidak error isoDate
     const { data, error } = await supabase.from('transaksi').select('*').order('id', { ascending: false });
     if (error) console.error("Error transactions:", error);
     if (data) setTransactions(data);
@@ -378,8 +377,6 @@ function MainApp() {
     });
     
     const totalModal = detailPesanan.reduce((s, i) => s + (i.modal * i.qty), 0);
-    
-    // FIX PENTING: Dihapusnya isoDate dari payload agar tidak error di Supabase Anda
     const newTransaction = { 
       id: `TRX-${Date.now()}`, 
       tanggal: new Date().toLocaleString('id-ID'), 
@@ -399,7 +396,6 @@ function MainApp() {
        return; 
     }
     
-    // Update stok satu per satu
     for (const item of detailPesanan) {
       const prod = products.find(p => p.id === item.id);
       if (prod) {
@@ -543,14 +539,12 @@ function MainApp() {
     if (useDiskon) disc = { min_qty: parseInt(newProduct.diskonQty) || 1, harga_total: parseInt(newProduct.diskonHarga) || 0 };
     
     const targetId = editingId ? editingId : Date.now();
-    // FIX PENTING: Dihapusnya tanggal_dibuat dari payload agar tidak error schema
     const tempProd = { 
       nama: newProduct.nama, barcode: newProduct.barcode, modal: newProduct.modal||0, 
       jual: newProduct.jual||0, stok: newProduct.stok||0, diskon: disc
     };
     
     if (editingId) {
-      // Edit
       const { error } = await supabase.from('produk').update(tempProd).eq('id', editingId);
       if (error) {
         showToast(`Gagal Edit: ${error.message}`, 'error');
@@ -563,7 +557,6 @@ function MainApp() {
         setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '' });
       }
     } else {
-      // Tambah
       const { error } = await supabase.from('produk').insert([{ ...tempProd, id: targetId }]);
       if (error) {
         showToast(`Gagal Tambah: ${error.message} (Matikan RLS!)`, 'error');
@@ -616,7 +609,7 @@ function MainApp() {
     if (!supabase) return;
     if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda benar-benar yakin ingin MENGHAPUS SELURUH RIWAYAT TRANSAKSI PENJUALAN (Data Uji Coba)?\n\nData yang dihapus TIDAK BISA DIKEMBALIKAN!")) {
       setIsProcessing(true);
-      const { error } = await supabase.from('transaksi').delete().neq('id', '0'); // TRX-... is string
+      const { error } = await supabase.from('transaksi').delete().neq('id', '0'); 
       if (error) {
         showToast(`Gagal Hapus: ${error.message}`, 'error');
       } else {
@@ -1132,6 +1125,7 @@ function MainApp() {
 
                      <hr className="border-slate-100"/>
                      
+                     {/* FITUR BARU: UPLOAD & DOWNLOAD QRIS */}
                      <div className="space-y-3">
                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 flex items-center gap-2"><QrCode size={14}/> Foto QRIS Pembayaran</label>
                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 bg-slate-50 p-6 rounded-3xl shadow-inner">
