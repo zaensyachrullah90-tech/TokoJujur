@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
-import { createClient } from '@supabase/supabase-js';
 import { 
   Store, Search, Camera, X, ChevronRight, ArrowLeft, 
   CreditCard, QrCode, Copy, CheckCircle, AlertTriangle, 
@@ -7,23 +6,10 @@ import {
 } from 'lucide-react';
 
 // =========================================================================
-// PENGATURAN KONEKSI SUPABASE (STRICT REALTIME SYNC)
+// PENGATURAN KONEKSI SUPABASE (STRICT REALTIME SYNC & ANTI-CRASH)
 // =========================================================================
-const getSupabaseInstance = () => {
-  try {
-    const env = typeof import.meta !== 'undefined' ? import.meta.env : {};
-    const url = env.VITE_SUPABASE_URL || '';
-    const key = env.VITE_SUPABASE_ANON_KEY || '';
-    if (url && key) {
-      return createClient(url, key);
-    }
-  } catch (error) {
-    console.warn("Gagal inisialisasi database.");
-  }
-  return null;
-};
-
-const supabase = getSupabaseInstance();
+// Kita menggunakan 'let' dan menghapus import statis agar bebas dari error kompilasi
+let supabase = null;
 
 // --- LOGIKA BANTUAN ---
 const formatRupiah = (angka) => {
@@ -171,7 +157,7 @@ function MainApp() {
   useEffect(() => { try { localStorage.setItem('tokojujur_view', view); } catch(e){} }, [view]);
   useEffect(() => { try { localStorage.setItem('tokojujur_admintab', adminTab); } catch(e){} }, [adminTab]);
 
-  // INISIALISASI SUPABASE KLIEN (AMAN)
+  // INISIALISASI SUPABASE KLIEN (AMAN & DINAMIS)
   useEffect(() => {
     const initSupabase = () => {
       try {
@@ -403,13 +389,11 @@ function MainApp() {
     const { error: trxError } = await supabase.from('transaksi').insert([newTransaction]);
     
     if (trxError) {
-       // JIKA DATABASE MENOLAK (MISAL: KARENA RLS SUPABASE)
        showToast(`Gagal: ${trxError.message}. Tolong matikan RLS di Supabase!`, 'error');
        setIsProcessing(false);
-       return; // Transaksi digagalkan
+       return; 
     }
     
-    // JIKA BERHASIL: Update stok barang satu per satu di Database
     for (const item of detailPesanan) {
       const prod = products.find(p => p.id === item.id);
       if (prod) {
@@ -417,11 +401,15 @@ function MainApp() {
       }
     }
 
-    // Tarik data terbaru dari Server agar sinkron dengan perangkat lain
     await fetchTransactions();
     await fetchProducts();
 
-    // Pindah Tampilan ke Struk setelah dijamin masuk DB
+    setTransactions(prev => [newTransaction, ...prev]);
+    setProducts(prev => prev.map(prod => {
+      const boughtItem = detailPesanan.find(i => i.id === prod.id);
+      return boughtItem ? { ...prod, stok: (prod.stok || 0) - boughtItem.qty } : prod;
+    }));
+
     setStrukTerakhir(newTransaction);
     setView('struk');
     setCart({});
@@ -532,7 +520,6 @@ function MainApp() {
     e.preventDefault();
     if (!supabase) return showToast('Database belum terhubung', 'error');
     
-    // Cek Toleransi Barang Ganda (Anti-Duplicate)
     const isDuplicate = products.some(p => {
       const isNameSame = p.nama.toLowerCase().trim() === newProduct.nama.toLowerCase().trim();
       const isBarcodeSame = newProduct.barcode && p.barcode === newProduct.barcode;
@@ -561,6 +548,7 @@ function MainApp() {
         showToast(`Gagal Edit: ${error.message}`, 'error');
       } else {
         showToast('Barang Diperbarui di Server!', 'success');
+        setProducts(p => p.map(item => item.id === editingId ? { ...item, ...tempProd } : item));
         await fetchProducts();
         setShowAddForm(false);
         setEditingId(null);
@@ -572,6 +560,7 @@ function MainApp() {
         showToast(`Gagal Tambah: ${error.message} (Matikan RLS!)`, 'error');
       } else {
         showToast('Barang Tersimpan di Server!', 'success');
+        setProducts(p => [...p, { ...tempProd, id: targetId }]);
         await fetchProducts();
         setShowAddForm(false);
         setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '' });
@@ -591,6 +580,7 @@ function MainApp() {
          showToast(`Gagal Hapus: ${error.message}`, 'error');
        } else {
          showToast('Barang Dihapus dari Server', 'success');
+         setProducts(prev => prev.filter(item => item.id !== id));
          await fetchProducts();
        }
        setIsProcessing(false);
@@ -606,13 +596,13 @@ function MainApp() {
         showToast(`Gagal: ${error.message}`, 'error');
       } else {
         showToast('Seluruh daftar barang telah dihapus!', 'success');
+        setProducts([]);
         await fetchProducts();
       }
       setIsProcessing(false);
     }
   };
 
-  // FUNGSI MENGHAPUS SEMUA DATA TRANSAKSI (DATA UJI COBA)
   const handleClearTransactions = async () => {
     if (!supabase) return;
     if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda benar-benar yakin ingin MENGHAPUS SELURUH RIWAYAT TRANSAKSI PENJUALAN (Data Uji Coba)?\n\nData yang dihapus TIDAK BISA DIKEMBALIKAN!")) {
@@ -622,6 +612,7 @@ function MainApp() {
         showToast(`Gagal Hapus: ${error.message}`, 'error');
       } else {
         showToast('Seluruh riwayat transaksi telah dihapus!', 'success');
+        setTransactions([]);
         await fetchTransactions();
       }
       setIsProcessing(false);
@@ -1125,6 +1116,7 @@ function MainApp() {
 
                      <hr className="border-slate-100"/>
                      
+                     {/* FITUR BARU: UPLOAD & DOWNLOAD QRIS */}
                      <div className="space-y-3">
                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 flex items-center gap-2"><QrCode size={14}/> Foto QRIS Pembayaran</label>
                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 bg-slate-50 p-6 rounded-3xl shadow-inner">
