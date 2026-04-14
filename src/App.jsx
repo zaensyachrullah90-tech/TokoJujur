@@ -5,7 +5,7 @@ import {
   Store, QrCode, CreditCard, ChevronRight, ArrowLeft,
   Search, X, Lock, LogOut, TrendingUp, Edit, Trash2, List, TrendingDown,
   Fish, Carrot, Apple, Beef, Soup, Cookie, Pill, Sparkles, Flame, ShoppingBasket, Camera, Download, Power, UploadCloud,
-  AlertTriangle, Copy, Barcode
+  AlertTriangle, Copy, Barcode, Share2, Printer, ArrowUpDown
 } from 'lucide-react';
 
 // =========================================================================
@@ -13,7 +13,25 @@ import {
 // =========================================================================
 let supabaseClient = null;
 
-// --- LOGIKA BANTUAN ---
+// --- LOGIKA BANTUAN & EFEK SUARA ---
+const playBeep = () => {
+  try {
+    const AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(800, ctx.currentTime);
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    osc.start();
+    gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.1);
+    osc.stop(ctx.currentTime + 0.1);
+  } catch (e) {}
+};
+
 const formatRupiah = (angka) => {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka || 0);
 };
@@ -56,7 +74,7 @@ const hitungTotalHargaItem = (item, qty) => {
 };
 
 // =========================================================================
-// KOMPONEN UTAMA
+// KOMPONEN UTAMA (BLUEPRINT TERKUNCI)
 // =========================================================================
 function MainApp() {
   const [dbReady, setDbReady] = useState(false);
@@ -83,7 +101,6 @@ function MainApp() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [tempQty, setTempQty] = useState(0);
 
-  // STATE LIVE SCANNER CANGGIH
   const [isScanningModalOpen, setIsScanningModalOpen] = useState(false);
   const [scanTarget, setScanTarget] = useState(''); 
   const videoRef = useRef(null);
@@ -96,9 +113,11 @@ function MainApp() {
     try { if (typeof window !== 'undefined') return localStorage.getItem('tokojujur_admintab') || 'analisa'; } catch(e){}
     return 'analisa';
   }); 
+  
   const [loginInput, setLoginInput] = useState('');
   const [filterStart, setFilterStart] = useState('');
   const [filterEnd, setFilterEnd] = useState('');
+  const [sortTrx, setSortTrx] = useState('terbaru'); // State Sorting Baru
   
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null); 
@@ -110,7 +129,7 @@ function MainApp() {
     setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 4500); 
   };
 
-  // SYSTEM PWA & NOTIFIKASI & FAVICON
+  // SYSTEM PWA & NOTIFIKASI & FAVICON (TERKUNCI)
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') Notification.requestPermission();
@@ -155,14 +174,11 @@ function MainApp() {
     }
   }, []);
 
-  // =========================================================================
   // REALTIME INSTAN (SEKEJAP MATA) - DIRECT PAYLOAD INJECTION
-  // =========================================================================
   useEffect(() => {
     if (!dbReady) return;
     if (!supabaseClient) { setIsLoadingDB(false); return; }
     
-    // Load awal
     const loadInitialData = async () => {
       setIsLoadingDB(true);
       const [prodRes, trxRes, setRes] = await Promise.all([
@@ -177,7 +193,6 @@ function MainApp() {
     };
     loadInitialData();
 
-    // Subscribe Realtime Langsung Ubah State Tanpa Fetch Ulang!
     const channel = supabaseClient.channel('toko-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'produk' }, (payload) => {
         setProducts(prev => {
@@ -208,9 +223,6 @@ function MainApp() {
     return () => { supabaseClient.removeChannel(channel); }
   }, [dbReady]);
 
-  // =========================================================================
-  // LOGIKA MENGAMBIL REKENING (YG SEBELUMNYA ERROR)
-  // =========================================================================
   const handleCopyRekening = () => {
     const amanRekening = settings.rekening || '';
     const matchAngka = amanRekening.match(/\d+/);
@@ -229,9 +241,7 @@ function MainApp() {
     }
   };
 
-  // =========================================================================
-  // LOGIKA LIVE BARCODE SCANNER (AUTO-FOCUS & HD)
-  // =========================================================================
+  // LOGIKA LIVE BARCODE SCANNER (AUTO-FOCUS & HD & BEEP SOUND)
   const startScanner = async (target) => {
     if (!('BarcodeDetector' in window)) {
       showToast('Browser HP Anda belum mendukung pemindaian kamera otomatis.', 'error');
@@ -270,13 +280,21 @@ function MainApp() {
 
   const handleBarcodeResultAdmin = async (code) => {
     setNewProduct(prev => ({ ...prev, barcode: code }));
+    
+    // Cek Database Lokal Terlebih Dahulu! (Fitur Baru)
+    const localProduct = products.find(p => p.barcode === code);
+    if (localProduct) {
+      showToast(`Membaca data: ${localProduct.nama}`, 'success');
+      return; // Tidak perlu panggil API internet jika sudah ada di database sendiri
+    }
+
     showToast('Barcode Terbaca! Mencari di internet...', 'success');
     try {
       const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
       const data = await res.json();
       if (data.status === 1 && data.product && data.product.product_name) {
         setNewProduct(prev => ({ ...prev, nama: data.product.product_name }));
-        showToast('Nama otomatis berhasil terisi!', 'success');
+        showToast(`Ditemukan: ${data.product.product_name}`, 'success');
       }
     } catch (err) {}
   };
@@ -291,20 +309,19 @@ function MainApp() {
             const barcodes = await detector.detect(videoRef.current);
             if (barcodes.length > 0) {
               const code = barcodes[0].rawValue;
+              playBeep(); // Mainkan Suara Mesin Kasir "BEEP"
               stopScanner();
               if (scanTarget === 'toko') handleBarcodeResultToko(code);
               else handleBarcodeResultAdmin(code);
             }
           } catch (e) {}
         }
-      }, 300); // 300ms super cepat
+      }, 300); // Super cepat
     }
     return () => clearInterval(interval);
   }, [isScanningModalOpen, scanTarget, products]);
 
-  // =========================================================================
-  // LOGIKA KERANJANG
-  // =========================================================================
+  // LOGIKA KERANJANG & TRANSAKSI (SEKEJAP MATA / OPTIMISTIC)
   const openProductModal = (product) => {
     setSelectedProduct(product);
     setTempQty(cart[product.id] || 0);
@@ -330,9 +347,6 @@ function MainApp() {
 
   const jumlahItem = Object.values(cart).reduce((a, b) => a + b, 0);
 
-  // =========================================================================
-  // TRANSAKSI SEKEJAP MATA (OPTIMISTIC + SUPABASE INSERT)
-  // =========================================================================
   const handleSelesaiBayar = async () => {
     if (!supabaseClient) return showToast('Koneksi Database Terputus!', 'error');
     setIsProcessing(true);
@@ -357,7 +371,7 @@ function MainApp() {
       metode: metodeBayar 
     };
 
-    // OPTIMISTIC UI: Langsung ubah layar sebelum tunggu server agar sekejap mata
+    // OPTIMISTIC UI (SEKEJAP MATA)
     setTransactions(prev => [newTransaction, ...prev]);
     setProducts(prev => prev.map(prod => {
       const boughtItem = detailPesanan.find(i => i.id === prod.id);
@@ -371,16 +385,11 @@ function MainApp() {
 
     // BACKGROUND SYNC KE SERVER
     const { error: trxError } = await supabaseClient.from('transaksi').insert([newTransaction]);
-    if (trxError) {
-       showToast(`Data gagal masuk ke server. Peringatan: ${trxError.message}`, 'error');
-    }
+    if (trxError) showToast(`Data gagal masuk ke server. Peringatan: ${trxError.message}`, 'error');
     
-    // Update stok satu per satu di background
     for (const item of detailPesanan) {
       const prod = products.find(p => p.id === item.id);
-      if (prod) {
-        await supabaseClient.from('produk').update({ stok: (prod.stok || 0) - item.qty }).eq('id', item.id);
-      }
+      if (prod) await supabaseClient.from('produk').update({ stok: (prod.stok || 0) - item.qty }).eq('id', item.id);
     }
   };
 
@@ -389,6 +398,22 @@ function MainApp() {
     setMetodeBayar(null);
     setStrukTerakhir(null);
     setView('toko');
+  };
+
+  // FITUR LUAR BIASA: SHARE STRUK (CETAK / WA)
+  const handleShareStruk = async () => {
+    if (!strukTerakhir) return;
+    
+    const shareData = {
+      title: `Struk - ${settings.nama_toko}`,
+      text: `*${settings.nama_toko}*\nID Transaksi: ${strukTerakhir.id}\nTanggal: ${strukTerakhir.tanggal}\n\nBelanjaan:\n${strukTerakhir.items.map(i => `- ${i.qty}x ${i.nama} = ${formatRupiah(i.totalHarga)}`).join('\n')}\n\n*Total Dibayar: ${formatRupiah(strukTerakhir.total)}*\nMetode: ${strukTerakhir.metode}\n\nTerima kasih atas kejujuran Anda!`,
+    };
+
+    if (navigator.share) {
+      try { await navigator.share(shareData); } catch (err) {}
+    } else {
+      window.print(); // Fallback jika web share tidak disupport (misal di PC)
+    }
   };
 
   const handleExitApp = () => {
@@ -403,9 +428,7 @@ function MainApp() {
     }
   };
 
-  // =========================================================================
   // ADMIN FUNCTIONS
-  // =========================================================================
   const handleLogin = (e) => {
     e.preventDefault();
     if (loginInput === settings.admin_password) {
@@ -450,8 +473,6 @@ function MainApp() {
   const handleSaveSettings = async () => {
     if (!supabaseClient) return showToast('Database belum terhubung', 'error');
     setIsProcessing(true);
-    
-    // Optimistic
     setSettings(settings);
     
     const { error } = await supabaseClient.from('pengaturan').update({
@@ -525,7 +546,7 @@ function MainApp() {
   const handleDeleteProduct = async (id) => {
     if (!supabaseClient) return;
     if(window.confirm("Yakin ingin menghapus barang ini secara permanen?")) {
-       setProducts(prev => prev.filter(item => item.id !== id)); // Optimistic
+       setProducts(prev => prev.filter(item => item.id !== id)); 
        const { error } = await supabaseClient.from('produk').delete().eq('id', id);
        if (error) showToast(`Gagal Hapus Server: ${error.message}`, 'error');
        else showToast('Dihapus dari server', 'success');
@@ -535,7 +556,7 @@ function MainApp() {
   const handleClearAllProducts = async () => {
     if (!supabaseClient) return;
     if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda benar-benar yakin ingin MENGHAPUS SELURUH BARANG TOKO?\n\nData yang dihapus TIDAK BISA DIKEMBALIKAN!")) {
-      setProducts([]); // Optimistic
+      setProducts([]); 
       const { error } = await supabaseClient.from('produk').delete().neq('id', 0); 
       if (error) showToast(`Gagal Server: ${error.message}`, 'error');
       else showToast('Seluruh daftar barang dihapus!', 'success');
@@ -545,7 +566,7 @@ function MainApp() {
   const handleClearTransactions = async () => {
     if (!supabaseClient) return;
     if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda benar-benar yakin MENGHAPUS SELURUH RIWAYAT TRANSAKSI PENJUALAN?\n\nData yang dihapus TIDAK BISA DIKEMBALIKAN!")) {
-      setTransactions([]); // Optimistic
+      setTransactions([]); 
       const { error } = await supabaseClient.from('transaksi').delete().neq('id', '0'); 
       if (error) showToast(`Gagal Server: ${error.message}`, 'error');
       else showToast('Seluruh riwayat transaksi dihapus!', 'success');
@@ -761,7 +782,7 @@ function MainApp() {
         </div>
       )}
 
-      {/* VIEW: STRUK (MODERN) */}
+      {/* VIEW: STRUK (MODERN + FITUR SHARE/PRINT) */}
       {view === 'struk' && (
         <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4">
           <div className="mb-6 flex flex-col items-center animate-slide-up">
@@ -772,7 +793,7 @@ function MainApp() {
             <p className="text-slate-500 text-sm mt-1 font-bold">Terima kasih atas kejujuran Anda!</p>
           </div>
 
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden animate-fade-in relative">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden animate-fade-in relative mb-6">
             <div className="bg-slate-900 p-6 text-center text-white">
               <Store className="mx-auto mb-2 opacity-80" size={32} />
               <h3 className="font-bold text-xl tracking-wide">{settings.nama_toko}</h3>
@@ -816,9 +837,14 @@ function MainApp() {
             <div className="absolute top-[80px] -right-4 w-8 h-8 bg-slate-100 rounded-full"></div>
           </div>
 
-          <button onClick={handleTutupStruk} className="mt-8 px-8 py-3 bg-slate-900 text-white rounded-full font-bold shadow-lg hover:shadow-xl hover:-translate-y-1 transition-all active:scale-95">
-            Selesai & Kembali
-          </button>
+          <div className="flex gap-4 w-full max-w-md">
+            <button onClick={handleShareStruk} className="flex-1 py-4 bg-blue-100 text-blue-700 rounded-full font-bold shadow-sm hover:shadow-md hover:bg-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2">
+              <Share2 size={20}/> Bagikan / Cetak
+            </button>
+            <button onClick={handleTutupStruk} className="flex-1 py-4 bg-slate-900 text-white rounded-full font-bold shadow-lg hover:shadow-xl hover:bg-slate-800 transition-all active:scale-95 flex items-center justify-center gap-2">
+               Tutup
+            </button>
+          </div>
         </div>
       )}
 
@@ -847,6 +873,15 @@ function MainApp() {
           let eDate = filterEnd ? new Date(filterEnd) : new Date('2100-01-01');
           if (filterEnd) eDate.setHours(23, 59, 59, 999);
           return tDate >= sDate && tDate <= eDate;
+        });
+
+        // FITUR SORTING TRANSAKSI
+        const sortedTransactions = [...filteredTransactions].sort((a, b) => {
+          if (sortTrx === 'terbaru') return b.id.localeCompare(a.id);
+          if (sortTrx === 'terlama') return a.id.localeCompare(b.id);
+          if (sortTrx === 'terbesar') return b.total - a.total;
+          if (sortTrx === 'terkecil') return a.total - b.total;
+          return 0;
         });
 
         const totalPendapatanKotor = filteredTransactions.reduce((sum, t) => sum + (t.total || 0), 0);
@@ -919,7 +954,7 @@ function MainApp() {
                       <h1 className="text-3xl font-black tracking-tighter text-slate-800">Ikhtisar Penjualan</h1>
                       <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto">
                         <div className="flex flex-wrap items-center gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm w-full md:w-auto">
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Filter:</span>
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Filter Waktu:</span>
                           <input type="date" value={filterStart} onChange={e => setFilterStart(e.target.value)} className="bg-slate-50 px-3 py-2 rounded-xl text-sm font-bold outline-none text-slate-700 focus:ring-2 focus:ring-emerald-500 border border-slate-100 flex-1 md:flex-none"/>
                           <span className="text-slate-300 font-black hidden md:inline">-</span>
                           <input type="date" value={filterEnd} onChange={e => setFilterEnd(e.target.value)} className="bg-slate-50 px-3 py-2 rounded-xl text-sm font-bold outline-none text-slate-700 focus:ring-2 focus:ring-emerald-500 border border-slate-100 flex-1 md:flex-none"/>
@@ -989,11 +1024,23 @@ function MainApp() {
                         </div>
                     </div>
 
-                    {/* Tabel Riwayat Transaksi (Modern) */}
+                    {/* Tabel Riwayat Transaksi (Modern + Sort By) */}
                     <div className="bg-white rounded-[32px] shadow-sm border border-gray-100 p-6 md:p-8">
-                      <h2 className="font-black text-lg mb-6 flex items-center gap-2 text-slate-900"><List className="text-blue-500"/> Riwayat Transaksi Lengkap</h2>
+                      <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
+                        <h2 className="font-black text-lg flex items-center gap-2 text-slate-900"><List className="text-blue-500"/> Riwayat Transaksi Lengkap</h2>
+                        <div className="flex items-center gap-2">
+                           <ArrowUpDown size={16} className="text-slate-400"/>
+                           <select value={sortTrx} onChange={e => setSortTrx(e.target.value)} className="bg-slate-50 px-3 py-2 rounded-xl text-sm font-bold outline-none text-slate-700 border border-slate-200 focus:ring-2 focus:ring-emerald-500">
+                             <option value="terbaru">Paling Baru</option>
+                             <option value="terlama">Paling Lama</option>
+                             <option value="terbesar">Nominal Terbesar</option>
+                             <option value="terkecil">Nominal Terkecil</option>
+                           </select>
+                        </div>
+                      </div>
+
                       <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
-                        {filteredTransactions.length === 0 ? <p className="text-gray-400 text-sm font-bold text-center py-10">Belum ada transaksi.</p> : filteredTransactions.slice().reverse().map(t => (
+                        {sortedTransactions.length === 0 ? <p className="text-gray-400 text-sm font-bold text-center py-10">Belum ada transaksi.</p> : sortedTransactions.map(t => (
                           <div key={t.id} className="border border-gray-200 rounded-3xl p-5 bg-gray-50/50 hover:bg-white transition-colors">
                             <div className="flex justify-between items-center text-sm mb-3 pb-3 border-b border-gray-200">
                               <span className="font-mono text-xs font-bold text-slate-500">{t.id} • {t.tanggal}</span>
