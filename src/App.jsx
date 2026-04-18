@@ -5,7 +5,7 @@ import {
   Store, QrCode, CreditCard, ChevronRight, ArrowLeft,
   Search, X, Lock, LogOut, TrendingUp, Edit, Trash2, List, TrendingDown,
   Fish, Carrot, Apple, Beef, Soup, Cookie, Pill, Sparkles, Flame, ShoppingBasket, Camera, Download, Power, UploadCloud,
-  AlertTriangle, Copy, Barcode, Share2, Printer, ArrowUpDown
+  AlertTriangle, Copy, Barcode, Share2, Printer, ArrowUpDown, CupSoda, Croissant
 } from 'lucide-react';
 
 // =========================================================================
@@ -45,22 +45,25 @@ const formatImageUrl = (url) => {
   return url;
 };
 
+// IKON LEBIH SPESIFIK & AKURAT (MIE, BAKSO, WAFER, CIKI, KOPI, DLL)
 const getDynamicIcon = (namaBarang) => {
   const name = (namaBarang || '').toLowerCase();
-  if (name.match(/kopi|minum|teh|coca|susu/)) return <Coffee className="w-10 h-10 text-amber-700" />;
-  if (name.match(/air|mineral|aqua|le minerale/)) return <Droplet className="w-10 h-10 text-blue-500" />;
-  if (name.match(/nasi|mie|roti|makan|lontong/)) return <Utensils className="w-10 h-10 text-orange-600" />;
-  if (name.match(/daging|sapi|ayam|kambing/)) return <Beef className="w-10 h-10 text-rose-700" />;
-  if (name.match(/ikan|lele|nila|udang/)) return <Fish className="w-10 h-10 text-sky-500" />;
-  if (name.match(/sayur|bayam|kangkung|wortel|tomat/)) return <Carrot className="w-10 h-10 text-orange-500" />;
-  if (name.match(/buah|apel|jeruk|pisang|mangga/)) return <Apple className="w-10 h-10 text-red-500" />;
-  if (name.match(/terasi|garam|gula|merica|micin|bumbu|kecap|saus/)) return <Soup className="w-10 h-10 text-amber-800" />;
-  if (name.match(/es|ice|krim/)) return <IceCream className="w-10 h-10 text-pink-500" />;
-  if (name.match(/permen|candy|yupi/)) return <Candy className="w-10 h-10 text-purple-500" />;
-  if (name.match(/snack|chiki|keripik|biskuit|kue/)) return <Cookie className="w-10 h-10 text-yellow-600" />;
-  if (name.match(/obat|panadol|paramex|bodrex/)) return <Pill className="w-10 h-10 text-red-600" />;
+  if (name.match(/kopi|teh|panas/)) return <Coffee className="w-10 h-10 text-amber-800" />;
+  if (name.match(/minum|coca|susu|es|ice|jus|sirup|sprite|fanta/)) return <CupSoda className="w-10 h-10 text-blue-400" />;
+  if (name.match(/air|mineral|aqua|le minerale|cleo|vit/)) return <Droplet className="w-10 h-10 text-blue-500" />;
+  if (name.match(/mie|bakso|soto|kuah|indomie|sedap|pop mie/)) return <Soup className="w-10 h-10 text-orange-600" />;
+  if (name.match(/nasi|makan|lontong|geprek|pecel/)) return <Utensils className="w-10 h-10 text-orange-700" />;
+  if (name.match(/roti|bolu|bakpao|pizza|burger/)) return <Croissant className="w-10 h-10 text-amber-600" />;
+  if (name.match(/snack|ciki|keripik|wafer|biskuit|kue|tango|oreo|taro|nabati|beng/)) return <Cookie className="w-10 h-10 text-yellow-600" />;
+  if (name.match(/daging|sapi|ayam|kambing|sosis|nugget/)) return <Beef className="w-10 h-10 text-rose-700" />;
+  if (name.match(/ikan|lele|nila|udang|seafood/)) return <Fish className="w-10 h-10 text-sky-500" />;
+  if (name.match(/sayur|bayam|kangkung|wortel|tomat|cabe/)) return <Carrot className="w-10 h-10 text-green-500" />;
+  if (name.match(/buah|apel|jeruk|pisang|mangga|melon/)) return <Apple className="w-10 h-10 text-red-500" />;
+  if (name.match(/terasi|garam|gula|merica|micin|bumbu|kecap|saus/)) return <Package className="w-10 h-10 text-amber-800" />;
+  if (name.match(/permen|candy|yupi|kopiko/)) return <Candy className="w-10 h-10 text-purple-500" />;
+  if (name.match(/obat|panadol|paramex|bodrex|tolak|vitamin/)) return <Pill className="w-10 h-10 text-red-600" />;
   if (name.match(/sabun|shampo|rinso|sunlight|cuci|odol|pasta gigi|deterjen/)) return <Sparkles className="w-10 h-10 text-teal-400" />;
-  if (name.match(/rokok|korek|mancis/)) return <Flame className="w-10 h-10 text-orange-500" />;
+  if (name.match(/rokok|korek|mancis|sampoerna|djarum/)) return <Flame className="w-10 h-10 text-orange-500" />;
   return <ShoppingBasket className="w-10 h-10 text-slate-800" />;
 };
 
@@ -74,7 +77,7 @@ const hitungTotalHargaItem = (item, qty) => {
 };
 
 // =========================================================================
-// KOMPONEN UTAMA (BLUEPRINT TERKUNCI)
+// KOMPONEN UTAMA (BLUEPRINT TERKUNCI 100%)
 // =========================================================================
 function MainApp() {
   const [dbReady, setDbReady] = useState(false);
@@ -117,7 +120,7 @@ function MainApp() {
   const [loginInput, setLoginInput] = useState('');
   const [filterStart, setFilterStart] = useState('');
   const [filterEnd, setFilterEnd] = useState('');
-  const [sortTrx, setSortTrx] = useState('terbaru'); // State Sorting Baru
+  const [sortTrx, setSortTrx] = useState('terbaru'); 
   
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null); 
@@ -129,7 +132,7 @@ function MainApp() {
     setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 4500); 
   };
 
-  // SYSTEM PWA & NOTIFIKASI & FAVICON (TERKUNCI)
+  // SYSTEM PWA & NOTIFIKASI & FAVICON
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') Notification.requestPermission();
@@ -150,7 +153,7 @@ function MainApp() {
   useEffect(() => { try { localStorage.setItem('tokojujur_view', view); } catch(e){} }, [view]);
   useEffect(() => { try { localStorage.setItem('tokojujur_admintab', adminTab); } catch(e){} }, [adminTab]);
 
-  // INISIALISASI SUPABASE KLIEN (AMAN & DINAMIS)
+  // INISIALISASI SUPABASE KLIEN (AMAN)
   useEffect(() => {
     const initSupabase = () => {
       try {
@@ -241,7 +244,7 @@ function MainApp() {
     }
   };
 
-  // LOGIKA LIVE BARCODE SCANNER (AUTO-FOCUS & HD & BEEP SOUND)
+  // LOGIKA LIVE BARCODE SCANNER
   const startScanner = async (target) => {
     if (!('BarcodeDetector' in window)) {
       showToast('Browser HP Anda belum mendukung pemindaian kamera otomatis.', 'error');
@@ -281,11 +284,10 @@ function MainApp() {
   const handleBarcodeResultAdmin = async (code) => {
     setNewProduct(prev => ({ ...prev, barcode: code }));
     
-    // Cek Database Lokal Terlebih Dahulu! (Fitur Baru)
     const localProduct = products.find(p => p.barcode === code);
     if (localProduct) {
       showToast(`Membaca data: ${localProduct.nama}`, 'success');
-      return; // Tidak perlu panggil API internet jika sudah ada di database sendiri
+      return; 
     }
 
     showToast('Barcode Terbaca! Mencari di internet...', 'success');
@@ -294,7 +296,7 @@ function MainApp() {
       const data = await res.json();
       if (data.status === 1 && data.product && data.product.product_name) {
         setNewProduct(prev => ({ ...prev, nama: data.product.product_name }));
-        showToast(`Ditemukan: ${data.product.product_name}`, 'success');
+        showToast('Nama otomatis berhasil terisi!', 'success');
       }
     } catch (err) {}
   };
@@ -309,19 +311,19 @@ function MainApp() {
             const barcodes = await detector.detect(videoRef.current);
             if (barcodes.length > 0) {
               const code = barcodes[0].rawValue;
-              playBeep(); // Mainkan Suara Mesin Kasir "BEEP"
+              playBeep(); // Efek Suara BEEP
               stopScanner();
               if (scanTarget === 'toko') handleBarcodeResultToko(code);
               else handleBarcodeResultAdmin(code);
             }
           } catch (e) {}
         }
-      }, 300); // Super cepat
+      }, 300); 
     }
     return () => clearInterval(interval);
   }, [isScanningModalOpen, scanTarget, products]);
 
-  // LOGIKA KERANJANG & TRANSAKSI (SEKEJAP MATA / OPTIMISTIC)
+  // LOGIKA KERANJANG
   const openProductModal = (product) => {
     setSelectedProduct(product);
     setTempQty(cart[product.id] || 0);
@@ -347,6 +349,7 @@ function MainApp() {
 
   const jumlahItem = Object.values(cart).reduce((a, b) => a + b, 0);
 
+  // TRANSAKSI SEKEJAP MATA
   const handleSelesaiBayar = async () => {
     if (!supabaseClient) return showToast('Koneksi Database Terputus!', 'error');
     setIsProcessing(true);
@@ -371,7 +374,6 @@ function MainApp() {
       metode: metodeBayar 
     };
 
-    // OPTIMISTIC UI (SEKEJAP MATA)
     setTransactions(prev => [newTransaction, ...prev]);
     setProducts(prev => prev.map(prod => {
       const boughtItem = detailPesanan.find(i => i.id === prod.id);
@@ -383,7 +385,6 @@ function MainApp() {
     setCart({});
     setIsProcessing(false);
 
-    // BACKGROUND SYNC KE SERVER
     const { error: trxError } = await supabaseClient.from('transaksi').insert([newTransaction]);
     if (trxError) showToast(`Data gagal masuk ke server. Peringatan: ${trxError.message}`, 'error');
     
@@ -400,19 +401,16 @@ function MainApp() {
     setView('toko');
   };
 
-  // FITUR LUAR BIASA: SHARE STRUK (CETAK / WA)
   const handleShareStruk = async () => {
     if (!strukTerakhir) return;
-    
     const shareData = {
       title: `Struk - ${settings.nama_toko}`,
       text: `*${settings.nama_toko}*\nID Transaksi: ${strukTerakhir.id}\nTanggal: ${strukTerakhir.tanggal}\n\nBelanjaan:\n${strukTerakhir.items.map(i => `- ${i.qty}x ${i.nama} = ${formatRupiah(i.totalHarga)}`).join('\n')}\n\n*Total Dibayar: ${formatRupiah(strukTerakhir.total)}*\nMetode: ${strukTerakhir.metode}\n\nTerima kasih atas kejujuran Anda!`,
     };
-
     if (navigator.share) {
       try { await navigator.share(shareData); } catch (err) {}
     } else {
-      window.print(); // Fallback jika web share tidak disupport (misal di PC)
+      window.print(); 
     }
   };
 
@@ -474,7 +472,6 @@ function MainApp() {
     if (!supabaseClient) return showToast('Database belum terhubung', 'error');
     setIsProcessing(true);
     setSettings(settings);
-    
     const { error } = await supabaseClient.from('pengaturan').update({
       nama_toko: settings.nama_toko, qris_url: settings.qris_url,
       rekening: settings.rekening, admin_password: settings.admin_password
@@ -482,11 +479,9 @@ function MainApp() {
     
     if (error) showToast(`Gagal: ${error.message} (Cek RLS Supabase)`, 'error');
     else showToast('Pengaturan Disimpan ke Database', 'success');
-    
     setIsProcessing(false);
   };
 
-  // CRUD BARANG (ANTI DUPLIKAT & SEKEJAP MATA)
   const handleEditClick = (product) => {
     setNewProduct({
       nama: product.nama, modal: product.modal || 0, jual: product.jual || 0, stok: product.stok || 0,
@@ -521,7 +516,6 @@ function MainApp() {
       jual: newProduct.jual||0, stok: newProduct.stok||0, diskon: disc
     };
     
-    // OPTIMISTIC UI
     if (editingId) setProducts(p => p.map(item => item.id === editingId ? { ...item, ...tempProd } : item));
     else setProducts(p => [...p, { ...tempProd, id: targetId, tanggal_dibuat: new Date().toISOString() }]);
 
@@ -530,7 +524,6 @@ function MainApp() {
     setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '' });
     setUseDiskon(false);
     
-    // BACKGROUND SYNC
     if (editingId) {
       const { error } = await supabaseClient.from('produk').update(tempProd).eq('id', editingId);
       if (error) showToast(`Gagal Edit Server: ${error.message}`, 'error');
@@ -782,7 +775,7 @@ function MainApp() {
         </div>
       )}
 
-      {/* VIEW: STRUK (MODERN + FITUR SHARE/PRINT) */}
+      {/* VIEW: STRUK (MODERN + SHARE/PRINT) */}
       {view === 'struk' && (
         <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4">
           <div className="mb-6 flex flex-col items-center animate-slide-up">
@@ -864,6 +857,7 @@ function MainApp() {
 
       {/* VIEW: ADMIN DASHBOARD */}
       {view === 'admin' && isAdminLogged && (() => {
+        // FILTER TRANSAKSI LOGIC
         const filteredTransactions = transactions.filter(t => {
           if (!filterStart && !filterEnd) return true;
           let tDate;
@@ -884,9 +878,25 @@ function MainApp() {
           return 0;
         });
 
+        // KALKULASI PENJUALAN
         const totalPendapatanKotor = filteredTransactions.reduce((sum, t) => sum + (t.total || 0), 0);
         const totalKeuntunganBersih = filteredTransactions.reduce((sum, t) => sum + (t.profit || 0), 0);
-        const totalModalAdmin = filteredTransactions.reduce((sum, t) => sum + (t.modal || 0), 0);
+        const totalModalTerjual = filteredTransactions.reduce((sum, t) => sum + (t.modal || 0), 0);
+
+        // FILTER BARANG INPUT (BERDASARKAN TANGGAL)
+        const filteredProductsInput = products.filter(p => {
+          if (!filterStart && !filterEnd) return true;
+          const pDate = new Date(p.tanggal_dibuat || new Date());
+          const sDate = filterStart ? new Date(filterStart) : new Date(0);
+          let eDate = filterEnd ? new Date(filterEnd) : new Date('2100-01-01');
+          if (filterEnd) eDate.setHours(23, 59, 59, 999);
+          return pDate >= sDate && pDate <= eDate;
+        });
+
+        // KALKULASI REKAP INPUT BARANG
+        const totalBarangInput = filteredProductsInput.reduce((sum, p) => sum + (p.stok || 0), 0);
+        const totalModalInput = filteredProductsInput.reduce((sum, p) => sum + ((p.modal || 0) * (p.stok || 0)), 0);
+        const potensiKeuntungan = filteredProductsInput.reduce((sum, p) => sum + (((p.jual || 0) - (p.modal || 0)) * (p.stok || 0)), 0);
 
         // LOGIKA PERINGKAT BARANG
         const itemSalesMap = {};
@@ -947,11 +957,11 @@ function MainApp() {
             
             <main className="flex-1 p-4 md:p-10 overflow-y-auto">
                
-               {/* TAB: ANALISA PENJUALAN */}
+               {/* TAB: ANALISA PENJUALAN & REKAP BARANG */}
                {adminTab === 'analisa' && (
                  <div className="animate-fade-in max-w-6xl mx-auto">
                     <div className="flex flex-col xl:flex-row justify-between xl:items-center mb-8 gap-6">
-                      <h1 className="text-3xl font-black tracking-tighter text-slate-800">Ikhtisar Penjualan</h1>
+                      <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-slate-800">Ikhtisar Penjualan & Stok</h1>
                       <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto">
                         <div className="flex flex-wrap items-center gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm w-full md:w-auto">
                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Filter Waktu:</span>
@@ -967,6 +977,8 @@ function MainApp() {
                       </div>
                     </div>
 
+                    {/* SECTION: REKAP TRANSAKSI BERHASIL */}
+                    <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2"><CheckCircle className="text-emerald-500"/> Rekap Penjualan (Terjual)</h2>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                        <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden">
                          <div className="absolute top-0 right-0 p-6 opacity-5"><BarChart3 size={64}/></div>
@@ -975,8 +987,8 @@ function MainApp() {
                        </div>
                        <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden">
                          <div className="absolute top-0 right-0 p-6 opacity-5"><Store size={64}/></div>
-                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Total Modal</p>
-                         <p className="text-3xl font-extrabold text-blue-600">{formatRupiah(totalModalAdmin)}</p>
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Total Modal (Terjual)</p>
+                         <p className="text-3xl font-extrabold text-blue-600">{formatRupiah(totalModalTerjual)}</p>
                        </div>
                        <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-6 rounded-[32px] shadow-sm text-white relative overflow-hidden">
                          <div className="absolute top-0 right-0 p-6 opacity-10"><CheckCircle size={64}/></div>
@@ -985,42 +997,81 @@ function MainApp() {
                        </div>
                     </div>
 
-                    <div className="grid lg:grid-cols-2 gap-6 mb-8">
+                    {/* SECTION: REKAP INPUT BARANG */}
+                    <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2"><Package className="text-blue-500"/> Rekap Input Barang (Stok Tersedia)</h2>
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+                       <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden">
+                         <div className="absolute top-0 right-0 p-6 opacity-5"><Package size={64}/></div>
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Total Barang (Pcs)</p>
+                         <p className="text-3xl font-extrabold text-slate-800">{totalBarangInput}</p>
+                       </div>
+                       <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden">
+                         <div className="absolute top-0 right-0 p-6 opacity-5"><Store size={64}/></div>
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Total Modal (Stok)</p>
+                         <p className="text-3xl font-extrabold text-blue-600">{formatRupiah(totalModalInput)}</p>
+                       </div>
+                       <div className="bg-gradient-to-br from-blue-500 to-indigo-600 p-6 rounded-[32px] shadow-sm text-white relative overflow-hidden">
+                         <div className="absolute top-0 right-0 p-6 opacity-10"><TrendingUp size={64}/></div>
+                         <p className="text-[10px] font-black text-blue-100 uppercase tracking-widest mb-2">Potensi Keuntungan</p>
+                         <p className="text-3xl font-extrabold drop-shadow-sm">{formatRupiah(potensiKeuntungan)}</p>
+                       </div>
+                    </div>
+
+                    {/* TABEL PERINGKAT BARANG */}
+                    <div className="grid lg:grid-cols-2 gap-6 md:gap-8 mb-8 md:mb-12">
                         {/* Tabel Peringkat Barang Laku */}
-                        <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm overflow-hidden p-6 flex flex-col">
-                            <h2 className="font-black text-lg mb-4 flex items-center gap-2 text-slate-900"><TrendingUp className="text-orange-500"/> Barang Paling Laku</h2>
-                            {topSelling.length === 0 ? <p className="text-gray-400 text-sm font-bold">Belum ada data penjualan.</p> : (
-                              <div className="space-y-3 overflow-y-auto max-h-[300px]">
-                                {topSelling.map((item, idx) => (
-                                  <div key={idx} className="flex justify-between items-center p-3 bg-slate-50 rounded-2xl border border-slate-100">
-                                    <div className="flex items-center gap-3">
-                                      <span className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center text-xs font-black text-slate-700 border border-slate-200">{idx+1}</span>
-                                      <span className="font-extrabold text-sm text-slate-900">{item.nama}</span>
-                                    </div>
-                                    <div className="text-right">
-                                      <p className="text-sm font-extrabold text-slate-800">{item.qty} terjual</p>
-                                      <p className="text-[10px] font-black text-emerald-600 tracking-widest uppercase">+ Untung {formatRupiah(item.profit)}</p>
-                                    </div>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                        <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+                          <div className="p-6 md:p-8 border-b border-slate-100">
+                            <h2 className="font-black text-xl text-slate-800 flex items-center gap-2"><TrendingUp className="text-orange-500"/> Barang Paling Laku</h2>
+                            <p className="text-xs text-slate-500 font-semibold mt-1">Ranking Tertinggi.</p>
+                          </div>
+                          <div className="overflow-y-auto max-h-[400px]">
+                            <table className="w-full text-left">
+                               <thead className="bg-slate-50 sticky top-0"><tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest"><th className="p-4">Nama Barang</th><th className="p-4 text-center">Terjual</th><th className="p-4 text-right">Pendapatan</th></tr></thead>
+                               <tbody className="divide-y divide-slate-50">
+                                 {topSelling.length === 0 && <tr><td colSpan="3" className="p-6 text-center text-slate-400 font-bold">Data kosong.</td></tr>}
+                                 {topSelling.map((p, idx) => (
+                                   <tr key={p.id} className="text-sm font-bold hover:bg-slate-50 transition-colors">
+                                     <td className="p-4 flex items-center gap-3">
+                                       <span className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[10px] ${idx < 3 && p.qty > 0 ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-500'}`}>{idx + 1}</span>
+                                       <span className={`truncate ${p.qty === 0 ? 'text-slate-400' : 'text-slate-700'}`}>{p.nama}</span>
+                                     </td>
+                                     <td className="p-4 text-center">
+                                       <span className={`px-2 py-1 rounded-md text-[10px] ${p.qty > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-50 text-rose-500'}`}>{p.qty}</span>
+                                     </td>
+                                     <td className={`p-4 text-right ${p.revenue === 0 ? 'text-slate-400' : 'text-slate-600'}`}>{formatRupiah(p.revenue)}</td>
+                                   </tr>
+                                 ))}
+                               </tbody>
+                            </table>
+                          </div>
                         </div>
 
                         {/* Tabel Barang Nganggur */}
-                        <div className="bg-white rounded-[32px] border border-slate-100 shadow-sm overflow-hidden p-6 flex flex-col">
-                            <h2 className="font-black text-lg mb-4 flex items-center gap-2 text-slate-900"><TrendingDown className="text-red-500"/> Perhatian: Kurang Laku</h2>
-                            <div className="space-y-3 overflow-y-auto max-h-[300px]">
-                              {bottomSelling.map((item, idx) => (
-                                <div key={idx} className="flex justify-between items-center p-3 bg-red-50/50 rounded-2xl border border-red-100">
-                                  <span className="font-extrabold text-sm text-slate-900">{item.nama}</span>
-                                  <div className="text-right">
-                                    <p className="text-sm font-extrabold text-red-600">{item.qty} terjual</p>
-                                    <p className="text-[10px] font-black text-red-500 tracking-widest uppercase">Nganggur {item.daysActive} hari</p>
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
+                        <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+                          <div className="p-6 md:p-8 border-b border-slate-100">
+                            <h2 className="font-black text-xl text-slate-800 flex items-center gap-2"><TrendingDown className="text-red-500"/> Perhatian: Kurang Laku</h2>
+                            <p className="text-xs text-slate-500 font-semibold mt-1">Ranking Terendah / Belum Laku.</p>
+                          </div>
+                          <div className="overflow-y-auto max-h-[400px]">
+                            <table className="w-full text-left">
+                               <thead className="bg-slate-50 sticky top-0"><tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest"><th className="p-4">Nama Barang</th><th className="p-4 text-center">Terjual</th><th className="p-4 text-right">Status</th></tr></thead>
+                               <tbody className="divide-y divide-slate-50">
+                                 {bottomSelling.length === 0 && <tr><td colSpan="3" className="p-6 text-center text-slate-400 font-bold">Semua barang laku!</td></tr>}
+                                 {bottomSelling.map((item, idx) => (
+                                   <tr key={idx} className="text-sm font-bold hover:bg-slate-50 transition-colors">
+                                     <td className="p-4 flex items-center gap-3">
+                                       <span className="truncate text-slate-700">{item.nama}</span>
+                                     </td>
+                                     <td className="p-4 text-center">
+                                       <span className="px-2 py-1 rounded-md text-[10px] bg-rose-50 text-rose-500">{item.qty}</span>
+                                     </td>
+                                     <td className="p-4 text-right text-xs text-slate-500">Nganggur {item.daysActive} hr</td>
+                                   </tr>
+                                 ))}
+                               </tbody>
+                            </table>
+                          </div>
                         </div>
                     </div>
 
