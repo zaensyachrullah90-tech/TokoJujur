@@ -1,16 +1,13 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  Coffee, Utensils, Package, IceCream, Droplet, Candy, 
   CheckCircle, Settings, BarChart3, PlusCircle, 
   Store, QrCode, CreditCard, ChevronRight, ArrowLeft,
   Search, X, Lock, LogOut, TrendingUp, Edit, Trash2, List, TrendingDown,
-  Fish, Carrot, Apple, Beef, Soup, Cookie, Pill, Sparkles, Flame, ShoppingBasket, Camera, Download, Power, UploadCloud,
-  AlertTriangle, Copy, Barcode, Share2, ArrowUpDown, CupSoda, Croissant
+  Camera, Download, Power, UploadCloud, AlertTriangle, Copy, Barcode, Share2, ArrowUpDown, Package
 } from 'lucide-react';
 
 // =========================================================================
-// PENGATURAN KONEKSI SUPABASE (DYNAMIC SCRIPT - BEBAS ERROR BUILD)
-// Blueprint Terkunci! Jangan diubah!
+// PENGATURAN KONEKSI SUPABASE (DYNAMIC SCRIPT - BLUEPRINT TERKUNCI 100%)
 // =========================================================================
 let supabaseClient = null;
 
@@ -46,26 +43,44 @@ const formatImageUrl = (url) => {
   return url;
 };
 
-// IKON LEBIH SPESIFIK & AKURAT (MIE, BAKSO, WAFER, CIKI, KOPI, DLL)
+// =========================================================================
+// 1. UPDATE: IKON REALISTIS (3D EMOJI SHADOW)
+// =========================================================================
 const getDynamicIcon = (namaBarang) => {
   const name = (namaBarang || '').toLowerCase();
-  if (name.match(/kopi|teh|panas/)) return <Coffee className="w-10 h-10 text-amber-800" />;
-  if (name.match(/minum|coca|susu|es|ice|jus|sirup|sprite|fanta/)) return <CupSoda className="w-10 h-10 text-blue-400" />;
-  if (name.match(/air|mineral|aqua|le minerale|cleo|vit/)) return <Droplet className="w-10 h-10 text-blue-500" />;
-  if (name.match(/mie|bakso|soto|kuah|indomie|sedap|pop mie/)) return <Soup className="w-10 h-10 text-orange-600" />;
-  if (name.match(/nasi|makan|lontong|geprek|pecel/)) return <Utensils className="w-10 h-10 text-orange-700" />;
-  if (name.match(/roti|bolu|bakpao|pizza|burger/)) return <Croissant className="w-10 h-10 text-amber-600" />;
-  if (name.match(/snack|ciki|keripik|wafer|biskuit|kue|tango|oreo|taro|nabati|beng/)) return <Cookie className="w-10 h-10 text-yellow-600" />;
-  if (name.match(/daging|sapi|ayam|kambing|sosis|nugget/)) return <Beef className="w-10 h-10 text-rose-700" />;
-  if (name.match(/ikan|lele|nila|udang|seafood/)) return <Fish className="w-10 h-10 text-sky-500" />;
-  if (name.match(/sayur|bayam|kangkung|wortel|tomat|cabe/)) return <Carrot className="w-10 h-10 text-green-500" />;
-  if (name.match(/buah|apel|jeruk|pisang|mangga|melon/)) return <Apple className="w-10 h-10 text-red-500" />;
-  if (name.match(/terasi|garam|gula|merica|micin|bumbu|kecap|saus/)) return <Package className="w-10 h-10 text-amber-800" />;
-  if (name.match(/permen|candy|yupi|kopiko/)) return <Candy className="w-10 h-10 text-purple-500" />;
-  if (name.match(/obat|panadol|paramex|bodrex|tolak|vitamin/)) return <Pill className="w-10 h-10 text-red-600" />;
-  if (name.match(/sabun|shampo|rinso|sunlight|cuci|odol|pasta gigi|deterjen/)) return <Sparkles className="w-10 h-10 text-teal-400" />;
-  if (name.match(/rokok|korek|mancis|sampoerna|djarum/)) return <Flame className="w-10 h-10 text-orange-500" />;
-  return <ShoppingBasket className="w-10 h-10 text-slate-800" />;
+  
+  const iconWrapper = (emoji) => (
+    <span className="text-4xl drop-shadow-md transition-transform transform hover:scale-110">{emoji}</span>
+  );
+
+  // Snack, Jajanan & Manisan
+  if (name.match(/wafer|tango|nabati|beng|biskuat|nissin/)) return iconWrapper('🧇');
+  if (name.match(/coklat|chocolate|silverqueen|choki|delfi|milo|cadbury/)) return iconWrapper('🍫');
+  if (name.match(/permen|candy|yupi|kopiko|kiss|mint|sugus/)) return iconWrapper('🍬');
+  if (name.match(/snack|ciki|chiki|keripik|taro|lays|citato|chitato|qtela|piattos/)) return iconWrapper('🥔');
+  if (name.match(/es|ice|krim|campina|walls/)) return iconWrapper('🍦');
+
+  // Makanan Berat & Mie
+  if (name.match(/bakso|pentol|cilok|tahu/)) return iconWrapper('🍲');
+  if (name.match(/mie|indomie|sedap|noodle|samyang|pop mie|kuah|soto/)) return iconWrapper('🍜');
+  if (name.match(/nasi|makan|lontong|geprek|pecel|ayam/)) return iconWrapper('🍛');
+  if (name.match(/roti|bolu|bakpao|pizza|burger|sari roti/)) return iconWrapper('🍞');
+  if (name.match(/daging|sapi|kambing|sosis|nugget/)) return iconWrapper('🥩');
+  if (name.match(/ikan|lele|nila|udang|seafood/)) return iconWrapper('🐟');
+
+  // Minuman
+  if (name.match(/kopi|teh|panas|good day|kapal api/)) return iconWrapper('☕');
+  if (name.match(/air|mineral|aqua|le minerale|cleo|vit/)) return iconWrapper('💧');
+  if (name.match(/minum|coca|susu|jus|sirup|sprite|fanta|soda/)) return iconWrapper('🥤');
+
+  // Lainnya (Kebutuhan & Bumbu)
+  if (name.match(/obat|panadol|paramex|bodrex|tolak|vitamin|promag/)) return iconWrapper('💊');
+  if (name.match(/sabun|shampo|rinso|sunlight|cuci|odol|pasta gigi|deterjen|pepsodent/)) return iconWrapper('🧼');
+  if (name.match(/rokok|korek|mancis|sampoerna|djarum|gudang/)) return iconWrapper('🚬');
+  if (name.match(/sayur|bayam|kangkung|wortel|tomat|cabe|bawang/)) return iconWrapper('🥬');
+  if (name.match(/buah|apel|jeruk|pisang|mangga|melon/)) return iconWrapper('🍎');
+  
+  return iconWrapper('🛍️');
 };
 
 const hitungTotalHargaItem = (item, qty) => {
@@ -78,7 +93,7 @@ const hitungTotalHargaItem = (item, qty) => {
 };
 
 // =========================================================================
-// KOMPONEN UTAMA (BLUEPRINT TERKUNCI 100%)
+// KOMPONEN UTAMA
 // =========================================================================
 function MainApp() {
   const [dbReady, setDbReady] = useState(false);
@@ -178,7 +193,7 @@ function MainApp() {
     }
   }, []);
 
-  // REALTIME INSTAN (SEKEJAP MATA) - DIRECT PAYLOAD INJECTION
+  // REALTIME INSTAN & SINKRONISASI
   useEffect(() => {
     if (!dbReady) return;
     if (!supabaseClient) { setIsLoadingDB(false); return; }
@@ -197,6 +212,7 @@ function MainApp() {
     };
     loadInitialData();
 
+    // Realtime Subs yang disempurnakan (Pastikan Replication Supabase aktif!)
     const channel = supabaseClient.channel('toko-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'produk' }, (payload) => {
         setProducts(prev => {
@@ -341,7 +357,6 @@ function MainApp() {
     setSelectedProduct(null);
   };
 
-  // FUNGSI UPDATE KERANJANG (DI HALAMAN CHECKOUT)
   const handleUpdateCartQty = (id, change) => {
     const product = products.find(p => p.id === parseInt(id));
     if (!product) return;
@@ -699,7 +714,7 @@ function MainApp() {
               <div className="bg-white w-full max-w-md rounded-[32px] p-8 shadow-2xl animate-slide-up border-4 border-white">
                 <div className="flex justify-between items-center mb-8">
                    <div className="flex items-center gap-4">
-                     <div className="p-4 bg-slate-50 rounded-2xl text-4xl">{getDynamicIcon(selectedProduct.nama)}</div>
+                     <div className="p-4 bg-slate-50 rounded-2xl text-4xl flex items-center justify-center">{getDynamicIcon(selectedProduct.nama)}</div>
                      <div><h3 className="font-black text-xl text-slate-800 leading-tight">{selectedProduct.nama}</h3><p className="text-emerald-600 font-black text-lg">{formatRupiah(selectedProduct.jual)}</p></div>
                    </div>
                    <button onClick={() => setSelectedProduct(null)} className="p-2 bg-slate-100 rounded-full"><X/></button>
@@ -735,7 +750,7 @@ function MainApp() {
         <div className="max-w-md mx-auto p-6 min-h-screen flex flex-col pb-32">
           <button onClick={() => setView('toko')} className="flex items-center gap-2 font-black mb-6 text-slate-400 hover:text-slate-600 transition"><ArrowLeft/> Kembali Belanja</button>
           
-          {/* FITUR BARU: EDIT KERANJANG SEBELUM BAYAR */}
+          {/* FITUR EDIT KERANJANG SEBELUM BAYAR */}
           <div className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-100 mb-6">
             <h3 className="font-black text-lg mb-4 text-slate-800 border-b border-slate-100 pb-3">Keranjang Belanja</h3>
             <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
@@ -745,7 +760,7 @@ function MainApp() {
                 return (
                   <div key={id} className="flex justify-between items-center border-b border-slate-50 pb-4 last:border-0 last:pb-0">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100">{getDynamicIcon(p.nama)}</div>
+                      <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 text-2xl">{getDynamicIcon(p.nama)}</div>
                       <div>
                         <p className="font-bold text-sm text-slate-800 line-clamp-1 max-w-[120px]">{p.nama}</p>
                         <p className="text-[10px] text-emerald-600 font-black">{formatRupiah(p.jual)} / pcs</p>
@@ -853,7 +868,7 @@ function MainApp() {
                 {strukTerakhir?.items?.map((item, idx) => (
                   <div key={idx} className="flex justify-between items-start">
                     <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center mt-0.5 border">
+                      <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center mt-0.5 border text-xl">
                         {getDynamicIcon(item.nama)}
                       </div>
                       <div>
@@ -970,6 +985,15 @@ function MainApp() {
           }
         }).sort((a, b) => b.qty - a.qty); 
 
+        // TAMPILKAN 10 PRODUK TERLARIS (REVISI)
+        const topSelling = productRankings.filter(p => p.qty > 0).slice(0, 10);
+        const bottomSelling = [...productRankings]
+          .filter(p => p.stok > 0)
+          .sort((a, b) => {
+            if (a.qty !== b.qty) return a.qty - b.qty; 
+            return b.daysActive - a.daysActive; 
+          }).slice(0, 5);
+
         return (
           <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row relative">
             
@@ -1046,7 +1070,7 @@ function MainApp() {
                     </div>
 
                     {/* SECTION: REKAP INPUT BARANG */}
-                    <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2"><Package className="text-blue-500"/> Rekap Input Barang (Stok Tersedia)</h2>
+                    <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2"><Package className="text-blue-500"/> Rekap Input Barang (Sesuai Filter Tanggal)</h2>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
                        <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden">
                          <div className="absolute top-0 right-0 p-6 opacity-5"><Package size={64}/></div>
@@ -1087,7 +1111,7 @@ function MainApp() {
                              {productRankings.map((p) => (
                                <tr key={p.id} className="text-sm font-bold hover:bg-slate-50 transition-colors">
                                  <td className="p-4 flex items-center gap-3">
-                                   <div className="w-8 h-8 rounded-xl border border-slate-200 flex items-center justify-center bg-white shrink-0">
+                                   <div className="w-10 h-10 rounded-xl border border-slate-200 flex items-center justify-center bg-white shrink-0 text-xl">
                                       {getDynamicIcon(p.nama)}
                                    </div>
                                    <span className="truncate text-slate-700">{p.nama}</span>
@@ -1101,6 +1125,64 @@ function MainApp() {
                            </tbody>
                         </table>
                       </div>
+                    </div>
+
+                    {/* TABEL PERINGKAT BARANG (10 TERLARIS) */}
+                    <div className="grid lg:grid-cols-2 gap-6 md:gap-8 mb-8 md:mb-12">
+                        {/* Tabel 10 Peringkat Barang Laku */}
+                        <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+                          <div className="p-6 md:p-8 border-b border-slate-100">
+                            <h2 className="font-black text-xl text-slate-800 flex items-center gap-2"><TrendingUp className="text-orange-500"/> 10 Barang Paling Laku</h2>
+                            <p className="text-xs text-slate-500 font-semibold mt-1">Ranking Tertinggi Berdasarkan Terjual.</p>
+                          </div>
+                          <div className="overflow-y-auto max-h-[400px]">
+                            <table className="w-full text-left">
+                               <thead className="bg-slate-50 sticky top-0"><tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest"><th className="p-4">Nama Barang</th><th className="p-4 text-center">Terjual</th><th className="p-4 text-right">Pendapatan</th></tr></thead>
+                               <tbody className="divide-y divide-slate-50">
+                                 {topSelling.length === 0 && <tr><td colSpan="3" className="p-6 text-center text-slate-400 font-bold">Data kosong.</td></tr>}
+                                 {topSelling.map((p, idx) => (
+                                   <tr key={p.id} className="text-sm font-bold hover:bg-slate-50 transition-colors">
+                                     <td className="p-4 flex items-center gap-3">
+                                       <span className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[10px] ${idx < 3 && p.qty > 0 ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-500'}`}>{idx + 1}</span>
+                                       <span className={`truncate ${p.qty === 0 ? 'text-slate-400' : 'text-slate-700'}`}>{p.nama}</span>
+                                     </td>
+                                     <td className="p-4 text-center">
+                                       <span className={`px-2 py-1 rounded-md text-[10px] ${p.qty > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-50 text-rose-500'}`}>{p.qty}</span>
+                                     </td>
+                                     <td className={`p-4 text-right ${p.revenue === 0 ? 'text-slate-400' : 'text-slate-600'}`}>{formatRupiah(p.revenue)}</td>
+                                   </tr>
+                                 ))}
+                               </tbody>
+                            </table>
+                          </div>
+                        </div>
+
+                        {/* Tabel Barang Nganggur */}
+                        <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+                          <div className="p-6 md:p-8 border-b border-slate-100">
+                            <h2 className="font-black text-xl text-slate-800 flex items-center gap-2"><TrendingDown className="text-red-500"/> Perhatian: Kurang Laku</h2>
+                            <p className="text-xs text-slate-500 font-semibold mt-1">Ranking Terendah / Belum Laku.</p>
+                          </div>
+                          <div className="overflow-y-auto max-h-[400px]">
+                            <table className="w-full text-left">
+                               <thead className="bg-slate-50 sticky top-0"><tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest"><th className="p-4">Nama Barang</th><th className="p-4 text-center">Terjual</th><th className="p-4 text-right">Status</th></tr></thead>
+                               <tbody className="divide-y divide-slate-50">
+                                 {bottomSelling.length === 0 && <tr><td colSpan="3" className="p-6 text-center text-slate-400 font-bold">Semua barang laku!</td></tr>}
+                                 {bottomSelling.map((item, idx) => (
+                                   <tr key={idx} className="text-sm font-bold hover:bg-slate-50 transition-colors">
+                                     <td className="p-4 flex items-center gap-3">
+                                       <span className="truncate text-slate-700">{item.nama}</span>
+                                     </td>
+                                     <td className="p-4 text-center">
+                                       <span className="px-2 py-1 rounded-md text-[10px] bg-rose-50 text-rose-500">{item.qty}</span>
+                                     </td>
+                                     <td className="p-4 text-right text-xs text-slate-500">Nganggur {item.daysActive} hr</td>
+                                   </tr>
+                                 ))}
+                               </tbody>
+                            </table>
+                          </div>
+                        </div>
                     </div>
 
                     {/* Tabel Riwayat Transaksi (Modern + Sort By) */}
@@ -1153,6 +1235,26 @@ function MainApp() {
                         <button onClick={handleClearAllProducts} disabled={isProcessing} className="bg-rose-100 text-rose-600 px-6 py-3 rounded-2xl font-black flex items-center justify-center gap-2 shadow-sm hover:bg-rose-200 active:scale-95 transition-all uppercase w-full md:w-auto text-sm"><Trash2 size={18}/> {isProcessing ? 'PROSES...' : 'Hapus Semua'}</button>
                         <button onClick={() => { setEditingId(null); setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '' }); setUseDiskon(false); setShowAddForm(!showAddForm); }} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black flex items-center justify-center gap-2 shadow-xl shadow-emerald-100 hover:bg-emerald-500 active:scale-95 transition-all uppercase w-full md:w-auto text-sm">{showAddForm ? <X size={18}/> : <PlusCircle size={18}/>} {showAddForm ? 'Tutup Form' : 'Tambah Barang'}</button>
                       </div>
+                    </div>
+
+                    {/* CARD SUMMARY DATA BARANG */}
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                        <div className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
+                          <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Total Produk</span>
+                          <span className="text-2xl font-extrabold text-slate-800">{products.length} Item</span>
+                        </div>
+                        <div className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
+                          <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Total Stok</span>
+                          <span className="text-2xl font-extrabold text-blue-600">{products.reduce((sum, p) => sum + (p.stok || 0), 0)} Pcs</span>
+                        </div>
+                        <div className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
+                          <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Total Modal</span>
+                          <span className="text-xl font-extrabold text-rose-600">{formatRupiah(products.reduce((sum, p) => sum + ((p.modal || 0) * (p.stok || 0)), 0))}</span>
+                        </div>
+                        <div className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
+                          <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Potensi Profit</span>
+                          <span className="text-xl font-extrabold text-emerald-600">{formatRupiah(products.reduce((sum, p) => sum + (((p.jual || 0) - (p.modal || 0)) * (p.stok || 0)), 0))}</span>
+                        </div>
                     </div>
 
                     {showAddForm && (
@@ -1221,7 +1323,7 @@ function MainApp() {
                            {products.map(p => (
                              <tr key={p.id} className={`transition-colors ${editingId === p.id ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
                                <td className="p-6 flex items-center gap-4">
-                                 <div className="w-12 h-12 bg-white rounded-2xl border shadow-sm flex items-center justify-center shrink-0">{getDynamicIcon(p.nama)}</div>
+                                 <div className="w-14 h-14 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-center shrink-0">{getDynamicIcon(p.nama)}</div>
                                  <div className="min-w-0">
                                    <p className="font-extrabold text-sm text-slate-900 truncate">{p.nama}</p>
                                    {p.barcode ? <p className="font-mono text-[10px] text-slate-500 mt-1 uppercase tracking-widest flex items-center gap-1"><Barcode size={10}/> {p.barcode}</p> : <p className="text-[10px] text-slate-400 mt-1 italic">No Barcode</p>}
