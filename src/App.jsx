@@ -5,11 +5,12 @@ import {
   Store, QrCode, CreditCard, ChevronRight, ArrowLeft,
   Search, X, Lock, LogOut, TrendingUp, Edit, Trash2, List, TrendingDown,
   Fish, Carrot, Apple, Beef, Soup, Cookie, Pill, Sparkles, Flame, ShoppingBasket, Camera, Download, Power, UploadCloud,
-  AlertTriangle, Copy, Barcode, Share2, Printer, ArrowUpDown, CupSoda, Croissant
+  AlertTriangle, Copy, Barcode, Share2, ArrowUpDown, CupSoda, Croissant
 } from 'lucide-react';
 
 // =========================================================================
 // PENGATURAN KONEKSI SUPABASE (DYNAMIC SCRIPT - BEBAS ERROR BUILD)
+// Blueprint Terkunci! Jangan diubah!
 // =========================================================================
 let supabaseClient = null;
 
@@ -340,6 +341,26 @@ function MainApp() {
     setSelectedProduct(null);
   };
 
+  // FUNGSI UPDATE KERANJANG (DI HALAMAN CHECKOUT)
+  const handleUpdateCartQty = (id, change) => {
+    const product = products.find(p => p.id === parseInt(id));
+    if (!product) return;
+    
+    const currentQty = cart[id] || 0;
+    const newQty = currentQty + change;
+    
+    if (newQty <= 0) {
+      const newCart = { ...cart };
+      delete newCart[id];
+      setCart(newCart);
+      if (Object.keys(newCart).length === 0) setView('toko');
+    } else if (newQty > product.stok) {
+      showToast('Stok tidak mencukupi!', 'error');
+    } else {
+      setCart({ ...cart, [id]: newQty });
+    }
+  };
+
   const totalBelanja = useMemo(() => {
     return Object.entries(cart).reduce((total, [id, qty]) => {
       const p = products.find(prod => prod.id === parseInt(id));
@@ -613,7 +634,7 @@ function MainApp() {
   const searchFilteredProducts = products.filter(p => p.nama?.toLowerCase().includes(searchQuery.toLowerCase()) || p.barcode?.includes(searchQuery));
 
   return (
-    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-emerald-100">
+    <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-emerald-100 relative">
       
       {/* MODAL LIVE SCANNER KAMERA SUPER FOKUS */}
       {isScanningModalOpen && (
@@ -711,9 +732,36 @@ function MainApp() {
 
       {/* VIEW: CHECKOUT */}
       {view === 'checkout' && (
-        <div className="max-w-md mx-auto p-6 min-h-screen flex flex-col">
-          <button onClick={() => setView('toko')} className="flex items-center gap-2 font-black mb-8 text-slate-400 hover:text-slate-600 transition"><ArrowLeft/> Kembali Belanja</button>
+        <div className="max-w-md mx-auto p-6 min-h-screen flex flex-col pb-32">
+          <button onClick={() => setView('toko')} className="flex items-center gap-2 font-black mb-6 text-slate-400 hover:text-slate-600 transition"><ArrowLeft/> Kembali Belanja</button>
           
+          {/* FITUR BARU: EDIT KERANJANG SEBELUM BAYAR */}
+          <div className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-100 mb-6">
+            <h3 className="font-black text-lg mb-4 text-slate-800 border-b border-slate-100 pb-3">Keranjang Belanja</h3>
+            <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2">
+              {Object.entries(cart).map(([id, qty]) => {
+                const p = products.find(prod => prod.id === parseInt(id));
+                if (!p) return null;
+                return (
+                  <div key={id} className="flex justify-between items-center border-b border-slate-50 pb-4 last:border-0 last:pb-0">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100">{getDynamicIcon(p.nama)}</div>
+                      <div>
+                        <p className="font-bold text-sm text-slate-800 line-clamp-1 max-w-[120px]">{p.nama}</p>
+                        <p className="text-[10px] text-emerald-600 font-black">{formatRupiah(p.jual)} / pcs</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 bg-slate-50 rounded-xl p-1 border border-slate-100">
+                      <button onClick={() => handleUpdateCartQty(id, -1)} className="w-8 h-8 flex items-center justify-center bg-white rounded-lg font-black shadow-sm text-slate-700 active:scale-95">-</button>
+                      <span className="font-black text-sm w-5 text-center text-slate-800">{qty}</span>
+                      <button onClick={() => handleUpdateCartQty(id, 1)} className="w-8 h-8 flex items-center justify-center bg-emerald-500 text-white rounded-lg font-black shadow-sm active:scale-95">+</button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
           <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-[40px] p-8 mb-8 shadow-2xl text-white relative overflow-hidden">
              <div className="absolute -top-10 -right-10 opacity-10 rotate-12"><CreditCard size={150}/></div>
              <p className="text-xs opacity-70 font-black uppercase tracking-widest mb-2">Total Tagihan Anda</p>
@@ -769,9 +817,11 @@ function MainApp() {
              );
           })()}
 
-          <button onClick={handleSelesaiBayar} disabled={!metodeBayar || isProcessing} className="mt-auto w-full py-6 bg-slate-900 text-white rounded-3xl font-black text-2xl shadow-xl disabled:opacity-30 active:scale-95 transition-all">
-            {isProcessing ? 'MENYIMPAN...' : 'Selesai & Cetak Struk'}
-          </button>
+          <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-sm border-t border-slate-100 z-50">
+            <button onClick={handleSelesaiBayar} disabled={!metodeBayar || isProcessing} className="w-full max-w-md mx-auto block py-5 bg-slate-900 text-white rounded-[24px] font-black text-xl shadow-2xl disabled:opacity-30 active:scale-95 transition-all">
+              {isProcessing ? 'MENYIMPAN...' : 'Selesai & Cetak Struk'}
+            </button>
+          </div>
         </div>
       )}
 
@@ -898,7 +948,7 @@ function MainApp() {
         const totalModalInput = filteredProductsInput.reduce((sum, p) => sum + ((p.modal || 0) * (p.stok || 0)), 0);
         const potensiKeuntungan = filteredProductsInput.reduce((sum, p) => sum + (((p.jual || 0) - (p.modal || 0)) * (p.stok || 0)), 0);
 
-        // LOGIKA PERINGKAT BARANG
+        // LOGIKA PERINGKAT BARANG & REKAP KESELURUHAN
         const itemSalesMap = {};
         filteredTransactions.forEach(t => {
           t.items.forEach(item => {
@@ -920,37 +970,35 @@ function MainApp() {
           }
         }).sort((a, b) => b.qty - a.qty); 
 
-        const topSelling = productRankings.filter(p => p.qty > 0).slice(0, 5);
-        const bottomSelling = [...productRankings]
-          .filter(p => p.stok > 0)
-          .sort((a, b) => {
-            if (a.qty !== b.qty) return a.qty - b.qty; 
-            return b.daysActive - a.daysActive; 
-          }).slice(0, 5);
-
         return (
           <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row relative">
-            {/* ADMIN SIDEBAR (STICKY/FREEZE) */}
-            <aside className="bg-slate-950 text-white w-full md:w-64 flex-shrink-0 flex flex-col shadow-2xl sticky top-0 z-40 overflow-x-auto md:overflow-x-visible md:overflow-y-auto md:h-screen scrollbar-hide">
+            
+            {/* FITUR BARU: MENU ADMIN SIMETRIS GRID 4 KOTAK DI HP */}
+            <aside className="bg-slate-950 text-white w-full md:w-64 flex-shrink-0 flex flex-col shadow-2xl sticky top-0 z-40 md:h-screen">
               <div className="hidden md:flex p-6 items-center gap-3 border-b border-slate-800 flex-shrink-0">
-                 <Store className="text-emerald-400" size={28} />
+                 <Store className="text-emerald-400 shrink-0" size={28} />
                  <div>
                    <h2 className="font-extrabold text-xl text-white leading-tight tracking-wide">Admin Area</h2>
                    <p className="text-[10px] text-emerald-400 font-black uppercase tracking-widest mt-1">Toko Kejujuran</p>
                  </div>
               </div>
-              <nav className="flex-1 p-4 flex md:flex-col gap-2">
-                <button onClick={() => {setAdminTab('analisa'); setEditingId(null); setShowAddForm(false);}} className={`flex items-center gap-3 px-4 py-3 md:py-4 rounded-2xl w-full text-left transition-all whitespace-nowrap flex-shrink-0 ${adminTab==='analisa' ? 'bg-emerald-500 text-white shadow-md font-black' : 'text-slate-400 hover:bg-slate-800 hover:text-white font-bold'}`}>
-                  <BarChart3 size={20} className="shrink-0" /> <span className="text-sm md:text-base">Analisa Penjualan</span>
+              
+              <nav className="p-2 md:p-4 grid grid-cols-4 md:flex md:flex-col gap-2 w-full">
+                <button onClick={() => {setAdminTab('analisa'); setEditingId(null); setShowAddForm(false);}} className={`flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='analisa' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+                   <BarChart3 size={20} className="md:w-6 md:h-6 shrink-0" />
+                   <span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Analisa<br className="md:hidden"/>Penjualan</span>
                 </button>
-                <button onClick={() => {setAdminTab('barang'); setEditingId(null); setShowAddForm(false);}} className={`flex items-center gap-3 px-4 py-3 md:py-4 rounded-2xl w-full text-left transition-all whitespace-nowrap flex-shrink-0 ${adminTab==='barang' ? 'bg-emerald-500 text-white shadow-md font-black' : 'text-slate-400 hover:bg-slate-800 hover:text-white font-bold'}`}>
-                  <Package size={20} className="shrink-0" /> <span className="text-sm md:text-base">Manajemen Barang</span>
+                <button onClick={() => {setAdminTab('barang'); setEditingId(null); setShowAddForm(false);}} className={`flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='barang' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+                   <Package size={20} className="md:w-6 md:h-6 shrink-0" />
+                   <span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Data<br className="md:hidden"/>Barang</span>
                 </button>
-                <button onClick={() => {setAdminTab('pengaturan'); setEditingId(null); setShowAddForm(false);}} className={`flex items-center gap-3 px-4 py-3 md:py-4 rounded-2xl w-full text-left transition-all whitespace-nowrap flex-shrink-0 ${adminTab==='pengaturan' ? 'bg-emerald-500 text-white shadow-md font-black' : 'text-slate-400 hover:bg-slate-800 hover:text-white font-bold'}`}>
-                  <Settings size={20} className="shrink-0" /> <span className="text-sm md:text-base">Pengaturan Toko</span>
+                <button onClick={() => {setAdminTab('pengaturan'); setEditingId(null); setShowAddForm(false);}} className={`flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='pengaturan' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}>
+                   <Settings size={20} className="md:w-6 md:h-6 shrink-0" />
+                   <span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Pengaturan<br className="md:hidden"/>Toko</span>
                 </button>
-                <button onClick={handleLogout} className="md:mt-auto flex items-center gap-3 px-4 py-3 md:py-4 rounded-2xl w-full text-left text-rose-400 hover:bg-slate-800 hover:text-rose-300 font-black transition-all whitespace-nowrap flex-shrink-0">
-                  <LogOut size={20} className="shrink-0" /> <span className="text-sm md:text-base">Keluar (Logout)</span>
+                <button onClick={handleLogout} className="flex flex-col md:flex-row md:mt-auto items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl text-rose-500 hover:bg-slate-800 hover:text-rose-400 transition-all">
+                   <LogOut size={20} className="md:w-6 md:h-6 shrink-0" />
+                   <span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Keluar<br className="md:hidden"/>Admin</span>
                 </button>
               </nav>
             </aside>
@@ -1017,62 +1065,42 @@ function MainApp() {
                        </div>
                     </div>
 
-                    {/* TABEL PERINGKAT BARANG */}
-                    <div className="grid lg:grid-cols-2 gap-6 md:gap-8 mb-8 md:mb-12">
-                        {/* Tabel Peringkat Barang Laku */}
-                        <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
-                          <div className="p-6 md:p-8 border-b border-slate-100">
-                            <h2 className="font-black text-xl text-slate-800 flex items-center gap-2"><TrendingUp className="text-orange-500"/> Barang Paling Laku</h2>
-                            <p className="text-xs text-slate-500 font-semibold mt-1">Ranking Tertinggi.</p>
-                          </div>
-                          <div className="overflow-y-auto max-h-[400px]">
-                            <table className="w-full text-left">
-                               <thead className="bg-slate-50 sticky top-0"><tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest"><th className="p-4">Nama Barang</th><th className="p-4 text-center">Terjual</th><th className="p-4 text-right">Pendapatan</th></tr></thead>
-                               <tbody className="divide-y divide-slate-50">
-                                 {topSelling.length === 0 && <tr><td colSpan="3" className="p-6 text-center text-slate-400 font-bold">Data kosong.</td></tr>}
-                                 {topSelling.map((p, idx) => (
-                                   <tr key={p.id} className="text-sm font-bold hover:bg-slate-50 transition-colors">
-                                     <td className="p-4 flex items-center gap-3">
-                                       <span className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[10px] ${idx < 3 && p.qty > 0 ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-500'}`}>{idx + 1}</span>
-                                       <span className={`truncate ${p.qty === 0 ? 'text-slate-400' : 'text-slate-700'}`}>{p.nama}</span>
-                                     </td>
-                                     <td className="p-4 text-center">
-                                       <span className={`px-2 py-1 rounded-md text-[10px] ${p.qty > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-rose-50 text-rose-500'}`}>{p.qty}</span>
-                                     </td>
-                                     <td className={`p-4 text-right ${p.revenue === 0 ? 'text-slate-400' : 'text-slate-600'}`}>{formatRupiah(p.revenue)}</td>
-                                   </tr>
-                                 ))}
-                               </tbody>
-                            </table>
-                          </div>
-                        </div>
-
-                        {/* Tabel Barang Nganggur */}
-                        <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
-                          <div className="p-6 md:p-8 border-b border-slate-100">
-                            <h2 className="font-black text-xl text-slate-800 flex items-center gap-2"><TrendingDown className="text-red-500"/> Perhatian: Kurang Laku</h2>
-                            <p className="text-xs text-slate-500 font-semibold mt-1">Ranking Terendah / Belum Laku.</p>
-                          </div>
-                          <div className="overflow-y-auto max-h-[400px]">
-                            <table className="w-full text-left">
-                               <thead className="bg-slate-50 sticky top-0"><tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest"><th className="p-4">Nama Barang</th><th className="p-4 text-center">Terjual</th><th className="p-4 text-right">Status</th></tr></thead>
-                               <tbody className="divide-y divide-slate-50">
-                                 {bottomSelling.length === 0 && <tr><td colSpan="3" className="p-6 text-center text-slate-400 font-bold">Semua barang laku!</td></tr>}
-                                 {bottomSelling.map((item, idx) => (
-                                   <tr key={idx} className="text-sm font-bold hover:bg-slate-50 transition-colors">
-                                     <td className="p-4 flex items-center gap-3">
-                                       <span className="truncate text-slate-700">{item.nama}</span>
-                                     </td>
-                                     <td className="p-4 text-center">
-                                       <span className="px-2 py-1 rounded-md text-[10px] bg-rose-50 text-rose-500">{item.qty}</span>
-                                     </td>
-                                     <td className="p-4 text-right text-xs text-slate-500">Nganggur {item.daysActive} hr</td>
-                                   </tr>
-                                 ))}
-                               </tbody>
-                            </table>
-                          </div>
-                        </div>
+                    {/* FITUR BARU: TABEL REKAP KESELURUHAN PER BARANG */}
+                    <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col mb-8">
+                      <div className="p-6 md:p-8 border-b border-slate-100">
+                        <h2 className="font-black text-xl text-slate-800 flex items-center gap-2"><Package className="text-emerald-500"/> Rekap Keseluruhan per Barang</h2>
+                        <p className="text-xs text-slate-500 font-semibold mt-1">Total ketersediaan dan penjualan berdasarkan nama barang.</p>
+                      </div>
+                      <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
+                        <table className="w-full text-left min-w-[600px]">
+                           <thead className="bg-slate-50 sticky top-0 shadow-sm">
+                             <tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest">
+                               <th className="p-4">Nama Barang</th>
+                               <th className="p-4 text-center">Terjual</th>
+                               <th className="p-4 text-center">Sisa Stok</th>
+                               <th className="p-4 text-center">Total Awal (Stok+Terjual)</th>
+                               <th className="p-4 text-right">Pendapatan</th>
+                             </tr>
+                           </thead>
+                           <tbody className="divide-y divide-slate-50">
+                             {productRankings.length === 0 && <tr><td colSpan="5" className="p-6 text-center text-slate-400 font-bold">Data kosong.</td></tr>}
+                             {productRankings.map((p) => (
+                               <tr key={p.id} className="text-sm font-bold hover:bg-slate-50 transition-colors">
+                                 <td className="p-4 flex items-center gap-3">
+                                   <div className="w-8 h-8 rounded-xl border border-slate-200 flex items-center justify-center bg-white shrink-0">
+                                      {getDynamicIcon(p.nama)}
+                                   </div>
+                                   <span className="truncate text-slate-700">{p.nama}</span>
+                                 </td>
+                                 <td className="p-4 text-center text-emerald-600 font-black">{p.qty}</td>
+                                 <td className="p-4 text-center text-blue-600 font-black">{p.stok}</td>
+                                 <td className="p-4 text-center text-slate-600 font-black">{p.stok + p.qty}</td>
+                                 <td className="p-4 text-right text-slate-800 font-black">{formatRupiah(p.revenue)}</td>
+                               </tr>
+                             ))}
+                           </tbody>
+                        </table>
+                      </div>
                     </div>
 
                     {/* Tabel Riwayat Transaksi (Modern + Sort By) */}
