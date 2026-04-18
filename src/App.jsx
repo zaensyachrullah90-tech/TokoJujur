@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
+  Coffee, Utensils, Package, IceCream, Droplet, Candy, 
   CheckCircle, Settings, BarChart3, PlusCircle, 
   Store, QrCode, CreditCard, ChevronRight, ArrowLeft,
   Search, X, Lock, LogOut, TrendingUp, Edit, Trash2, List, TrendingDown,
-  Camera, Download, Power, UploadCloud, AlertTriangle, Copy, Barcode, Share2, ArrowUpDown, Package
+  Camera, Download, Power, UploadCloud, AlertTriangle, Copy, Barcode, Share2, ArrowUpDown
 } from 'lucide-react';
 
 // =========================================================================
@@ -54,17 +55,18 @@ const getDynamicIcon = (namaBarang) => {
   );
 
   // Snack, Jajanan & Manisan
+  if (name.match(/kacang|peanut|sukro|garuda|dua kelinci/)) return iconWrapper('🥜');
   if (name.match(/wafer|tango|nabati|beng|biskuat|nissin|biskuit/)) return iconWrapper('🧇');
   if (name.match(/coklat|chocolate|silverqueen|choki|delfi|milo|cadbury/)) return iconWrapper('🍫');
   if (name.match(/permen|candy|yupi|kopiko|kiss|mint|sugus|relaxa/)) return iconWrapper('🍬');
-  if (name.match(/snack|ciki|chiki|keripik|taro|lays|citato|chitato|qtela|piattos|kacang|sukro|garuda/)) return iconWrapper('🍟');
+  if (name.match(/snack|ciki|chiki|keripik|taro|lays|citato|chitato|qtela|piattos|potabee/)) return iconWrapper('🍿');
   if (name.match(/es|ice|krim|campina|walls|aice/)) return iconWrapper('🍦');
 
   // Makanan Berat & Mie
   if (name.match(/bakso|pentol|cilok|tahu|soto|kuah/)) return iconWrapper('🍲');
   if (name.match(/mie|indomie|sedap|noodle|samyang|pop mie|sarimi/)) return iconWrapper('🍜');
   if (name.match(/nasi|makan|lontong|geprek|pecel|ayam|gorengan/)) return iconWrapper('🍛');
-  if (name.match(/roti|bolu|bakpao|pizza|burger|sari roti|kue/)) return iconWrapper('🥐');
+  if (name.match(/roti|bolu|bakpao|pizza|burger|sari roti|kue/)) return iconWrapper('🍞');
   if (name.match(/daging|sapi|kambing|sosis|nugget|kornet/)) return iconWrapper('🥩');
   if (name.match(/ikan|lele|nila|udang|seafood|sarden/)) return iconWrapper('🐟');
 
@@ -530,7 +532,6 @@ function MainApp() {
     e.preventDefault();
     if (!supabaseClient) return showToast('Database belum terhubung', 'error');
     
-    // CEK TOLAK BARANG GANDA
     const isDuplicate = products.some(p => {
       const isNameSame = p.nama.toLowerCase().trim() === newProduct.nama.toLowerCase().trim();
       const isBarcodeSame = newProduct.barcode && p.barcode === newProduct.barcode;
@@ -596,7 +597,6 @@ function MainApp() {
     if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda yakin MENGHAPUS SELURUH RIWAYAT TRANSAKSI PENJUALAN?\nSTOK BARANG AKAN DIKEMBALIKAN SEPERTI SEMULA!")) {
       setIsProcessing(true);
       
-      // 1. Hitung stok yang harus dikembalikan
       const stockToRestore = {};
       transactions.forEach(t => {
         t.items.forEach(item => {
@@ -605,7 +605,6 @@ function MainApp() {
         });
       });
 
-      // 2. Update stok secara optimistic
       setProducts(prevProducts => prevProducts.map(p => {
         if (stockToRestore[p.id]) {
           return { ...p, stok: p.stok + stockToRestore[p.id] };
@@ -614,7 +613,6 @@ function MainApp() {
       }));
       setTransactions([]); 
 
-      // 3. Update stok ke database Supabase
       for (const [productId, qtyToReturn] of Object.entries(stockToRestore)) {
         const product = products.find(p => p.id === parseInt(productId));
         if (product) {
@@ -622,7 +620,6 @@ function MainApp() {
         }
       }
 
-      // 4. Hapus seluruh data transaksi
       const { error } = await supabaseClient.from('transaksi').delete().neq('id', '0'); 
       if (error) {
         showToast(`Gagal Server: ${error.message}`, 'error');
@@ -710,7 +707,7 @@ function MainApp() {
       {/* VIEW: TOKO */}
       {view === 'toko' && (
         <div className="pb-28">
-          <header className="bg-white p-4 shadow-sm sticky top-0 z-40">
+          <header className="bg-white p-4 shadow-sm sticky top-0 z-40 mb-4">
             <div className="flex justify-between items-center mb-4 max-w-5xl mx-auto">
               <div className="flex items-center gap-2 text-emerald-600 font-black text-xl"><Store/> {settings.nama_toko}</div>
               <div className="flex items-center gap-2">
@@ -727,14 +724,29 @@ function MainApp() {
             </div>
           </header>
 
-          <main className="p-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 max-w-5xl mx-auto">
+          {/* PANDUAN PEMBELIAN */}
+          <div className="max-w-5xl mx-auto px-4 mb-4">
+            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 shadow-sm">
+              <h3 className="font-extrabold text-emerald-800 text-sm mb-2 flex items-center gap-2">
+                <CheckCircle size={16} /> Panduan Pembelian:
+              </h3>
+              <ol className="list-decimal list-inside text-xs font-bold text-emerald-700 space-y-1 ml-1">
+                <li>Pilih Barang yang ingin dibeli</li>
+                <li>Pilih Metode Pembayaran di menu Bayar</li>
+                <li>Klik Selesai dan Cetak Struk</li>
+                <li>Silakan Melakukan Pembayaran (Transfer / Scan QRIS) yang tertera pada struk</li>
+              </ol>
+            </div>
+          </div>
+
+          <main className="p-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 max-w-5xl mx-auto pt-0">
             {searchFilteredProducts.map(p => (
               <div key={p.id} onClick={() => openProductModal(p)} className="bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col items-center text-center relative active:scale-95 transition-all group hover:shadow-md cursor-pointer border-b-4 border-b-slate-100 overflow-hidden">
                 {cart[p.id] > 0 && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] font-black px-2 py-1 rounded-bl-xl shadow-lg">{cart[p.id]}</div>}
                 <div className="mb-4 bg-slate-50 w-20 h-20 rounded-full transition-colors flex items-center justify-center">{getDynamicIcon(p.nama)}</div>
                 <h3 className="font-bold text-sm mb-1 line-clamp-2 h-10 text-slate-700">{p.nama}</h3>
                 <p className="text-emerald-600 font-black mb-2 text-lg">{formatRupiah(p.jual)}</p>
-                <div className={`text-[10px] font-black px-2 py-0.5 rounded-full ${(p.stok||0) > 5 ? 'bg-blue-50 text-blue-500' : 'bg-rose-50 text-rose-500'}`}>Sisa: {p.stok || 0}</div>
+                <div className={`text-[10px] font-black px-2 py-0.5 rounded-full whitespace-nowrap w-max mx-auto ${(p.stok||0) > 5 ? 'bg-blue-50 text-blue-500' : 'bg-rose-50 text-rose-500'}`}>Sisa: {p.stok || 0}</div>
               </div>
             ))}
             {searchFilteredProducts.length === 0 && <div className="col-span-full text-center text-slate-400 mt-10 font-bold">Barang tidak ditemukan.</div>}
@@ -791,7 +803,7 @@ function MainApp() {
                 return (
                   <div key={id} className="flex justify-between items-center border-b border-slate-50 pb-4 last:border-0 last:pb-0">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100">{getDynamicIcon(p.nama)}</div>
+                      <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 text-2xl">{getDynamicIcon(p.nama)}</div>
                       <div>
                         <p className="font-bold text-sm text-slate-800 line-clamp-1 max-w-[120px]">{p.nama}</p>
                         <p className="text-[10px] text-emerald-600 font-black">{formatRupiah(p.jual)} / pcs</p>
@@ -826,45 +838,6 @@ function MainApp() {
              </button>
           </div>
 
-          {/* MENAMPILKAN QRIS SAAT PEMBAYARAN */}
-          {metodeBayar === 'qris' && (
-             <div className="p-8 bg-white rounded-[40px] border-2 border-slate-50 shadow-sm mb-10 text-center animate-fade-in flex flex-col items-center">
-               {settings.qris_url ? (
-                 <>
-                   <img src={formatImageUrl(settings.qris_url)} className="w-64 h-64 mx-auto mb-6 border p-4 rounded-3xl shadow-sm object-contain bg-white" alt="QRIS Pembayaran"/>
-                   <button onClick={handleDownloadQRIS} className="mb-4 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-6 py-3 rounded-2xl font-black flex items-center gap-2 transition-all active:scale-95">
-                     <Download size={18}/> DOWNLOAD QRIS
-                   </button>
-                 </>
-               ) : (
-                 <div className="w-64 h-64 mx-auto mb-6 border-2 border-dashed border-slate-200 rounded-3xl flex items-center justify-center bg-slate-50 text-slate-400 font-bold text-sm">QRIS Belum Diatur</div>
-               )}
-               <p className="text-[10px] text-slate-400 font-black tracking-[0.2em] uppercase">Scan untuk Kejujuran</p>
-             </div>
-          )}
-
-          {/* MENAMPILKAN REKENING SAAT PEMBAYARAN */}
-          {metodeBayar === 'transfer' && (() => {
-             const rekStr = settings.rekening || '';
-             const matchResult = rekStr.match(/\d+/);
-             const noRek = matchResult ? matchResult[0] : '-';
-             const pemilik = rekStr.split(/a\.?n\.?/i)[1] || 'Toko';
-             return (
-               <div className="p-8 bg-white rounded-[40px] border-2 border-slate-50 shadow-sm mb-10 animate-fade-in text-center relative overflow-hidden">
-                 <div className="absolute top-0 right-0 p-4 opacity-5"><Copy size={80}/></div>
-                 <p className="text-xs text-slate-400 font-black mb-4 uppercase tracking-widest">Nomor Rekening</p>
-                 <div className="flex items-center justify-center gap-4 mb-4">
-                    <h4 className="text-3xl font-black tracking-tighter text-slate-800">{noRek}</h4> 
-                    <button onClick={handleCopyRekening} className="p-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition active:scale-90" title="Salin Rekening"><Copy size={20}/></button>
-                 </div>
-                 <div className="bg-slate-50 p-4 rounded-2xl inline-block border border-slate-100 max-w-full overflow-hidden">
-                    <p className="font-black text-slate-500 uppercase text-[10px] tracking-widest">Bank & Nama Pemilik:</p>
-                    <p className="font-bold text-slate-800 mt-1 truncate px-2">{pemilik.trim()}</p>
-                 </div>
-               </div>
-             );
-          })()}
-
           <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-sm border-t border-slate-100 z-50">
             <button onClick={handleSelesaiBayar} disabled={!metodeBayar || isProcessing} className="w-full max-w-md mx-auto block py-5 bg-slate-900 text-white rounded-[24px] font-black text-xl shadow-2xl disabled:opacity-30 active:scale-95 transition-all">
               {isProcessing ? 'MENYIMPAN...' : 'Selesai & Cetak Struk'}
@@ -873,7 +846,7 @@ function MainApp() {
         </div>
       )}
 
-      {/* VIEW: STRUK (MODERN + SHARE/PRINT) */}
+      {/* VIEW: STRUK (MODERN + SHARE/PRINT + PEMBAYARAN) */}
       {view === 'struk' && (
         <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4">
           <div className="mb-6 flex flex-col items-center animate-slide-up">
@@ -920,8 +893,30 @@ function MainApp() {
               </div>
             </div>
 
-            <div className="bg-gray-50 p-4 text-center border-t border-dashed">
-              <p className="text-xs text-gray-400 uppercase font-bold tracking-widest">Metode: {strukTerakhir?.metode}</p>
+            {/* BLOK INFORMASI PEMBAYARAN DI STRUK (AGAR BISA BAYAR SETELAH CHECKOUT) */}
+            <div className="bg-gray-50 p-6 text-center border-t border-dashed">
+               <p className="text-xs text-gray-400 uppercase font-bold tracking-widest mb-3">Selesaikan Pembayaran: {strukTerakhir?.metode}</p>
+               
+               {strukTerakhir?.metode === 'qris' && settings.qris_url && (
+                 <div className="flex flex-col items-center">
+                   <img src={formatImageUrl(settings.qris_url)} className="w-48 h-48 mx-auto border p-2 rounded-2xl shadow-sm object-contain bg-white mb-3" alt="QRIS Pembayaran"/>
+                   <button onClick={handleDownloadQRIS} className="bg-emerald-100 hover:bg-emerald-200 text-emerald-800 px-4 py-2 rounded-xl font-black flex items-center gap-2 transition-all active:scale-95 text-[10px] uppercase">
+                     <Download size={14}/> Download QRIS
+                   </button>
+                 </div>
+               )}
+
+               {strukTerakhir?.metode === 'transfer' && (
+                 <div className="flex flex-col items-center">
+                    <div className="flex items-center justify-center gap-3 mb-2">
+                      <h4 className="text-2xl font-black tracking-tighter text-slate-800">{settings.rekening.match(/\d+/) ? settings.rekening.match(/\d+/)[0] : '-'}</h4> 
+                      <button onClick={handleCopyRekening} className="p-2 bg-slate-900 text-white rounded-xl hover:bg-slate-800 transition active:scale-90" title="Salin Rekening"><Copy size={16}/></button>
+                    </div>
+                    <div className="bg-white p-2 rounded-xl inline-block border border-slate-200 max-w-full overflow-hidden">
+                      <p className="font-bold text-slate-800 text-xs truncate px-2">{settings.rekening.split(/a\.?n\.?/i)[1] ? settings.rekening.split(/a\.?n\.?/i)[1].trim() : 'Toko'}</p>
+                    </div>
+                 </div>
+               )}
             </div>
             
             <div className="absolute top-[80px] -left-4 w-8 h-8 bg-slate-100 rounded-full"></div>
