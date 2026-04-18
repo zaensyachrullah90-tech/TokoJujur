@@ -44,7 +44,7 @@ const formatImageUrl = (url) => {
 };
 
 // =========================================================================
-// 1. UPDATE: IKON REALISTIS (3D EMOJI SHADOW)
+// 1. UPDATE: IKON REALISTIS (3D EMOJI SHADOW) SESUAI PERMINTAAN
 // =========================================================================
 const getDynamicIcon = (namaBarang) => {
   const name = (namaBarang || '').toLowerCase();
@@ -54,29 +54,29 @@ const getDynamicIcon = (namaBarang) => {
   );
 
   // Snack, Jajanan & Manisan
-  if (name.match(/wafer|tango|nabati|beng|biskuat|nissin/)) return iconWrapper('🧇');
+  if (name.match(/wafer|tango|nabati|beng|biskuat|nissin|biskuit/)) return iconWrapper('🧇');
   if (name.match(/coklat|chocolate|silverqueen|choki|delfi|milo|cadbury/)) return iconWrapper('🍫');
-  if (name.match(/permen|candy|yupi|kopiko|kiss|mint|sugus/)) return iconWrapper('🍬');
-  if (name.match(/snack|ciki|chiki|keripik|taro|lays|citato|chitato|qtela|piattos/)) return iconWrapper('🥔');
-  if (name.match(/es|ice|krim|campina|walls/)) return iconWrapper('🍦');
+  if (name.match(/permen|candy|yupi|kopiko|kiss|mint|sugus|relaxa/)) return iconWrapper('🍬');
+  if (name.match(/snack|ciki|chiki|keripik|taro|lays|citato|chitato|qtela|piattos|kacang|sukro|garuda/)) return iconWrapper('🍟');
+  if (name.match(/es|ice|krim|campina|walls|aice/)) return iconWrapper('🍦');
 
   // Makanan Berat & Mie
-  if (name.match(/bakso|pentol|cilok|tahu/)) return iconWrapper('🍲');
-  if (name.match(/mie|indomie|sedap|noodle|samyang|pop mie|kuah|soto/)) return iconWrapper('🍜');
-  if (name.match(/nasi|makan|lontong|geprek|pecel|ayam/)) return iconWrapper('🍛');
-  if (name.match(/roti|bolu|bakpao|pizza|burger|sari roti/)) return iconWrapper('🍞');
-  if (name.match(/daging|sapi|kambing|sosis|nugget/)) return iconWrapper('🥩');
-  if (name.match(/ikan|lele|nila|udang|seafood/)) return iconWrapper('🐟');
+  if (name.match(/bakso|pentol|cilok|tahu|soto|kuah/)) return iconWrapper('🍲');
+  if (name.match(/mie|indomie|sedap|noodle|samyang|pop mie|sarimi/)) return iconWrapper('🍜');
+  if (name.match(/nasi|makan|lontong|geprek|pecel|ayam|gorengan/)) return iconWrapper('🍛');
+  if (name.match(/roti|bolu|bakpao|pizza|burger|sari roti|kue/)) return iconWrapper('🥐');
+  if (name.match(/daging|sapi|kambing|sosis|nugget|kornet/)) return iconWrapper('🥩');
+  if (name.match(/ikan|lele|nila|udang|seafood|sarden/)) return iconWrapper('🐟');
 
   // Minuman
-  if (name.match(/kopi|teh|panas|good day|kapal api/)) return iconWrapper('☕');
+  if (name.match(/kopi|teh|panas|good day|kapal api|nescafe/)) return iconWrapper('☕');
   if (name.match(/air|mineral|aqua|le minerale|cleo|vit/)) return iconWrapper('💧');
-  if (name.match(/minum|coca|susu|jus|sirup|sprite|fanta|soda/)) return iconWrapper('🥤');
+  if (name.match(/minum|coca|susu|jus|sirup|sprite|fanta|soda|nutrisari|floridina/)) return iconWrapper('🥤');
 
   // Lainnya (Kebutuhan & Bumbu)
   if (name.match(/obat|panadol|paramex|bodrex|tolak|vitamin|promag/)) return iconWrapper('💊');
-  if (name.match(/sabun|shampo|rinso|sunlight|cuci|odol|pasta gigi|deterjen|pepsodent/)) return iconWrapper('🧼');
-  if (name.match(/rokok|korek|mancis|sampoerna|djarum|gudang/)) return iconWrapper('🚬');
+  if (name.match(/sabun|shampo|rinso|sunlight|cuci|odol|pasta gigi|deterjen|pepsodent|biore|lifebuoy/)) return iconWrapper('🧼');
+  if (name.match(/rokok|korek|mancis|sampoerna|djarum|gudang|surya/)) return iconWrapper('🚬');
   if (name.match(/sayur|bayam|kangkung|wortel|tomat|cabe|bawang/)) return iconWrapper('🥬');
   if (name.match(/buah|apel|jeruk|pisang|mangga|melon/)) return iconWrapper('🍎');
   
@@ -169,7 +169,7 @@ function MainApp() {
   useEffect(() => { try { localStorage.setItem('tokojujur_view', view); } catch(e){} }, [view]);
   useEffect(() => { try { localStorage.setItem('tokojujur_admintab', adminTab); } catch(e){} }, [adminTab]);
 
-  // INISIALISASI SUPABASE KLIEN (AMAN)
+  // INISIALISASI SUPABASE KLIEN
   useEffect(() => {
     const initSupabase = () => {
       try {
@@ -193,7 +193,7 @@ function MainApp() {
     }
   }, []);
 
-  // REALTIME INSTAN & SINKRONISASI
+  // REALTIME INSTAN (SEKEJAP MATA) & INITIAL FETCH
   useEffect(() => {
     if (!dbReady) return;
     if (!supabaseClient) { setIsLoadingDB(false); return; }
@@ -212,7 +212,6 @@ function MainApp() {
     };
     loadInitialData();
 
-    // Realtime Subs yang disempurnakan (Pastikan Replication Supabase aktif!)
     const channel = supabaseClient.channel('toko-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'produk' }, (payload) => {
         setProducts(prev => {
@@ -243,6 +242,7 @@ function MainApp() {
     return () => { supabaseClient.removeChannel(channel); }
   }, [dbReady]);
 
+  // FUNGSI COPY REKENING
   const handleCopyRekening = () => {
     const amanRekening = settings.rekening || '';
     const matchAngka = amanRekening.match(/\d+/);
@@ -250,13 +250,13 @@ function MainApp() {
     
     if (navigator.clipboard && navigator.clipboard.writeText && textToCopy) {
       navigator.clipboard.writeText(textToCopy);
-      showToast('Rekening Disalin', 'success');
+      showToast('Berhasil Menyalin Nomor Rekening!', 'success');
     } else if (textToCopy) {
       const textArea = document.createElement("textarea");
       textArea.value = textToCopy;
       document.body.appendChild(textArea);
       textArea.select();
-      try { document.execCommand('copy'); showToast('Rekening Disalin', 'success'); } catch(e) {}
+      try { document.execCommand('copy'); showToast('Berhasil Menyalin Nomor Rekening!', 'success'); } catch(e) {}
       document.body.removeChild(textArea);
     }
   };
@@ -300,14 +300,12 @@ function MainApp() {
 
   const handleBarcodeResultAdmin = async (code) => {
     setNewProduct(prev => ({ ...prev, barcode: code }));
-    
     const localProduct = products.find(p => p.barcode === code);
     if (localProduct) {
-      showToast(`Membaca data: ${localProduct.nama}`, 'success');
+      showToast(`Membaca data lokal: ${localProduct.nama}`, 'success');
       return; 
     }
-
-    showToast('Barcode Terbaca! Mencari di internet...', 'success');
+    showToast('Barcode Terbaca! Mencari nama di internet...', 'success');
     try {
       const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
       const data = await res.json();
@@ -328,7 +326,7 @@ function MainApp() {
             const barcodes = await detector.detect(videoRef.current);
             if (barcodes.length > 0) {
               const code = barcodes[0].rawValue;
-              playBeep(); // Efek Suara BEEP
+              playBeep(); // Efek Suara BEEP saat terbaca
               stopScanner();
               if (scanTarget === 'toko') handleBarcodeResultToko(code);
               else handleBarcodeResultAdmin(code);
@@ -360,7 +358,6 @@ function MainApp() {
   const handleUpdateCartQty = (id, change) => {
     const product = products.find(p => p.id === parseInt(id));
     if (!product) return;
-    
     const currentQty = cart[id] || 0;
     const newQty = currentQty + change;
     
@@ -370,7 +367,7 @@ function MainApp() {
       setCart(newCart);
       if (Object.keys(newCart).length === 0) setView('toko');
     } else if (newQty > product.stok) {
-      showToast('Stok tidak mencukupi!', 'error');
+      showToast('Sisa stok tidak mencukupi!', 'error');
     } else {
       setCart({ ...cart, [id]: newQty });
     }
@@ -385,7 +382,7 @@ function MainApp() {
 
   const jumlahItem = Object.values(cart).reduce((a, b) => a + b, 0);
 
-  // TRANSAKSI SEKEJAP MATA
+  // TRANSAKSI SEKEJAP MATA (OPTIMISTIC + BG SYNC)
   const handleSelesaiBayar = async () => {
     if (!supabaseClient) return showToast('Koneksi Database Terputus!', 'error');
     setIsProcessing(true);
@@ -533,6 +530,7 @@ function MainApp() {
     e.preventDefault();
     if (!supabaseClient) return showToast('Database belum terhubung', 'error');
     
+    // CEK TOLAK BARANG GANDA
     const isDuplicate = products.some(p => {
       const isNameSame = p.nama.toLowerCase().trim() === newProduct.nama.toLowerCase().trim();
       const isBarcodeSame = newProduct.barcode && p.barcode === newProduct.barcode;
@@ -592,13 +590,46 @@ function MainApp() {
     }
   };
 
+  // UPDATE: RESET UJI COBA MENGEMBALIKAN STOK KE JUMLAH SEMULA
   const handleClearTransactions = async () => {
     if (!supabaseClient) return;
-    if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda benar-benar yakin MENGHAPUS SELURUH RIWAYAT TRANSAKSI PENJUALAN?\n\nData yang dihapus TIDAK BISA DIKEMBALIKAN!")) {
+    if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda yakin MENGHAPUS SELURUH RIWAYAT TRANSAKSI PENJUALAN?\nSTOK BARANG AKAN DIKEMBALIKAN SEPERTI SEMULA!")) {
+      setIsProcessing(true);
+      
+      // 1. Hitung stok yang harus dikembalikan
+      const stockToRestore = {};
+      transactions.forEach(t => {
+        t.items.forEach(item => {
+          if (!stockToRestore[item.id]) stockToRestore[item.id] = 0;
+          stockToRestore[item.id] += item.qty;
+        });
+      });
+
+      // 2. Update stok secara optimistic
+      setProducts(prevProducts => prevProducts.map(p => {
+        if (stockToRestore[p.id]) {
+          return { ...p, stok: p.stok + stockToRestore[p.id] };
+        }
+        return p;
+      }));
       setTransactions([]); 
+
+      // 3. Update stok ke database Supabase
+      for (const [productId, qtyToReturn] of Object.entries(stockToRestore)) {
+        const product = products.find(p => p.id === parseInt(productId));
+        if (product) {
+          await supabaseClient.from('produk').update({ stok: (product.stok || 0) + qtyToReturn }).eq('id', product.id);
+        }
+      }
+
+      // 4. Hapus seluruh data transaksi
       const { error } = await supabaseClient.from('transaksi').delete().neq('id', '0'); 
-      if (error) showToast(`Gagal Server: ${error.message}`, 'error');
-      else showToast('Seluruh riwayat transaksi dihapus!', 'success');
+      if (error) {
+        showToast(`Gagal Server: ${error.message}`, 'error');
+      } else {
+        showToast('Transaksi dihapus & Stok barang telah dikembalikan!', 'success');
+      }
+      setIsProcessing(false);
     }
   };
 
@@ -700,7 +731,7 @@ function MainApp() {
             {searchFilteredProducts.map(p => (
               <div key={p.id} onClick={() => openProductModal(p)} className="bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col items-center text-center relative active:scale-95 transition-all group hover:shadow-md cursor-pointer border-b-4 border-b-slate-100 overflow-hidden">
                 {cart[p.id] > 0 && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] font-black px-2 py-1 rounded-bl-xl shadow-lg">{cart[p.id]}</div>}
-                <div className="mb-4 bg-slate-50 p-4 rounded-full transition-colors flex items-center justify-center">{getDynamicIcon(p.nama)}</div>
+                <div className="mb-4 bg-slate-50 w-20 h-20 rounded-full transition-colors flex items-center justify-center">{getDynamicIcon(p.nama)}</div>
                 <h3 className="font-bold text-sm mb-1 line-clamp-2 h-10 text-slate-700">{p.nama}</h3>
                 <p className="text-emerald-600 font-black mb-2 text-lg">{formatRupiah(p.jual)}</p>
                 <div className={`text-[10px] font-black px-2 py-0.5 rounded-full ${(p.stok||0) > 5 ? 'bg-blue-50 text-blue-500' : 'bg-rose-50 text-rose-500'}`}>Sisa: {p.stok || 0}</div>
@@ -714,7 +745,7 @@ function MainApp() {
               <div className="bg-white w-full max-w-md rounded-[32px] p-8 shadow-2xl animate-slide-up border-4 border-white">
                 <div className="flex justify-between items-center mb-8">
                    <div className="flex items-center gap-4">
-                     <div className="p-4 bg-slate-50 rounded-2xl text-4xl flex items-center justify-center">{getDynamicIcon(selectedProduct.nama)}</div>
+                     <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center shadow-inner">{getDynamicIcon(selectedProduct.nama)}</div>
                      <div><h3 className="font-black text-xl text-slate-800 leading-tight">{selectedProduct.nama}</h3><p className="text-emerald-600 font-black text-lg">{formatRupiah(selectedProduct.jual)}</p></div>
                    </div>
                    <button onClick={() => setSelectedProduct(null)} className="p-2 bg-slate-100 rounded-full"><X/></button>
@@ -760,7 +791,7 @@ function MainApp() {
                 return (
                   <div key={id} className="flex justify-between items-center border-b border-slate-50 pb-4 last:border-0 last:pb-0">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 text-2xl">{getDynamicIcon(p.nama)}</div>
+                      <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100">{getDynamicIcon(p.nama)}</div>
                       <div>
                         <p className="font-bold text-sm text-slate-800 line-clamp-1 max-w-[120px]">{p.nama}</p>
                         <p className="text-[10px] text-emerald-600 font-black">{formatRupiah(p.jual)} / pcs</p>
@@ -795,6 +826,7 @@ function MainApp() {
              </button>
           </div>
 
+          {/* MENAMPILKAN QRIS SAAT PEMBAYARAN */}
           {metodeBayar === 'qris' && (
              <div className="p-8 bg-white rounded-[40px] border-2 border-slate-50 shadow-sm mb-10 text-center animate-fade-in flex flex-col items-center">
                {settings.qris_url ? (
@@ -811,6 +843,7 @@ function MainApp() {
              </div>
           )}
 
+          {/* MENAMPILKAN REKENING SAAT PEMBAYARAN */}
           {metodeBayar === 'transfer' && (() => {
              const rekStr = settings.rekening || '';
              const matchResult = rekStr.match(/\d+/);
@@ -822,7 +855,7 @@ function MainApp() {
                  <p className="text-xs text-slate-400 font-black mb-4 uppercase tracking-widest">Nomor Rekening</p>
                  <div className="flex items-center justify-center gap-4 mb-4">
                     <h4 className="text-3xl font-black tracking-tighter text-slate-800">{noRek}</h4> 
-                    <button onClick={handleCopyRekening} className="p-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition active:scale-90"><Copy size={20}/></button>
+                    <button onClick={handleCopyRekening} className="p-3 bg-slate-900 text-white rounded-2xl hover:bg-slate-800 transition active:scale-90" title="Salin Rekening"><Copy size={20}/></button>
                  </div>
                  <div className="bg-slate-50 p-4 rounded-2xl inline-block border border-slate-100 max-w-full overflow-hidden">
                     <p className="font-black text-slate-500 uppercase text-[10px] tracking-widest">Bank & Nama Pemilik:</p>
@@ -868,7 +901,7 @@ function MainApp() {
                 {strukTerakhir?.items?.map((item, idx) => (
                   <div key={idx} className="flex justify-between items-start">
                     <div className="flex items-start gap-3">
-                      <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center mt-0.5 border text-xl">
+                      <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center border text-2xl">
                         {getDynamicIcon(item.nama)}
                       </div>
                       <div>
@@ -985,7 +1018,7 @@ function MainApp() {
           }
         }).sort((a, b) => b.qty - a.qty); 
 
-        // TAMPILKAN 10 PRODUK TERLARIS (REVISI)
+        // TAMPILKAN 10 PRODUK TERLARIS
         const topSelling = productRankings.filter(p => p.qty > 0).slice(0, 10);
         const bottomSelling = [...productRankings]
           .filter(p => p.stok > 0)
@@ -997,7 +1030,7 @@ function MainApp() {
         return (
           <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row relative">
             
-            {/* FITUR BARU: MENU ADMIN SIMETRIS GRID 4 KOTAK DI HP */}
+            {/* MENU ADMIN SIMETRIS GRID 4 KOTAK DI HP */}
             <aside className="bg-slate-950 text-white w-full md:w-64 flex-shrink-0 flex flex-col shadow-2xl sticky top-0 z-40 md:h-screen">
               <div className="hidden md:flex p-6 items-center gap-3 border-b border-slate-800 flex-shrink-0">
                  <Store className="text-emerald-400 shrink-0" size={28} />
@@ -1089,7 +1122,7 @@ function MainApp() {
                        </div>
                     </div>
 
-                    {/* FITUR BARU: TABEL REKAP KESELURUHAN PER BARANG */}
+                    {/* TABEL REKAP KESELURUHAN PER BARANG */}
                     <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col mb-8">
                       <div className="p-6 md:p-8 border-b border-slate-100">
                         <h2 className="font-black text-xl text-slate-800 flex items-center gap-2"><Package className="text-emerald-500"/> Rekap Keseluruhan per Barang</h2>
@@ -1323,7 +1356,7 @@ function MainApp() {
                            {products.map(p => (
                              <tr key={p.id} className={`transition-colors ${editingId === p.id ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
                                <td className="p-6 flex items-center gap-4">
-                                 <div className="w-14 h-14 bg-slate-50 rounded-2xl border border-slate-100 flex items-center justify-center shrink-0">{getDynamicIcon(p.nama)}</div>
+                                 <div className="w-12 h-12 bg-white rounded-2xl border shadow-sm flex items-center justify-center shrink-0">{getDynamicIcon(p.nama)}</div>
                                  <div className="min-w-0">
                                    <p className="font-extrabold text-sm text-slate-900 truncate">{p.nama}</p>
                                    {p.barcode ? <p className="font-mono text-[10px] text-slate-500 mt-1 uppercase tracking-widest flex items-center gap-1"><Barcode size={10}/> {p.barcode}</p> : <p className="text-[10px] text-slate-400 mt-1 italic">No Barcode</p>}
@@ -1367,7 +1400,6 @@ function MainApp() {
 
                      <hr className="border-slate-100"/>
                      
-                     {/* FITUR BARU: UPLOAD & DOWNLOAD QRIS */}
                      <div className="space-y-3">
                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><QrCode size={14}/> Foto QRIS Pembayaran</label>
                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 bg-slate-50 border border-slate-200 p-6 rounded-[32px]">
