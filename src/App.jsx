@@ -4,7 +4,7 @@ import {
   CheckCircle, Settings, BarChart3, PlusCircle, 
   Store, QrCode, CreditCard, ChevronRight, ArrowLeft,
   Search, X, Lock, LogOut, TrendingUp, Edit, Trash2, List, TrendingDown,
-  Camera, Download, Power, UploadCloud, AlertTriangle, Copy, Barcode, Share2, ArrowUpDown
+  Camera, Download, Power, UploadCloud, AlertTriangle, Copy, Barcode, Share2, ArrowUpDown, Sparkles, Image as ImageIcon
 } from 'lucide-react';
 
 // =========================================================================
@@ -45,7 +45,7 @@ const formatImageUrl = (url) => {
 };
 
 // =========================================================================
-// 1. UPDATE: IKON REALISTIS (3D EMOJI SHADOW) LEBIH SPESIFIK & AKURAT
+// IKON REALISTIS (3D EMOJI SHADOW) - FALLBACK JIKA GAMBAR TIDAK ADA
 // =========================================================================
 const getDynamicIcon = (namaBarang) => {
   const name = (namaBarang || '').toLowerCase();
@@ -54,29 +54,6 @@ const getDynamicIcon = (namaBarang) => {
     <span className="text-4xl drop-shadow-md transition-transform transform hover:scale-110">{emoji}</span>
   );
 
-  // --- KEMASAN MINUMAN SPESIFIK ---
-  if (name.match(/kotak|teh kotak|ultra|buavita|milo kotak/)) return iconWrapper('🧃');
-  if (name.match(/kaleng|sprite|coca cola|fanta|bear brand/)) return iconWrapper('🥫');
-  if (name.match(/botol|le minerale|aqua botol|pucuk|floridina/)) return iconWrapper('🍾');
-  if (name.match(/susu bayi|dot/)) return iconWrapper('🍼');
-  if (name.match(/boba|chatime|haus|mixue/)) return iconWrapper('🧋');
-  if (name.match(/teh panas|tea/)) return iconWrapper('🍵');
-  if (name.match(/kopi panas|kopi cup|starbucks|janji jiwa/)) return iconWrapper('☕');
-  if (name.match(/es kopi|kopi dingin/)) return iconWrapper('🧋');
-  
-  // --- MIE & MAKANAN KEMASAN ---
-  if (name.match(/cup|pop mie|mie sedap cup/)) return iconWrapper('🍜');
-  if (name.match(/mie bungkus|indomie|sedap|sarimi|supermi|lemonilo/)) return iconWrapper('🍝'); 
-  
-  // --- ROTI & KUE ---
-  if (name.match(/donat|donut/)) return iconWrapper('🍩');
-  if (name.match(/burger/)) return iconWrapper('🍔');
-  if (name.match(/pizza/)) return iconWrapper('🍕');
-  if (name.match(/roti tawar|sari roti/)) return iconWrapper('🍞');
-  if (name.match(/croissant|roti sobek|baguette/)) return iconWrapper('🥐');
-  if (name.match(/kue|cake|bolu/)) return iconWrapper('🍰');
-
-  // --- SNACK & MANISAN ---
   if (name.match(/kacang|peanut|sukro|garuda|dua kelinci|pilus/)) return iconWrapper('🥜');
   if (name.match(/wafer|tango|nabati|beng|biskuat|nissin|biskuit|oreo/)) return iconWrapper('🧇');
   if (name.match(/coklat|chocolate|silverqueen|choki|delfi/)) return iconWrapper('🍫');
@@ -85,23 +62,19 @@ const getDynamicIcon = (namaBarang) => {
   if (name.match(/popcorn/)) return iconWrapper('🍿');
   if (name.match(/snack|ciki|chiki|keripik|taro|lays|citato|chitato|qtela|piattos/)) return iconWrapper('🍟');
   
-  // --- ES KRIM ---
   if (name.match(/cone|cornetto|campina cone/)) return iconWrapper('🍦');
   if (name.match(/es krim|ice|campina|walls|aice|magnum|joyday/)) return iconWrapper('🍧');
 
-  // --- BAHAN POKOK & BUMBU ---
   if (name.match(/minyak|goreng|bimoli|sania|filma|sunco/)) return iconWrapper('🛢️');
   if (name.match(/garam|gula|merica|micin|bumbu|kecap|saus|royco|masako/)) return iconWrapper('🧂');
   if (name.match(/telur|telor/)) return iconWrapper('🥚');
   if (name.match(/keju|cheese/)) return iconWrapper('🧀');
 
-  // --- MAKANAN BERAT ---
   if (name.match(/bakso|pentol|cilok|tahu|soto|kuah|seblak/)) return iconWrapper('🍲');
   if (name.match(/nasi|makan|lontong|geprek|pecel|ayam/)) return iconWrapper('🍛');
   if (name.match(/daging|sapi|kambing|sosis|nugget/)) return iconWrapper('🥩');
   if (name.match(/ikan|lele|nila|udang|seafood|sarden|tuna/)) return iconWrapper('🐟');
 
-  // --- KEBUTUHAN HARIAN & KAMAR MANDI ---
   if (name.match(/botol shampo|lotion|sabun cair|body wash/)) return iconWrapper('🧴');
   if (name.match(/sikat gigi|odol|pasta gigi|pepsodent|ciptadent/)) return iconWrapper('🪥');
   if (name.match(/sabun|shampo|rinso|sunlight|cuci|deterjen|biore|lifebuoy|soklin/)) return iconWrapper('🧼');
@@ -111,7 +84,25 @@ const getDynamicIcon = (namaBarang) => {
   if (name.match(/sayur|bayam|kangkung|wortel|tomat|cabe|bawang/)) return iconWrapper('🥬');
   if (name.match(/buah|apel|jeruk|pisang|mangga|melon|semangka/)) return iconWrapper('🍎');
   
-  // Default Air & Kopi Kemasan Biasa
+  if (name.match(/kotak|teh kotak|ultra|buavita|milo kotak/)) return iconWrapper('🧃');
+  if (name.match(/kaleng|sprite|coca cola|fanta|bear brand/)) return iconWrapper('🥫');
+  if (name.match(/botol|le minerale|aqua botol|pucuk|floridina/)) return iconWrapper('🍾');
+  if (name.match(/susu bayi|dot/)) return iconWrapper('🍼');
+  if (name.match(/boba|chatime|haus|mixue/)) return iconWrapper('🧋');
+  if (name.match(/teh panas|tea/)) return iconWrapper('🍵');
+  if (name.match(/kopi panas|kopi cup|starbucks|janji jiwa/)) return iconWrapper('☕');
+  if (name.match(/es kopi|kopi dingin/)) return iconWrapper('🧋');
+  
+  if (name.match(/cup|pop mie|mie sedap cup/)) return iconWrapper('🍜');
+  if (name.match(/mie bungkus|indomie|sedap|sarimi|supermi|lemonilo/)) return iconWrapper('🍝'); 
+  
+  if (name.match(/donat|donut/)) return iconWrapper('🍩');
+  if (name.match(/burger/)) return iconWrapper('🍔');
+  if (name.match(/pizza/)) return iconWrapper('🍕');
+  if (name.match(/roti tawar|sari roti/)) return iconWrapper('🍞');
+  if (name.match(/croissant|roti sobek|baguette/)) return iconWrapper('🥐');
+  if (name.match(/kue|cake|bolu/)) return iconWrapper('🍰');
+
   if (name.match(/air|mineral|aqua|vit|club/)) return iconWrapper('💧');
   if (name.match(/kopi|teh/)) return iconWrapper('☕');
   
@@ -147,7 +138,11 @@ function MainApp() {
     nama_toko: 'Memuat Toko...', qris_url: '', rekening: '', admin_password: '' 
   });
   
-  // Keranjang Tersimpan di HP (Persistent Cart LocalStorage)
+  // API Key Gemini di-load dari local storage
+  const [geminiKey, setGeminiKey] = useState(() => {
+    try { return localStorage.getItem('tokojujur_gemini_key') || ''; } catch(e) { return ''; }
+  });
+  
   const [cart, setCart] = useState(() => {
     try {
       if (typeof window !== 'undefined') {
@@ -159,13 +154,11 @@ function MainApp() {
   });
 
   const [strukTerakhir, setStrukTerakhir] = useState(null);
-
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [tempQty, setTempQty] = useState(0);
 
   const [showShareApp, setShowShareApp] = useState(false);
-
   const [isScanningModalOpen, setIsScanningModalOpen] = useState(false);
   const [scanTarget, setScanTarget] = useState(''); 
   const videoRef = useRef(null);
@@ -186,10 +179,9 @@ function MainApp() {
   
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null); 
-  const [newProduct, setNewProduct] = useState({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '' });
+  // Ditambahkan field `gambar` pada state newProduct
+  const [newProduct, setNewProduct] = useState({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '', gambar: '' });
   const [useDiskon, setUseDiskon] = useState(false);
-
-  // STATE BARU: EDIT TRANSAKSI
   const [editingTrx, setEditingTrx] = useState(null);
 
   const showToast = (msg, type = 'success') => {
@@ -215,10 +207,11 @@ function MainApp() {
     }
   }, []);
 
-  // Menyimpan View & Tab & Cart ke LocalStorage
+  // Menyimpan Cache Lokal
   useEffect(() => { try { localStorage.setItem('tokojujur_view', view); } catch(e){} }, [view]);
   useEffect(() => { try { localStorage.setItem('tokojujur_admintab', adminTab); } catch(e){} }, [adminTab]);
   useEffect(() => { try { localStorage.setItem('tokojujur_cart', JSON.stringify(cart)); } catch(e){} }, [cart]);
+  useEffect(() => { try { localStorage.setItem('tokojujur_gemini_key', geminiKey); } catch(e){} }, [geminiKey]);
 
   // INISIALISASI SUPABASE KLIEN
   useEffect(() => {
@@ -244,7 +237,7 @@ function MainApp() {
     }
   }, []);
 
-  // REALTIME INSTAN (SEKEJAP MATA) & INITIAL FETCH
+  // REALTIME INSTAN & SINKRONISASI
   useEffect(() => {
     if (!dbReady) return;
     if (!supabaseClient) { setIsLoadingDB(false); return; }
@@ -358,13 +351,17 @@ function MainApp() {
       showToast(`Membaca data lokal: ${localProduct.nama}`, 'success');
       return; 
     }
-    showToast('Barcode Terbaca! Mencari nama di internet...', 'success');
+    showToast('Barcode Terbaca! Mencari nama & foto asli di internet...', 'success');
     try {
       const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
       const data = await res.json();
       if (data.status === 1 && data.product && data.product.product_name) {
-        setNewProduct(prev => ({ ...prev, nama: data.product.product_name }));
-        showToast('Nama otomatis berhasil terisi!', 'success');
+        setNewProduct(prev => ({ 
+          ...prev, 
+          nama: data.product.product_name,
+          gambar: data.product.image_url || prev.gambar // Otomatis ambil foto asli jika ada
+        }));
+        showToast('Nama dan Foto otomatis berhasil terisi!', 'success');
       }
     } catch (err) {}
   };
@@ -390,6 +387,55 @@ function MainApp() {
     }
     return () => clearInterval(interval);
   }, [isScanningModalOpen, scanTarget, products]);
+
+  // =========================================================================
+  // FITUR BARU: GENERATE GAMBAR VIA GEMINI API (IMAGEN)
+  // =========================================================================
+  const handleGenerateGeminiImage = async () => {
+    if (!geminiKey) return showToast('Harap masukkan API Key Gemini di tab Pengaturan terlebih dahulu!', 'error');
+    if (!newProduct.nama) return showToast('Isi nama barang terlebih dahulu untuk di-generate AI!', 'error');
+    
+    setIsProcessing(true);
+    showToast('AI sedang melukis gambar realistis...', 'success');
+    try {
+      const promptText = `A highly detailed, hyper-realistic studio photography of a commercial product package named "${newProduct.nama}", isolated on a pure solid white background, vibrant colors, 4k resolution, perfect lighting.`;
+      
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${geminiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          instances: { prompt: promptText },
+          parameters: { sampleCount: 1 }
+        })
+      });
+      
+      const data = await res.json();
+      if (data.predictions && data.predictions[0] && data.predictions[0].bytesBase64Encoded) {
+        const base64Image = `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}`;
+        setNewProduct(prev => ({ ...prev, gambar: base64Image }));
+        showToast('Gambar AI berhasil dibuat!', 'success');
+      } else {
+        showToast('Gagal generate gambar. Periksa kuota API Key Gemini Anda.', 'error');
+      }
+    } catch (err) {
+      showToast('Koneksi ke Gemini gagal. Periksa jaringan Anda.', 'error');
+    }
+    setIsProcessing(false);
+  };
+
+  // FITUR BARU: UPLOAD FOTO KAMERA LANGSUNG
+  const handleUploadProductImage = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 524288) return showToast('Ukuran gambar terlalu besar. Maksimal 500KB.', 'error');
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewProduct(prev => ({ ...prev, gambar: reader.result }));
+        showToast('Foto berhasil ditambahkan!', 'success');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
   // LOGIKA KERANJANG
   const openProductModal = (product) => {
@@ -435,7 +481,7 @@ function MainApp() {
 
   const jumlahItem = Object.values(cart).reduce((a, b) => a + b, 0);
 
-  // TRANSAKSI SEKEJAP MATA (OPTIMISTIC + BG SYNC) - TANPA PILIH PEMBAYARAN LAGI
+  // TRANSAKSI SEKEJAP MATA
   const handleSelesaiBayar = async () => {
     if (!supabaseClient) return showToast('Koneksi Database Terputus!', 'error');
     setIsProcessing(true);
@@ -445,7 +491,8 @@ function MainApp() {
       const subTotal = hitungTotalHargaItem(p, qty);
       return { 
         id: p.id, nama: p.nama, modal: p.modal || 0, jual: p.jual || 0, 
-        qty, totalHarga: subTotal, profitItem: subTotal - ((p.modal || 0) * qty) 
+        qty, totalHarga: subTotal, profitItem: subTotal - ((p.modal || 0) * qty),
+        gambar: p.gambar || null
       };
     });
     
@@ -468,7 +515,7 @@ function MainApp() {
     
     setStrukTerakhir(newTransaction);
     setView('struk');
-    setCart({}); // Keranjang otomatis reset
+    setCart({}); 
     setIsProcessing(false);
 
     const { error: trxError } = await supabaseClient.from('transaksi').insert([newTransaction]);
@@ -511,7 +558,6 @@ function MainApp() {
     }
   };
 
-  // ADMIN FUNCTIONS
   const handleLogin = (e) => {
     e.preventDefault();
     if (loginInput === settings.admin_password) {
@@ -557,6 +603,10 @@ function MainApp() {
     if (!supabaseClient) return showToast('Database belum terhubung', 'error');
     setIsProcessing(true);
     setSettings(settings);
+    
+    // Save API Key locally
+    try { localStorage.setItem('tokojujur_gemini_key', geminiKey); } catch(e){}
+
     const { error } = await supabaseClient.from('pengaturan').update({
       nama_toko: settings.nama_toko, qris_url: settings.qris_url,
       rekening: settings.rekening, admin_password: settings.admin_password
@@ -570,7 +620,8 @@ function MainApp() {
   const handleEditClick = (product) => {
     setNewProduct({
       nama: product.nama, modal: product.modal || 0, jual: product.jual || 0, stok: product.stok || 0,
-      barcode: product.barcode || '', diskonQty: product.diskon ? product.diskon.min_qty : '', diskonHarga: product.diskon ? product.diskon.harga_total : ''
+      barcode: product.barcode || '', diskonQty: product.diskon ? product.diskon.min_qty : '', diskonHarga: product.diskon ? product.diskon.harga_total : '',
+      gambar: product.gambar || ''
     });
     setUseDiskon(!!product.diskon);
     setEditingId(product.id);
@@ -578,6 +629,7 @@ function MainApp() {
     window.scrollTo({ top: 0, behavior: 'smooth' }); 
   };
 
+  // ADD PRODUCT DENGAN PENGAMAN KOLOM GAMBAR
   const handleAddProduct = async (e) => {
     e.preventDefault();
     if (!supabaseClient) return showToast('Database belum terhubung', 'error');
@@ -598,25 +650,45 @@ function MainApp() {
     const targetId = editingId ? editingId : Date.now();
     const tempProd = { 
       nama: newProduct.nama, barcode: newProduct.barcode, modal: newProduct.modal||0, 
-      jual: newProduct.jual||0, stok: newProduct.stok||0, diskon: disc
+      jual: newProduct.jual||0, stok: newProduct.stok||0, diskon: disc,
+      gambar: newProduct.gambar || null
     };
     
+    // OPTIMISTIC UI
     if (editingId) setProducts(p => p.map(item => item.id === editingId ? { ...item, ...tempProd } : item));
     else setProducts(p => [...p, { ...tempProd, id: targetId, tanggal_dibuat: new Date().toISOString() }]);
 
     setShowAddForm(false);
     setEditingId(null);
-    setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '' });
+    setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '', gambar: '' });
     setUseDiskon(false);
     
+    // BACKGROUND SYNC DENGAN PENGAMAN (JIKA USER BELUM BIKIN KOLOM GAMBAR DI SUPABASE)
     if (editingId) {
-      const { error } = await supabaseClient.from('produk').update(tempProd).eq('id', editingId);
-      if (error) showToast(`Gagal Edit Server: ${error.message}`, 'error');
-      else showToast('Berhasil update server!', 'success');
+      let { error } = await supabaseClient.from('produk').update(tempProd).eq('id', editingId);
+      if (error && error.message.includes('gambar')) {
+        // Fallback jika kolom gambar tidak ada di DB
+        const { gambar, ...prodNoImg } = tempProd;
+        const res = await supabaseClient.from('produk').update(prodNoImg).eq('id', editingId);
+        error = res.error;
+        if (!error) showToast('Data diupdate, tapi Gambar diabaikan karena kolom "gambar" belum ada di Supabase.', 'error');
+      } else if (error) {
+        showToast(`Gagal Edit Server: ${error.message}`, 'error');
+      } else {
+        showToast('Berhasil update server!', 'success');
+      }
     } else {
-      const { error } = await supabaseClient.from('produk').insert([{ ...tempProd, id: targetId, tanggal_dibuat: new Date().toISOString() }]);
-      if (error) showToast(`Gagal Tambah Server: ${error.message}`, 'error');
-      else showToast('Berhasil simpan ke server!', 'success');
+      let { error } = await supabaseClient.from('produk').insert([{ ...tempProd, id: targetId, tanggal_dibuat: new Date().toISOString() }]);
+      if (error && error.message.includes('gambar')) {
+        const { gambar, ...prodNoImg } = tempProd;
+        const res = await supabaseClient.from('produk').insert([{ ...prodNoImg, id: targetId, tanggal_dibuat: new Date().toISOString() }]);
+        error = res.error;
+        if (!error) showToast('Barang tersimpan, tapi Gambar diabaikan karena kolom "gambar" belum ada di Supabase.', 'error');
+      } else if (error) {
+        showToast(`Gagal Tambah Server: ${error.message}`, 'error');
+      } else {
+        showToast('Berhasil simpan ke server!', 'success');
+      }
     }
     setIsProcessing(false);
   };
@@ -641,7 +713,6 @@ function MainApp() {
     }
   };
 
-  // UPDATE: RESET UJI COBA MENGEMBALIKAN STOK KE JUMLAH SEMULA
   const handleClearTransactions = async () => {
     if (!supabaseClient) return;
     if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda yakin MENGHAPUS SELURUH RIWAYAT TRANSAKSI PENJUALAN?\nSTOK BARANG AKAN DIKEMBALIKAN SEPERTI SEMULA!")) {
@@ -680,7 +751,6 @@ function MainApp() {
     }
   };
 
-  // FITUR BARU: HAPUS 1 TRANSAKSI SAJA (KEMBALIKAN STOK)
   const handleDeleteSingleTransaction = async (id) => {
     if (!supabaseClient) return;
     if (window.confirm("Hapus transaksi ini? Stok barang akan dikembalikan seperti semula.")) {
@@ -688,7 +758,6 @@ function MainApp() {
       const trx = transactions.find(t => t.id === id);
       if (!trx) return;
 
-      // 1. Optimistic Update Stok Lokal
       setProducts(prevProducts => prevProducts.map(p => {
         const boughtItem = trx.items.find(i => i.id === p.id);
         if (boughtItem) {
@@ -697,10 +766,8 @@ function MainApp() {
         return p;
       }));
       
-      // 2. Hapus Transaksi Lokal
       setTransactions(prev => prev.filter(t => t.id !== id));
 
-      // 3. Kembalikan Stok di Database
       for (const item of trx.items) {
         const product = products.find(p => p.id === item.id);
         if (product) {
@@ -708,7 +775,6 @@ function MainApp() {
         }
       }
 
-      // 4. Hapus Transaksi di Database
       const { error } = await supabaseClient.from('transaksi').delete().eq('id', id);
       if (error) showToast(`Gagal hapus transaksi: ${error.message}`, 'error');
       else showToast('Transaksi berhasil dihapus & stok kembali!', 'success');
@@ -717,16 +783,13 @@ function MainApp() {
     }
   };
 
-  // FITUR BARU: SIMPAN EDIT TRANSAKSI
   const handleSaveEditTrx = async (e) => {
      e.preventDefault();
      if (!supabaseClient) return;
      setIsProcessing(true);
      
-     // Optimistic Update
      setTransactions(prev => prev.map(t => t.id === editingTrx.id ? editingTrx : t));
      
-     // Sync to DB
      const { error } = await supabaseClient.from('transaksi').update({
        metode: editingTrx.metode,
        total: editingTrx.total,
@@ -831,7 +894,7 @@ function MainApp() {
         </div>
       )}
 
-      {/* MODAL EDIT TRANSAKSI (BARU) */}
+      {/* MODAL EDIT TRANSAKSI */}
       {editingTrx && (
         <div className="fixed inset-0 bg-slate-900/60 z-[999] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
            <div className="bg-white rounded-3xl p-6 w-full max-w-md animate-slide-up shadow-2xl border-4 border-white">
@@ -921,7 +984,15 @@ function MainApp() {
             {searchFilteredProducts.map(p => (
               <div key={p.id} onClick={() => openProductModal(p)} className="bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col items-center text-center relative active:scale-95 transition-all group hover:shadow-md cursor-pointer border-b-4 border-b-slate-100 overflow-hidden">
                 {cart[p.id] > 0 && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] font-black px-2 py-1 rounded-bl-xl shadow-lg">{cart[p.id]}</div>}
-                <div className="mb-4 bg-slate-50 w-20 h-20 rounded-full transition-colors flex items-center justify-center">{getDynamicIcon(p.nama)}</div>
+                
+                <div className="mb-4 w-24 h-24 rounded-full flex items-center justify-center bg-slate-50 border shadow-inner">
+                  {p.gambar ? (
+                    <img src={formatImageUrl(p.gambar)} className="w-full h-full object-cover rounded-full" alt={p.nama}/>
+                  ) : (
+                    getDynamicIcon(p.nama)
+                  )}
+                </div>
+                
                 <h3 className="font-bold text-sm mb-1 line-clamp-2 h-10 text-slate-700">{p.nama}</h3>
                 <p className="text-emerald-600 font-black mb-2 text-lg">{formatRupiah(p.jual)}</p>
                 <div className={`text-[10px] font-black px-2 py-0.5 rounded-full whitespace-nowrap w-max mx-auto ${(p.stok||0) > 5 ? 'bg-blue-50 text-blue-500' : 'bg-rose-50 text-rose-500'}`}>Sisa: {p.stok || 0}</div>
@@ -935,7 +1006,9 @@ function MainApp() {
               <div className="bg-white w-full max-w-md rounded-[32px] p-8 shadow-2xl animate-slide-up border-4 border-white">
                 <div className="flex justify-between items-center mb-8">
                    <div className="flex items-center gap-4">
-                     <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center shadow-inner">{getDynamicIcon(selectedProduct.nama)}</div>
+                     <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center shadow-inner overflow-hidden border">
+                       {selectedProduct.gambar ? <img src={formatImageUrl(selectedProduct.gambar)} className="w-full h-full object-cover"/> : getDynamicIcon(selectedProduct.nama)}
+                     </div>
                      <div><h3 className="font-black text-xl text-slate-800 leading-tight">{selectedProduct.nama}</h3><p className="text-emerald-600 font-black text-lg">{formatRupiah(selectedProduct.jual)}</p></div>
                    </div>
                    <button onClick={() => setSelectedProduct(null)} className="p-2 bg-slate-100 rounded-full"><X/></button>
@@ -971,7 +1044,6 @@ function MainApp() {
         <div className="max-w-md mx-auto p-6 min-h-screen flex flex-col pb-32">
           <button onClick={() => setView('toko')} className="flex items-center gap-2 font-black mb-6 text-slate-400 hover:text-slate-600 transition"><ArrowLeft/> Kembali Belanja</button>
           
-          {/* FITUR EDIT KERANJANG SEBELUM BAYAR */}
           <div className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-100 mb-6">
             <h3 className="font-black text-lg mb-4 text-slate-800 border-b border-slate-100 pb-3">Review Keranjang</h3>
             <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
@@ -981,7 +1053,9 @@ function MainApp() {
                 return (
                   <div key={id} className="flex justify-between items-center border-b border-slate-50 pb-4 last:border-0 last:pb-0">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 text-2xl">{getDynamicIcon(p.nama)}</div>
+                      <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 text-2xl overflow-hidden">
+                        {p.gambar ? <img src={formatImageUrl(p.gambar)} className="w-full h-full object-cover"/> : getDynamicIcon(p.nama)}
+                      </div>
                       <div>
                         <p className="font-bold text-sm text-slate-800 line-clamp-1 max-w-[120px]">{p.nama}</p>
                         <p className="text-[10px] text-emerald-600 font-black">{formatRupiah(p.jual)} / pcs</p>
@@ -1014,16 +1088,16 @@ function MainApp() {
 
       {/* VIEW: STRUK (MODERN + SHARE/PRINT) */}
       {view === 'struk' && (
-        <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4">
+        <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4 pb-10">
           <div className="mb-6 flex flex-col items-center animate-slide-up">
             <div className="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center mb-3 shadow-lg shadow-emerald-200">
               <CheckCircle size={36} />
             </div>
-            <h2 className="text-2xl font-extrabold text-slate-800">Pembayaran Berhasil</h2>
-            <p className="text-slate-500 text-sm mt-1 font-bold">Terima kasih atas kejujuran Anda!</p>
+            <h2 className="text-2xl font-extrabold text-slate-800">Struk Tersimpan!</h2>
+            <p className="text-slate-500 text-sm mt-1 font-bold">Lanjutkan dengan pembayaran di bawah.</p>
           </div>
 
-          <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden animate-fade-in relative mb-6">
+          <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden animate-fade-in relative mb-6 border border-slate-200">
             <div className="bg-slate-900 p-6 text-center text-white">
               <Store className="mx-auto mb-2 opacity-80" size={32} />
               <h3 className="font-bold text-xl tracking-wide">{settings.nama_toko}</h3>
@@ -1040,8 +1114,8 @@ function MainApp() {
                 {strukTerakhir?.items?.map((item, idx) => (
                   <div key={idx} className="flex justify-between items-start">
                     <div className="flex items-start gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center border text-2xl">
-                        {getDynamicIcon(item.nama)}
+                      <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center border text-2xl overflow-hidden">
+                        {item.gambar ? <img src={formatImageUrl(item.gambar)} className="w-full h-full object-cover"/> : getDynamicIcon(item.nama)}
                       </div>
                       <div>
                         <p className="font-semibold text-slate-800 text-sm">{item.nama}</p>
@@ -1054,14 +1128,37 @@ function MainApp() {
               </div>
 
               <div className="bg-slate-50 p-4 rounded-2xl flex justify-between items-center border border-slate-100">
-                <span className="font-bold text-slate-600">Total Dibayar</span>
+                <span className="font-bold text-slate-600">Total Tagihan</span>
                 <span className="font-extrabold text-emerald-600 text-xl">{formatRupiah(strukTerakhir?.total)}</span>
               </div>
             </div>
 
-            <div className="bg-gray-50 p-6 text-center border-t border-dashed">
-               <p className="text-xs text-gray-400 uppercase font-bold tracking-widest mb-2">Instruksi Pembayaran</p>
-               <h3 className="font-black text-lg text-slate-800 tracking-tight leading-tight">Silakan bayar dengan scan QRIS atau Transfer Rekening.</h3>
+            <div className="bg-emerald-50 p-6 text-center border-t border-emerald-100 border-dashed">
+               <p className="text-[10px] text-emerald-600 uppercase font-black tracking-widest mb-3">Selesaikan Pembayaran Sekarang</p>
+               <h3 className="font-black text-sm text-emerald-900 tracking-tight leading-tight mb-4">Silahkan bayar dengan scan QRIS atau Transfer ke rekening di bawah ini.</h3>
+               
+               {/* MUNCULKAN QRIS DAN REKENING DI STRUK */}
+               <div className="flex flex-col gap-4">
+                 {settings.qris_url && (
+                   <div className="bg-white p-4 rounded-2xl border shadow-sm flex flex-col items-center">
+                     <p className="text-xs font-bold text-slate-500 mb-2">Scan QRIS</p>
+                     <img src={formatImageUrl(settings.qris_url)} className="w-40 h-40 object-contain mb-3" alt="QRIS"/>
+                     <button onClick={handleDownloadQRIS} className="w-full py-2 bg-emerald-100 text-emerald-800 rounded-xl font-bold text-xs flex justify-center items-center gap-2 hover:bg-emerald-200 transition"><Download size={14}/> Download QRIS</button>
+                   </div>
+                 )}
+                 {settings.rekening && (
+                   <div className="bg-white p-4 rounded-2xl border shadow-sm">
+                     <p className="text-xs font-bold text-slate-500 mb-2">Transfer Bank</p>
+                     <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border">
+                        <div>
+                          <p className="font-black text-lg text-slate-800">{settings.rekening.match(/\d+/) ? settings.rekening.match(/\d+/)[0] : '-'}</p>
+                          <p className="text-[10px] font-bold text-slate-500 truncate max-w-[150px]">{settings.rekening.split(/a\.?n\.?/i)[1] ? 'a.n ' + settings.rekening.split(/a\.?n\.?/i)[1].trim() : 'Toko'}</p>
+                        </div>
+                        <button onClick={handleCopyRekening} className="p-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800"><Copy size={16}/></button>
+                     </div>
+                   </div>
+                 )}
+               </div>
             </div>
             
             <div className="absolute top-[80px] -left-4 w-8 h-8 bg-slate-100 rounded-full"></div>
@@ -1070,10 +1167,10 @@ function MainApp() {
 
           <div className="flex gap-4 w-full max-w-md">
             <button onClick={handleShareStruk} className="flex-1 py-4 bg-blue-100 text-blue-700 rounded-full font-bold shadow-sm hover:shadow-md hover:bg-blue-200 transition-all active:scale-95 flex items-center justify-center gap-2">
-              <Share2 size={20}/> Bagikan / Cetak
+              <Share2 size={20}/> Bagikan Struk
             </button>
             <button onClick={handleTutupStruk} className="flex-1 py-4 bg-slate-900 text-white rounded-full font-bold shadow-lg hover:shadow-xl hover:bg-slate-800 transition-all active:scale-95 flex items-center justify-center gap-2">
-               Tutup
+               Tutup Toko
             </button>
           </div>
         </div>
@@ -1140,7 +1237,7 @@ function MainApp() {
         const itemSalesMap = {};
         filteredTransactions.forEach(t => {
           t.items.forEach(item => {
-            if (!itemSalesMap[item.id]) itemSalesMap[item.id] = { qty: 0, revenue: 0, profit: 0 };
+            if (!itemSalesMap[item.id]) itemSalesMap[item.id] = { qty: 0, revenue: 0, profit: 0, gambar: item.gambar };
             itemSalesMap[item.id].qty += item.qty;
             itemSalesMap[item.id].revenue += item.totalHarga;
             itemSalesMap[item.id].profit += item.profitItem;
@@ -1150,7 +1247,7 @@ function MainApp() {
         const productRankings = products.map(p => {
           const daysActive = Math.max(1, Math.floor((new Date() - new Date(p.tanggal_dibuat || new Date())) / (1000 * 60 * 60 * 24)));
           return {
-            id: p.id, nama: p.nama, stok: p.stok,
+            id: p.id, nama: p.nama, stok: p.stok, gambar: p.gambar,
             qty: itemSalesMap[p.id]?.qty || 0,
             revenue: itemSalesMap[p.id]?.revenue || 0,
             profit: itemSalesMap[p.id]?.profit || 0,
@@ -1201,7 +1298,80 @@ function MainApp() {
             
             <main className="flex-1 p-4 md:p-10 overflow-y-auto">
                
-               {/* TAB: ANALISA PENJUALAN & REKAP BARANG */}
+               {/* TAB: PENGATURAN (API GEMINI ADA DI SINI) */}
+               {adminTab === 'pengaturan' && (
+                 <div className="max-w-3xl animate-fade-in mx-auto md:mx-0">
+                    <h1 className="text-3xl font-black tracking-tighter text-slate-800 mb-8">Konfigurasi Toko</h1>
+                    <div className="bg-white p-8 md:p-10 rounded-[40px] border border-slate-200 shadow-sm space-y-8">
+                       
+                       <div className="space-y-3">
+                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Store size={14}/> Nama Toko Digital</label>
+                         <input value={settings.nama_toko || ''} onChange={e => setSettings({...settings, nama_toko: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-3xl font-black focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all text-lg"/>
+                       </div>
+
+                       <hr className="border-slate-100"/>
+                       
+                       <div className="space-y-3">
+                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><QrCode size={14}/> Foto QRIS Pembayaran</label>
+                         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 bg-slate-50 border border-slate-200 p-6 rounded-[32px]">
+                           
+                           <div className="flex flex-col items-center gap-3 w-full sm:w-auto">
+                             <div className="w-40 h-40 shrink-0 bg-white rounded-3xl border-2 border-dashed border-emerald-300 flex items-center justify-center p-2 overflow-hidden shadow-sm relative">
+                               {settings.qris_url ? (
+                                 <img src={formatImageUrl(settings.qris_url)} className="w-full h-full object-contain" alt="QRIS Preview"/>
+                               ) : (
+                                 <span className="text-xs text-slate-400 font-bold text-center">Belum ada QRIS</span>
+                               )}
+                             </div>
+                           </div>
+
+                           <div className="flex-1 w-full space-y-4">
+                             <label className="w-full flex items-center justify-center gap-2 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 p-4 rounded-2xl font-black cursor-pointer transition-all active:scale-95 border border-emerald-200 text-sm">
+                               <UploadCloud size={20}/> Upload dari Galeri/File
+                               <input type="file" accept="image/*" className="hidden" onChange={handleUploadQRIS} />
+                             </label>
+                             <div className="flex items-center gap-3">
+                               <div className="h-[1px] bg-slate-300 flex-1"></div>
+                               <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ATAU PASTE LINK</span>
+                               <div className="h-[1px] bg-slate-300 flex-1"></div>
+                             </div>
+                             <input placeholder="Link G-Drive/GitHub..." value={settings.qris_url || ''} onChange={e => setSettings({...settings, qris_url: e.target.value})} className="w-full p-4 bg-white border border-slate-200 rounded-2xl font-bold focus:ring-4 focus:ring-emerald-500/20 outline-none text-xs"/>
+                           </div>
+                         </div>
+                       </div>
+
+                       <hr className="border-slate-100"/>
+                       
+                       <div className="space-y-3">
+                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><CreditCard size={14}/> Info Rekening Manual</label>
+                         <input value={settings.rekening || ''} onChange={e => setSettings({...settings, rekening: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-3xl font-bold focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all text-sm"/>
+                         <p className="text-[10px] text-slate-400 font-bold ml-2">Format: NAMA BANK [SPASI] NO REKENING [SPASI] a.n NAMA PEMILIK</p>
+                       </div>
+
+                       <hr className="border-slate-100"/>
+
+                       {/* FITUR BARU: API GEMINI */}
+                       <div className="space-y-3">
+                         <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Sparkles size={14}/> Gemini API Key (Untuk Gambar AI)</label>
+                         <input type="password" value={geminiKey} onChange={e => setGeminiKey(e.target.value)} placeholder="AIzaSy..." className="w-full p-4 bg-blue-50/50 text-blue-900 rounded-3xl font-bold border border-blue-200 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/20 outline-none transition-all text-sm"/>
+                         <p className="text-[10px] text-slate-400 font-bold ml-2">Tersimpan aman di memori HP Anda. Diperlukan jika ingin memunculkan foto asli barang secara otomatis menggunakan AI.</p>
+                       </div>
+                       
+                       <hr className="border-slate-100"/>
+
+                       <div className="space-y-3">
+                         <label className="text-[10px] font-black text-rose-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Lock size={14}/> Sandi Rahasia Admin</label>
+                         <input type="text" value={settings.admin_password || ''} onChange={e => setSettings({...settings, admin_password: e.target.value})} className="w-full p-4 bg-rose-50/50 text-rose-900 rounded-3xl font-black border border-rose-200 focus:border-rose-400 focus:ring-4 focus:ring-rose-500/20 outline-none transition-all tracking-[0.5em] text-xl text-center"/>
+                       </div>
+                       
+                       <button disabled={isProcessing} onClick={handleSaveSettings} className="w-full py-5 bg-slate-900 text-white rounded-[32px] font-black text-lg shadow-xl shadow-slate-300 hover:bg-slate-800 transition-all active:scale-95 mt-8 disabled:opacity-50">
+                         {isProcessing ? 'MENYIMPAN...' : 'SIMPAN SEMUA PENGATURAN'}
+                       </button>
+                    </div>
+                 </div>
+               )}
+
+               {/* TAB: ANALISA PENJUALAN */}
                {adminTab === 'analisa' && (
                  <div className="animate-fade-in max-w-6xl mx-auto">
                     <div className="flex flex-col xl:flex-row justify-between xl:items-center mb-8 gap-6">
@@ -1221,7 +1391,6 @@ function MainApp() {
                       </div>
                     </div>
 
-                    {/* SECTION: REKAP TRANSAKSI BERHASIL */}
                     <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2"><CheckCircle className="text-emerald-500"/> Rekap Penjualan (Terjual)</h2>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
                        <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden">
@@ -1241,7 +1410,6 @@ function MainApp() {
                        </div>
                     </div>
 
-                    {/* SECTION: REKAP INPUT BARANG */}
                     <h2 className="text-xl font-bold text-slate-800 mb-4 flex items-center gap-2"><Package className="text-blue-500"/> Rekap Input Barang (Sesuai Filter Tanggal)</h2>
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
                        <div className="bg-white p-6 rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden">
@@ -1261,7 +1429,6 @@ function MainApp() {
                        </div>
                     </div>
 
-                    {/* TABEL REKAP KESELURUHAN PER BARANG */}
                     <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col mb-8">
                       <div className="p-6 md:p-8 border-b border-slate-100">
                         <h2 className="font-black text-xl text-slate-800 flex items-center gap-2"><Package className="text-emerald-500"/> Rekap Keseluruhan per Barang</h2>
@@ -1283,8 +1450,8 @@ function MainApp() {
                              {productRankings.map((p) => (
                                <tr key={p.id} className="text-sm font-bold hover:bg-slate-50 transition-colors">
                                  <td className="p-4 flex items-center gap-3">
-                                   <div className="w-10 h-10 rounded-xl border border-slate-200 flex items-center justify-center bg-white shrink-0 text-xl">
-                                      {getDynamicIcon(p.nama)}
+                                   <div className="w-10 h-10 rounded-xl border border-slate-200 flex items-center justify-center bg-white shrink-0 text-xl overflow-hidden">
+                                      {p.gambar ? <img src={formatImageUrl(p.gambar)} className="w-full h-full object-cover"/> : getDynamicIcon(p.nama)}
                                    </div>
                                    <span className="truncate text-slate-700">{p.nama}</span>
                                  </td>
@@ -1299,9 +1466,7 @@ function MainApp() {
                       </div>
                     </div>
 
-                    {/* TABEL PERINGKAT BARANG (10 TERLARIS) */}
                     <div className="grid lg:grid-cols-2 gap-6 md:gap-8 mb-8 md:mb-12">
-                        {/* Tabel 10 Peringkat Barang Laku */}
                         <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
                           <div className="p-6 md:p-8 border-b border-slate-100">
                             <h2 className="font-black text-xl text-slate-800 flex items-center gap-2"><TrendingUp className="text-orange-500"/> 10 Barang Paling Laku</h2>
@@ -1329,7 +1494,6 @@ function MainApp() {
                           </div>
                         </div>
 
-                        {/* Tabel Barang Nganggur */}
                         <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
                           <div className="p-6 md:p-8 border-b border-slate-100">
                             <h2 className="font-black text-xl text-slate-800 flex items-center gap-2"><TrendingDown className="text-red-500"/> Perhatian: Kurang Laku</h2>
@@ -1357,7 +1521,6 @@ function MainApp() {
                         </div>
                     </div>
 
-                    {/* Tabel Riwayat Transaksi (Hapus Satuan & Edit) */}
                     <div className="bg-white rounded-[32px] shadow-sm border border-gray-100 p-6 md:p-8">
                       <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
                         <h2 className="font-black text-lg flex items-center gap-2 text-slate-900"><List className="text-blue-500"/> Riwayat Transaksi Lengkap</h2>
@@ -1389,7 +1552,6 @@ function MainApp() {
                             </div>
                             
                             <div className="flex flex-col md:flex-row justify-between md:items-end mt-3 pt-3 border-t border-gray-200 gap-4">
-                              {/* FITUR BARU: TOMBOL EDIT & HAPUS SATUAN */}
                               <div className="flex items-center gap-2 w-full md:w-auto">
                                  <button onClick={() => setEditingTrx(t)} className="flex-1 md:flex-none flex items-center justify-center gap-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors text-xs font-bold shadow-sm" title="Edit Transaksi"><Edit size={14}/> Edit</button>
                                  <button onClick={() => handleDeleteSingleTransaction(t.id)} className="flex-1 md:flex-none flex items-center justify-center gap-1 px-3 py-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors text-xs font-bold shadow-sm" title="Hapus & Kembalikan Stok"><Trash2 size={14}/> Batal</button>
@@ -1413,11 +1575,10 @@ function MainApp() {
                       <h1 className="text-3xl font-black tracking-tighter text-slate-800">Manajemen Barang</h1>
                       <div className="flex flex-col md:flex-row gap-2">
                         <button onClick={handleClearAllProducts} disabled={isProcessing} className="bg-rose-100 text-rose-600 px-6 py-3 rounded-2xl font-black flex items-center justify-center gap-2 shadow-sm hover:bg-rose-200 active:scale-95 transition-all uppercase w-full md:w-auto text-sm"><Trash2 size={18}/> {isProcessing ? 'PROSES...' : 'Hapus Semua'}</button>
-                        <button onClick={() => { setEditingId(null); setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '' }); setUseDiskon(false); setShowAddForm(!showAddForm); }} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black flex items-center justify-center gap-2 shadow-xl shadow-emerald-100 hover:bg-emerald-500 active:scale-95 transition-all uppercase w-full md:w-auto text-sm">{showAddForm ? <X size={18}/> : <PlusCircle size={18}/>} {showAddForm ? 'Tutup Form' : 'Tambah Barang'}</button>
+                        <button onClick={() => { setEditingId(null); setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '', gambar: '' }); setUseDiskon(false); setShowAddForm(!showAddForm); }} className="bg-emerald-600 text-white px-6 py-3 rounded-2xl font-black flex items-center justify-center gap-2 shadow-xl shadow-emerald-100 hover:bg-emerald-500 active:scale-95 transition-all uppercase w-full md:w-auto text-sm">{showAddForm ? <X size={18}/> : <PlusCircle size={18}/>} {showAddForm ? 'Tutup Form' : 'Tambah Barang'}</button>
                       </div>
                     </div>
 
-                    {/* CARD SUMMARY DATA BARANG */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                         <div className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
                           <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Total Produk</span>
@@ -1439,9 +1600,36 @@ function MainApp() {
 
                     {showAddForm && (
                       <form onSubmit={handleAddProduct} className={`p-6 md:p-8 rounded-[40px] border shadow-sm mb-8 grid grid-cols-1 md:grid-cols-4 gap-4 md:gap-6 animate-slide-up ${editingId ? 'bg-blue-50 border-blue-200' : 'bg-white border-slate-200'}`}>
-                         <h3 className="md:col-span-4 font-black text-slate-800 mb-2 flex items-center gap-2">
-                           {editingId ? <><Edit className="text-blue-600"/> Edit Data Barang</> : <><PlusCircle className="text-emerald-600"/> Input Barang Baru</>}
-                         </h3>
+                         <div className="md:col-span-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-slate-200 pb-4 mb-2">
+                           <h3 className="font-black text-slate-800 text-xl flex items-center gap-2">
+                             {editingId ? <><Edit className="text-blue-600"/> Edit Data Barang</> : <><PlusCircle className="text-emerald-600"/> Input Barang Baru</>}
+                           </h3>
+                         </div>
+                         
+                         {/* FITUR BARU: GAMBAR ASLI DARI GEMINI & UPLOAD KAMERA */}
+                         <div className="md:col-span-4 flex flex-col md:flex-row gap-6 bg-slate-50 p-6 rounded-3xl border border-slate-200 mb-2">
+                           <div className="w-full md:w-32 h-32 bg-white rounded-2xl border-2 border-dashed border-emerald-300 flex items-center justify-center shrink-0 overflow-hidden shadow-sm relative">
+                             {newProduct.gambar ? (
+                               <img src={formatImageUrl(newProduct.gambar)} className="w-full h-full object-cover" alt="Preview"/>
+                             ) : (
+                               <span className="text-xs text-slate-400 font-bold text-center flex flex-col items-center gap-1"><ImageIcon size={20}/> Belum Ada<br/>Foto</span>
+                             )}
+                           </div>
+                           <div className="flex-1 space-y-3">
+                             <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Gambar / Foto Barang Asli (Opsional)</p>
+                             <div className="flex flex-wrap gap-2">
+                               <button type="button" onClick={handleGenerateGeminiImage} disabled={isProcessing} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-3 rounded-xl font-bold text-xs flex items-center gap-2 shadow-md transition-all active:scale-95 disabled:opacity-50">
+                                 <Sparkles size={16}/> Buat Gambar AI
+                               </button>
+                               <label className="bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-4 py-3 rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm transition-all active:scale-95 cursor-pointer">
+                                 <Camera size={16}/> Ambil / Upload Foto
+                                 <input type="file" accept="image/*" className="hidden" onChange={handleUploadProductImage} />
+                               </label>
+                             </div>
+                             <p className="text-xs text-slate-400 italic">PENTING: Agar gambar tersimpan di server, Anda wajib menambahkan kolom <strong>gambar</strong> dengan tipe <strong>text</strong> pada tabel <strong>produk</strong> di Supabase Anda.</p>
+                           </div>
+                         </div>
+
                          <div className="md:col-span-2">
                            <label className="text-[10px] font-black uppercase text-slate-500 mb-2 block tracking-widest ml-1">Nama Produk</label>
                            <input required value={newProduct.nama} onChange={e => setNewProduct({...newProduct, nama: e.target.value})} className="w-full p-4 bg-slate-50 rounded-2xl font-bold border border-slate-200 focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all"/>
@@ -1503,7 +1691,9 @@ function MainApp() {
                            {products.map(p => (
                              <tr key={p.id} className={`transition-colors ${editingId === p.id ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
                                <td className="p-6 flex items-center gap-4">
-                                 <div className="w-12 h-12 bg-white rounded-2xl border shadow-sm flex items-center justify-center shrink-0">{getDynamicIcon(p.nama)}</div>
+                                 <div className="w-14 h-14 bg-white rounded-2xl border shadow-sm flex items-center justify-center shrink-0 overflow-hidden">
+                                    {p.gambar ? <img src={formatImageUrl(p.gambar)} className="w-full h-full object-cover"/> : getDynamicIcon(p.nama)}
+                                 </div>
                                  <div className="min-w-0">
                                    <p className="font-extrabold text-sm text-slate-900 truncate">{p.nama}</p>
                                    {p.barcode ? <p className="font-mono text-[10px] text-slate-500 mt-1 uppercase tracking-widest flex items-center gap-1"><Barcode size={10}/> {p.barcode}</p> : <p className="text-[10px] text-slate-400 mt-1 italic">No Barcode</p>}
@@ -1530,74 +1720,6 @@ function MainApp() {
                          </tbody>
                       </table>
                     </div>
-                  </div>
-               </div>
-             )}
-
-             {/* TAB: PENGATURAN */}
-             {adminTab === 'pengaturan' && (
-               <div className="max-w-3xl animate-fade-in mx-auto md:mx-0">
-                  <h1 className="text-3xl font-black tracking-tighter text-slate-800 mb-8">Konfigurasi Toko</h1>
-                  <div className="bg-white p-8 md:p-10 rounded-[40px] border border-slate-200 shadow-sm space-y-8">
-                     
-                     <div className="space-y-3">
-                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Store size={14}/> Nama Toko Digital</label>
-                       <input value={settings.nama_toko || ''} onChange={e => setSettings({...settings, nama_toko: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-3xl font-black focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all text-lg"/>
-                     </div>
-
-                     <hr className="border-slate-100"/>
-                     
-                     {/* FITUR BARU: UPLOAD & DOWNLOAD QRIS */}
-                     <div className="space-y-3">
-                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><QrCode size={14}/> Foto QRIS Pembayaran</label>
-                       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 bg-slate-50 border border-slate-200 p-6 rounded-[32px]">
-                         
-                         <div className="flex flex-col items-center gap-3 w-full sm:w-auto">
-                           <div className="w-40 h-40 shrink-0 bg-white rounded-3xl border-2 border-dashed border-emerald-300 flex items-center justify-center p-2 overflow-hidden shadow-sm relative">
-                             {settings.qris_url ? (
-                               <img src={formatImageUrl(settings.qris_url)} className="w-full h-full object-contain" alt="QRIS Preview"/>
-                             ) : (
-                               <span className="text-xs text-slate-400 font-bold text-center">Belum ada QRIS</span>
-                             )}
-                           </div>
-                           <button onClick={handleDownloadQRIS} className="text-[10px] font-black bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-full transition-colors uppercase tracking-widest flex items-center gap-2 shadow-md">
-                             <Download size={14}/> Unduh QRIS
-                           </button>
-                         </div>
-
-                         <div className="flex-1 w-full space-y-4">
-                           <label className="w-full flex items-center justify-center gap-2 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 p-4 rounded-2xl font-black cursor-pointer transition-all active:scale-95 border border-emerald-200 text-sm">
-                             <UploadCloud size={20}/> Upload dari Galeri/File
-                             <input type="file" accept="image/*" className="hidden" onChange={handleUploadQRIS} />
-                           </label>
-                           <div className="flex items-center gap-3">
-                             <div className="h-[1px] bg-slate-300 flex-1"></div>
-                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ATAU PASTE LINK</span>
-                             <div className="h-[1px] bg-slate-300 flex-1"></div>
-                           </div>
-                           <input placeholder="Link G-Drive/GitHub..." value={settings.qris_url || ''} onChange={e => setSettings({...settings, qris_url: e.target.value})} className="w-full p-4 bg-white border border-slate-200 rounded-2xl font-bold focus:ring-4 focus:ring-emerald-500/20 outline-none text-xs"/>
-                         </div>
-                       </div>
-                     </div>
-
-                     <hr className="border-slate-100"/>
-                     
-                     <div className="space-y-3">
-                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><CreditCard size={14}/> Info Rekening Manual</label>
-                       <input value={settings.rekening || ''} onChange={e => setSettings({...settings, rekening: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-3xl font-bold focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all text-sm"/>
-                       <p className="text-[10px] text-slate-400 font-bold ml-2">Format: NAMA BANK [SPASI] NO REKENING [SPASI] a.n NAMA PEMILIK</p>
-                     </div>
-                     
-                     <hr className="border-slate-100"/>
-
-                     <div className="space-y-3">
-                       <label className="text-[10px] font-black text-rose-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Lock size={14}/> Sandi Rahasia Admin</label>
-                       <input type="text" value={settings.admin_password || ''} onChange={e => setSettings({...settings, admin_password: e.target.value})} className="w-full p-4 bg-rose-50/50 text-rose-900 rounded-3xl font-black border border-rose-200 focus:border-rose-400 focus:ring-4 focus:ring-rose-500/20 outline-none transition-all tracking-[0.5em] text-xl text-center"/>
-                     </div>
-                     
-                     <button disabled={isProcessing} onClick={handleSaveSettings} className="w-full py-5 bg-slate-900 text-white rounded-[32px] font-black text-lg shadow-xl shadow-slate-300 hover:bg-slate-800 transition-all active:scale-95 mt-8 disabled:opacity-50">
-                       {isProcessing ? 'MENYIMPAN...' : 'SIMPAN SEMUA PENGATURAN'}
-                     </button>
                   </div>
                </div>
              )}
