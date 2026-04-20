@@ -45,7 +45,7 @@ const formatImageUrl = (url) => {
 };
 
 // =========================================================================
-// IKON REALISTIS (3D EMOJI SHADOW)
+// 1. UPDATE: IKON REALISTIS (3D EMOJI SHADOW) LEBIH SPESIFIK & AKURAT
 // =========================================================================
 const getDynamicIcon = (namaBarang) => {
   const name = (namaBarang || '').toLowerCase();
@@ -54,29 +54,33 @@ const getDynamicIcon = (namaBarang) => {
     <span className="text-4xl drop-shadow-md transition-transform transform hover:scale-110">{emoji}</span>
   );
 
-  if (name.match(/kacang|peanut|sukro|garuda|dua kelinci/)) return iconWrapper('🥜');
-  if (name.match(/wafer|tango|nabati|beng|biskuat|nissin|biskuit/)) return iconWrapper('🧇');
-  if (name.match(/coklat|chocolate|silverqueen|choki|delfi|milo|cadbury/)) return iconWrapper('🍫');
-  if (name.match(/permen|candy|yupi|kopiko|kiss|mint|sugus|relaxa/)) return iconWrapper('🍬');
-  if (name.match(/snack|ciki|chiki|keripik|taro|lays|citato|chitato|qtela|piattos|potabee/)) return iconWrapper('🍿');
-  if (name.match(/es|ice|krim|campina|walls|aice/)) return iconWrapper('🍦');
+  // Snack, Jajanan, Manisan, Coklat, Wafer
+  if (name.match(/kacang|peanut|sukro|garuda|dua kelinci|pilus|koro|atom/)) return iconWrapper('🥜');
+  if (name.match(/wafer|tango|nabati|beng|biskuat|nissin|biskuit|oreo|malkist|roma|gery/)) return iconWrapper('🧇');
+  if (name.match(/coklat|chocolate|silverqueen|choki|delfi|milo|cadbury|beng-beng|chocolatos/)) return iconWrapper('🍫');
+  if (name.match(/permen|candy|yupi|kopiko|kiss|mint|sugus|relaxa|mintz|gummy|fox/)) return iconWrapper('🍬');
+  if (name.match(/snack|ciki|chiki|keripik|taro|lays|citato|chitato|qtela|piattos|potabee|cheetos|kusuka|jetz/)) return iconWrapper('🍟');
+  if (name.match(/es|ice|krim|campina|walls|aice|cornetto|magnum|joyday/)) return iconWrapper('🍦');
 
-  if (name.match(/bakso|pentol|cilok|tahu|soto|kuah/)) return iconWrapper('🍲');
-  if (name.match(/mie|indomie|sedap|noodle|samyang|pop mie|sarimi/)) return iconWrapper('🍜');
-  if (name.match(/nasi|makan|lontong|geprek|pecel|ayam|gorengan/)) return iconWrapper('🍛');
-  if (name.match(/roti|bolu|bakpao|pizza|burger|sari roti|kue/)) return iconWrapper('🍞');
-  if (name.match(/daging|sapi|kambing|sosis|nugget|kornet/)) return iconWrapper('🥩');
-  if (name.match(/ikan|lele|nila|udang|seafood|sarden/)) return iconWrapper('🐟');
+  // Makanan Berat, Roti & Mie
+  if (name.match(/bakso|pentol|cilok|tahu|soto|kuah|seblak|baso|cuanki/)) return iconWrapper('🍲');
+  if (name.match(/mie|indomie|sedap|noodle|samyang|pop mie|sarimi|supermi|lemonilo|gelas/)) return iconWrapper('🍜');
+  if (name.match(/nasi|makan|lontong|geprek|pecel|ayam|gorengan|penyet|lele/)) return iconWrapper('🍛');
+  if (name.match(/roti|bolu|bakpao|pizza|burger|sari roti|kue|donat|cake/)) return iconWrapper('🍞');
+  if (name.match(/daging|sapi|kambing|sosis|nugget|kornet|bakar|ayam goreng/)) return iconWrapper('🥩');
+  if (name.match(/ikan|lele|nila|udang|seafood|sarden|tuna|teri/)) return iconWrapper('🐟');
 
-  if (name.match(/kopi|teh|panas|good day|kapal api|nescafe/)) return iconWrapper('☕');
-  if (name.match(/air|mineral|aqua|le minerale|cleo|vit/)) return iconWrapper('💧');
-  if (name.match(/minum|coca|susu|jus|sirup|sprite|fanta|soda|nutrisari|floridina/)) return iconWrapper('🥤');
+  // Minuman
+  if (name.match(/kopi|teh|panas|good day|kapal api|nescafe|luwak|pucuk|javana|kotak/)) return iconWrapper('☕');
+  if (name.match(/air|mineral|aqua|le minerale|cleo|vit|nestle|ades|pristine|club/)) return iconWrapper('💧');
+  if (name.match(/minum|coca|susu|jus|sirup|sprite|fanta|soda|nutrisari|floridina|bear brand|yakult|mizone|pocari/)) return iconWrapper('🥤');
 
-  if (name.match(/obat|panadol|paramex|bodrex|tolak|vitamin|promag/)) return iconWrapper('💊');
-  if (name.match(/sabun|shampo|rinso|sunlight|cuci|odol|pasta gigi|deterjen|pepsodent|biore|lifebuoy/)) return iconWrapper('🧼');
-  if (name.match(/rokok|korek|mancis|sampoerna|djarum|gudang|surya/)) return iconWrapper('🚬');
+  // Kebutuhan, Bumbu & Lainnya
+  if (name.match(/obat|panadol|paramex|bodrex|tolak|vitamin|promag|mixagrip|diapet|antangin/)) return iconWrapper('💊');
+  if (name.match(/sabun|shampo|rinso|sunlight|cuci|odol|pasta gigi|deterjen|pepsodent|biore|lifebuoy|soklin|daia/)) return iconWrapper('🧼');
+  if (name.match(/rokok|korek|mancis|sampoerna|djarum|gudang|surya|magnum|esse|marlboro|camel/)) return iconWrapper('🚬');
   if (name.match(/sayur|bayam|kangkung|wortel|tomat|cabe|bawang/)) return iconWrapper('🥬');
-  if (name.match(/buah|apel|jeruk|pisang|mangga|melon/)) return iconWrapper('🍎');
+  if (name.match(/buah|apel|jeruk|pisang|mangga|melon|semangka/)) return iconWrapper('🍎');
   
   return iconWrapper('🛍️');
 };
@@ -110,7 +114,7 @@ function MainApp() {
     nama_toko: 'Memuat Toko...', qris_url: '', rekening: '', admin_password: '' 
   });
   
-  // FITUR BARU: Keranjang Tersimpan di HP (Persistent Cart LocalStorage)
+  // Keranjang Tersimpan di HP (Persistent Cart LocalStorage)
   const [cart, setCart] = useState(() => {
     try {
       if (typeof window !== 'undefined') {
@@ -151,6 +155,9 @@ function MainApp() {
   const [editingId, setEditingId] = useState(null); 
   const [newProduct, setNewProduct] = useState({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '' });
   const [useDiskon, setUseDiskon] = useState(false);
+
+  // STATE BARU: EDIT TRANSAKSI
+  const [editingTrx, setEditingTrx] = useState(null);
 
   const showToast = (msg, type = 'success') => {
     setToast({ show: true, msg: String(msg), type });
@@ -241,6 +248,9 @@ function MainApp() {
           if (prev.some(t => t.id === payload.new.id)) return prev;
           return [payload.new, ...prev]; 
         });
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'transaksi' }, (payload) => {
+        setTransactions(prev => prev.map(t => t.id === payload.new.id ? payload.new : t));
       })
       .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'transaksi' }, (payload) => {
         setTransactions(prev => prev.filter(t => t.id !== payload.old.id));
@@ -414,7 +424,7 @@ function MainApp() {
       total: totalBelanja, 
       modal: totalModal, 
       profit: totalBelanja - totalModal, 
-      metode: 'QRIS / Transfer' // Set default ke string ini
+      metode: 'QRIS / Transfer'
     };
 
     setTransactions(prev => [newTransaction, ...prev]);
@@ -598,6 +608,7 @@ function MainApp() {
     }
   };
 
+  // UPDATE: RESET UJI COBA MENGEMBALIKAN STOK KE JUMLAH SEMULA
   const handleClearTransactions = async () => {
     if (!supabaseClient) return;
     if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda yakin MENGHAPUS SELURUH RIWAYAT TRANSAKSI PENJUALAN?\nSTOK BARANG AKAN DIKEMBALIKAN SEPERTI SEMULA!")) {
@@ -634,6 +645,67 @@ function MainApp() {
       }
       setIsProcessing(false);
     }
+  };
+
+  // FITUR BARU: HAPUS 1 TRANSAKSI SAJA (KEMBALIKAN STOK)
+  const handleDeleteSingleTransaction = async (id) => {
+    if (!supabaseClient) return;
+    if (window.confirm("Hapus transaksi ini? Stok barang akan dikembalikan seperti semula.")) {
+      setIsProcessing(true);
+      const trx = transactions.find(t => t.id === id);
+      if (!trx) return;
+
+      // 1. Optimistic Update Stok Lokal
+      setProducts(prevProducts => prevProducts.map(p => {
+        const boughtItem = trx.items.find(i => i.id === p.id);
+        if (boughtItem) {
+          return { ...p, stok: (p.stok || 0) + boughtItem.qty };
+        }
+        return p;
+      }));
+      
+      // 2. Hapus Transaksi Lokal
+      setTransactions(prev => prev.filter(t => t.id !== id));
+
+      // 3. Kembalikan Stok di Database
+      for (const item of trx.items) {
+        const product = products.find(p => p.id === item.id);
+        if (product) {
+          await supabaseClient.from('produk').update({ stok: (product.stok || 0) + item.qty }).eq('id', product.id);
+        }
+      }
+
+      // 4. Hapus Transaksi di Database
+      const { error } = await supabaseClient.from('transaksi').delete().eq('id', id);
+      if (error) showToast(`Gagal hapus transaksi: ${error.message}`, 'error');
+      else showToast('Transaksi berhasil dihapus & stok kembali!', 'success');
+      
+      setIsProcessing(false);
+    }
+  };
+
+  // FITUR BARU: SIMPAN EDIT TRANSAKSI
+  const handleSaveEditTrx = async (e) => {
+     e.preventDefault();
+     if (!supabaseClient) return;
+     setIsProcessing(true);
+     
+     // Optimistic Update
+     setTransactions(prev => prev.map(t => t.id === editingTrx.id ? editingTrx : t));
+     
+     // Sync to DB
+     const { error } = await supabaseClient.from('transaksi').update({
+       metode: editingTrx.metode,
+       total: editingTrx.total,
+       profit: editingTrx.profit,
+       modal: editingTrx.modal
+     }).eq('id', editingTrx.id);
+
+     if (error) showToast(`Gagal edit: ${error.message}`, 'error');
+     else showToast('Transaksi berhasil diperbarui!', 'success');
+     
+     setEditingTrx(null);
+     setIsProcessing(false);
   };
 
   const handleExportCSV = () => {
@@ -726,6 +798,46 @@ function MainApp() {
         </div>
       )}
 
+      {/* MODAL EDIT TRANSAKSI (BARU) */}
+      {editingTrx && (
+        <div className="fixed inset-0 bg-slate-900/60 z-[999] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+           <div className="bg-white rounded-3xl p-6 w-full max-w-md animate-slide-up shadow-2xl border-4 border-white">
+              <h3 className="font-black text-xl mb-1 text-slate-800">Edit Data Transaksi</h3>
+              <p className="text-xs font-bold text-slate-400 mb-6 pb-4 border-b border-slate-100">Koreksi total harga atau metode pembayaran jika terjadi kesalahan kasir.</p>
+              
+              <form onSubmit={handleSaveEditTrx}>
+                 <div className="space-y-4">
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest font-black text-gray-500 ml-1">Metode Pembayaran</label>
+                      <select value={editingTrx.metode} onChange={e => setEditingTrx({...editingTrx, metode: e.target.value})} className="w-full p-4 mt-1 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm text-slate-700 outline-none focus:ring-4 focus:ring-emerald-500/20">
+                         <option value="QRIS / Transfer">QRIS / Transfer (Default)</option>
+                         <option value="qris">QRIS Cepat</option>
+                         <option value="transfer">Transfer Bank</option>
+                         <option value="tunai">Tunai / Cash</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest font-black text-gray-500 ml-1">Total Belanja (Rp)</label>
+                      <input type="number" value={editingTrx.total} onChange={e => setEditingTrx({...editingTrx, total: parseInt(e.target.value)||0, profit: (parseInt(e.target.value)||0) - editingTrx.modal})} className="w-full p-4 mt-1 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm text-slate-700 outline-none focus:ring-4 focus:ring-emerald-500/20" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest font-black text-gray-500 ml-1">Total Modal (Rp)</label>
+                      <input type="number" value={editingTrx.modal} onChange={e => setEditingTrx({...editingTrx, modal: parseInt(e.target.value)||0, profit: editingTrx.total - (parseInt(e.target.value)||0)})} className="w-full p-4 mt-1 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm text-slate-700 outline-none focus:ring-4 focus:ring-emerald-500/20" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest font-black text-gray-500 ml-1">Keuntungan / Profit (Rp)</label>
+                      <input type="number" value={editingTrx.profit} onChange={e => setEditingTrx({...editingTrx, profit: parseInt(e.target.value)||0})} className="w-full p-4 mt-1 bg-emerald-50 border border-emerald-200 rounded-2xl font-extrabold text-sm text-emerald-700 outline-none focus:ring-4 focus:ring-emerald-500/20" />
+                    </div>
+                 </div>
+                 <div className="flex gap-3 mt-8">
+                    <button type="button" onClick={() => setEditingTrx(null)} className="flex-1 py-4 bg-slate-100 font-bold rounded-2xl text-slate-600 hover:bg-slate-200 transition-colors">Batal</button>
+                    <button type="submit" disabled={isProcessing} className="flex-1 py-4 bg-emerald-600 font-bold rounded-2xl text-white hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">{isProcessing ? 'Menyimpan...' : 'Simpan Edit'}</button>
+                 </div>
+              </form>
+           </div>
+        </div>
+      )}
+
       {/* GLOBAL TOAST */}
       {toast.show && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-slate-900 text-white rounded-full shadow-2xl font-bold flex items-center gap-2 animate-slide-up border border-slate-700 w-max max-w-[90%] text-center text-sm md:text-base">
@@ -741,7 +853,6 @@ function MainApp() {
             <div className="flex justify-between items-center mb-4 max-w-5xl mx-auto">
               <div className="flex items-center gap-2 text-emerald-600 font-black text-xl"><Store/> {settings.nama_toko}</div>
               <div className="flex items-center gap-2">
-                {/* FITUR BARU: TOMBOL DOWNLOAD QRIS LANGSUNG DI HALAMAN TOKO */}
                 <button onClick={handleDownloadQRIS} className="p-2 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition shadow-sm" title="Download QRIS Pembayaran"><QrCode size={18}/></button>
                 <button onClick={() => setShowShareApp(true)} className="p-2 bg-emerald-50 text-emerald-600 rounded-full hover:bg-emerald-100 transition shadow-sm" title="Bagikan Link Toko (QR Code)"><Share2 size={18}/></button>
                 <button onClick={() => setView('admin')} className="p-2 bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200 transition shadow-sm" title="Masuk Mode Admin"><Lock size={18}/></button>
@@ -827,6 +938,7 @@ function MainApp() {
         <div className="max-w-md mx-auto p-6 min-h-screen flex flex-col pb-32">
           <button onClick={() => setView('toko')} className="flex items-center gap-2 font-black mb-6 text-slate-400 hover:text-slate-600 transition"><ArrowLeft/> Kembali Belanja</button>
           
+          {/* FITUR EDIT KERANJANG SEBELUM BAYAR */}
           <div className="bg-white rounded-[32px] p-6 shadow-sm border border-slate-100 mb-6">
             <h3 className="font-black text-lg mb-4 text-slate-800 border-b border-slate-100 pb-3">Review Keranjang</h3>
             <div className="space-y-4 max-h-[400px] overflow-y-auto pr-2">
@@ -915,7 +1027,6 @@ function MainApp() {
             </div>
 
             <div className="bg-gray-50 p-6 text-center border-t border-dashed">
-               {/* INSTRUKSI PEMBAYARAN SESUAI PERMINTAAN */}
                <p className="text-xs text-gray-400 uppercase font-bold tracking-widest mb-2">Instruksi Pembayaran</p>
                <h3 className="font-black text-lg text-slate-800 tracking-tight leading-tight">Silakan bayar dengan scan QRIS atau Transfer Rekening.</h3>
             </div>
@@ -1213,7 +1324,7 @@ function MainApp() {
                         </div>
                     </div>
 
-                    {/* Tabel Riwayat Transaksi */}
+                    {/* Tabel Riwayat Transaksi (Hapus Satuan & Edit) */}
                     <div className="bg-white rounded-[32px] shadow-sm border border-gray-100 p-6 md:p-8">
                       <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
                         <h2 className="font-black text-lg flex items-center gap-2 text-slate-900"><List className="text-blue-500"/> Riwayat Transaksi Lengkap</h2>
@@ -1228,12 +1339,12 @@ function MainApp() {
                         </div>
                       </div>
 
-                      <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2">
+                      <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2">
                         {sortedTransactions.length === 0 ? <p className="text-gray-400 text-sm font-bold text-center py-10">Belum ada transaksi.</p> : sortedTransactions.map(t => (
                           <div key={t.id} className="border border-gray-200 rounded-3xl p-5 bg-gray-50/50 hover:bg-white transition-colors">
                             <div className="flex justify-between items-center text-sm mb-3 pb-3 border-b border-gray-200">
                               <span className="font-mono text-xs font-bold text-slate-500">{t.id} • {t.tanggal}</span>
-                              <span className={`text-[10px] font-black px-3 py-1 rounded-xl uppercase tracking-widest ${t.metode === 'qris' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}`}>{t.metode}</span>
+                              <span className={`text-[10px] font-black px-3 py-1 rounded-xl uppercase tracking-widest ${t.metode.toLowerCase().includes('qris') ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'}`}>{t.metode}</span>
                             </div>
                             <div className="space-y-2 mb-3">
                               {t.items.map((i, idx) => (
@@ -1243,9 +1354,17 @@ function MainApp() {
                                 </div>
                               ))}
                             </div>
-                            <div className="flex justify-between items-end mt-3 pt-3 border-t border-gray-200">
-                              <span className="text-[10px] uppercase tracking-widest font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100">Untung {formatRupiah(t.profit)}</span>
-                              <span className="font-black text-xl text-slate-900">{formatRupiah(t.total)}</span>
+                            
+                            <div className="flex flex-col md:flex-row justify-between md:items-end mt-3 pt-3 border-t border-gray-200 gap-4">
+                              {/* FITUR BARU: TOMBOL EDIT & HAPUS SATUAN */}
+                              <div className="flex items-center gap-2 w-full md:w-auto">
+                                 <button onClick={() => setEditingTrx(t)} className="flex-1 md:flex-none flex items-center justify-center gap-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-xl hover:bg-blue-100 transition-colors text-xs font-bold shadow-sm" title="Edit Transaksi"><Edit size={14}/> Edit</button>
+                                 <button onClick={() => handleDeleteSingleTransaction(t.id)} className="flex-1 md:flex-none flex items-center justify-center gap-1 px-3 py-2 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-colors text-xs font-bold shadow-sm" title="Hapus & Kembalikan Stok"><Trash2 size={14}/> Batal</button>
+                              </div>
+                              <div className="flex justify-between md:justify-end items-end gap-4 w-full md:w-auto">
+                                <span className="text-[10px] uppercase tracking-widest font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg border border-emerald-100">Untung {formatRupiah(t.profit)}</span>
+                                <span className="font-black text-xl text-slate-900">{formatRupiah(t.total)}</span>
+                              </div>
                             </div>
                           </div>
                         ))}
@@ -1395,6 +1514,7 @@ function MainApp() {
 
                      <hr className="border-slate-100"/>
                      
+                     {/* FITUR BARU: UPLOAD & DOWNLOAD QRIS */}
                      <div className="space-y-3">
                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><QrCode size={14}/> Foto QRIS Pembayaran</label>
                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 bg-slate-50 border border-slate-200 p-6 rounded-[32px]">
