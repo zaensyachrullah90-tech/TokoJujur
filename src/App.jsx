@@ -882,7 +882,7 @@ function MainApp() {
               <CheckCircle size={36} />
             </div>
             <h2 className="text-2xl font-extrabold text-slate-800">Pembayaran Berhasil</h2>
-            <p className="text-slate-500 text-sm mt-1 font-bold">Terima kasih atas kejujuran Anda!</p>
+            <p className="text-slate-500 text-sm mt-1 font-bold">Jual Seadanya Terima kasih atas kejujuran Anda!</p>
           </div>
 
           <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden animate-fade-in relative mb-6">
