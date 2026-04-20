@@ -45,7 +45,7 @@ const formatImageUrl = (url) => {
 };
 
 // =========================================================================
-// 1. UPDATE: IKON REALISTIS (3D EMOJI SHADOW) SESUAI PERMINTAAN
+// IKON REALISTIS (3D EMOJI SHADOW)
 // =========================================================================
 const getDynamicIcon = (namaBarang) => {
   const name = (namaBarang || '').toLowerCase();
@@ -122,6 +122,9 @@ function MainApp() {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [tempQty, setTempQty] = useState(0);
 
+  // STATE MODAL SHARE LINK TOKO (BARU)
+  const [showShareApp, setShowShareApp] = useState(false);
+
   const [isScanningModalOpen, setIsScanningModalOpen] = useState(false);
   const [scanTarget, setScanTarget] = useState(''); 
   const videoRef = useRef(null);
@@ -171,7 +174,7 @@ function MainApp() {
   useEffect(() => { try { localStorage.setItem('tokojujur_view', view); } catch(e){} }, [view]);
   useEffect(() => { try { localStorage.setItem('tokojujur_admintab', adminTab); } catch(e){} }, [adminTab]);
 
-  // INISIALISASI SUPABASE KLIEN
+  // INISIALISASI SUPABASE KLIEN (AMAN)
   useEffect(() => {
     const initSupabase = () => {
       try {
@@ -244,7 +247,6 @@ function MainApp() {
     return () => { supabaseClient.removeChannel(channel); }
   }, [dbReady]);
 
-  // FUNGSI COPY REKENING
   const handleCopyRekening = () => {
     const amanRekening = settings.rekening || '';
     const matchAngka = amanRekening.match(/\d+/);
@@ -591,7 +593,6 @@ function MainApp() {
     }
   };
 
-  // UPDATE: RESET UJI COBA MENGEMBALIKAN STOK KE JUMLAH SEMULA
   const handleClearTransactions = async () => {
     if (!supabaseClient) return;
     if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda yakin MENGHAPUS SELURUH RIWAYAT TRANSAKSI PENJUALAN?\nSTOK BARANG AKAN DIKEMBALIKAN SEPERTI SEMULA!")) {
@@ -696,6 +697,30 @@ function MainApp() {
         </div>
       )}
 
+      {/* MODAL BAGIKAN LINK TOKO (QR CODE) */}
+      {showShareApp && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[999] flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white w-full max-w-sm rounded-[32px] p-8 shadow-2xl flex flex-col items-center relative text-center animate-slide-up">
+            <button onClick={() => setShowShareApp(false)} className="absolute top-4 right-4 p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition"><X size={20}/></button>
+            <Store className="text-emerald-500 mb-3" size={48}/>
+            <h3 className="font-black text-2xl text-slate-800 mb-1">{settings.nama_toko}</h3>
+            <p className="text-xs text-slate-500 font-bold mb-6">Scan QR Code ini untuk membuka toko di HP Pembeli</p>
+            
+            <div className="bg-white p-4 rounded-3xl shadow-sm border-2 border-dashed border-emerald-300 mb-6">
+              <img src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '')}`} alt="QR Code Toko" className="w-48 h-48 object-contain" />
+            </div>
+            
+            <div className="w-full bg-slate-50 p-3 rounded-2xl border border-slate-200 flex items-center justify-between gap-3 mb-2">
+              <span className="text-xs font-mono text-slate-600 truncate font-bold">{typeof window !== 'undefined' ? window.location.href : ''}</span>
+              <button onClick={() => {
+                if(navigator.clipboard) navigator.clipboard.writeText(window.location.href);
+                showToast('Link Toko Berhasil Disalin!', 'success');
+              }} className="p-2 bg-emerald-100 text-emerald-700 rounded-xl hover:bg-emerald-200 transition shadow-sm" title="Copy Link"><Copy size={16}/></button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* GLOBAL TOAST */}
       {toast.show && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-slate-900 text-white rounded-full shadow-2xl font-bold flex items-center gap-2 animate-slide-up border border-slate-700 w-max max-w-[90%] text-center text-sm md:text-base">
@@ -711,6 +736,8 @@ function MainApp() {
             <div className="flex justify-between items-center mb-4 max-w-5xl mx-auto">
               <div className="flex items-center gap-2 text-emerald-600 font-black text-xl"><Store/> {settings.nama_toko}</div>
               <div className="flex items-center gap-2">
+                {/* TOMBOL SHARE QR CODE TOKO */}
+                <button onClick={() => setShowShareApp(true)} className="p-2 bg-emerald-50 text-emerald-600 rounded-full hover:bg-emerald-100 transition shadow-sm" title="Bagikan Link Toko (QR Code)"><Share2 size={18}/></button>
                 <button onClick={() => setView('admin')} className="p-2 bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200 transition shadow-sm" title="Masuk Mode Admin"><Lock size={18}/></button>
                 <button onClick={handleExitApp} className="p-2 bg-rose-50 text-rose-500 rounded-full hover:bg-rose-100 transition shadow-sm" title="Keluar Aplikasi"><Power size={18}/></button>
               </div>
@@ -1117,7 +1144,7 @@ function MainApp() {
                        </div>
                     </div>
 
-                    {/* TABEL REKAP KESELURUHAN PER BARANG */}
+                    {/* FITUR BARU: TABEL REKAP KESELURUHAN PER BARANG */}
                     <div className="bg-white rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col mb-8">
                       <div className="p-6 md:p-8 border-b border-slate-100">
                         <h2 className="font-black text-xl text-slate-800 flex items-center gap-2"><Package className="text-emerald-500"/> Rekap Keseluruhan per Barang</h2>
@@ -1395,6 +1422,7 @@ function MainApp() {
 
                      <hr className="border-slate-100"/>
                      
+                     {/* FITUR BARU: UPLOAD & DOWNLOAD QRIS */}
                      <div className="space-y-3">
                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><QrCode size={14}/> Foto QRIS Pembayaran</label>
                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 bg-slate-50 border border-slate-200 p-6 rounded-[32px]">
