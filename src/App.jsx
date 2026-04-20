@@ -54,33 +54,66 @@ const getDynamicIcon = (namaBarang) => {
     <span className="text-4xl drop-shadow-md transition-transform transform hover:scale-110">{emoji}</span>
   );
 
-  // Snack, Jajanan, Manisan, Coklat, Wafer
-  if (name.match(/kacang|peanut|sukro|garuda|dua kelinci|pilus|koro|atom/)) return iconWrapper('🥜');
-  if (name.match(/wafer|tango|nabati|beng|biskuat|nissin|biskuit|oreo|malkist|roma|gery/)) return iconWrapper('🧇');
-  if (name.match(/coklat|chocolate|silverqueen|choki|delfi|milo|cadbury|beng-beng|chocolatos/)) return iconWrapper('🍫');
-  if (name.match(/permen|candy|yupi|kopiko|kiss|mint|sugus|relaxa|mintz|gummy|fox/)) return iconWrapper('🍬');
-  if (name.match(/snack|ciki|chiki|keripik|taro|lays|citato|chitato|qtela|piattos|potabee|cheetos|kusuka|jetz/)) return iconWrapper('🍟');
-  if (name.match(/es|ice|krim|campina|walls|aice|cornetto|magnum|joyday/)) return iconWrapper('🍦');
+  // --- KEMASAN MINUMAN SPESIFIK ---
+  if (name.match(/kotak|teh kotak|ultra|buavita|milo kotak/)) return iconWrapper('🧃');
+  if (name.match(/kaleng|sprite|coca cola|fanta|bear brand/)) return iconWrapper('🥫');
+  if (name.match(/botol|le minerale|aqua botol|pucuk|floridina/)) return iconWrapper('🍾');
+  if (name.match(/susu bayi|dot/)) return iconWrapper('🍼');
+  if (name.match(/boba|chatime|haus|mixue/)) return iconWrapper('🧋');
+  if (name.match(/teh panas|tea/)) return iconWrapper('🍵');
+  if (name.match(/kopi panas|kopi cup|starbucks|janji jiwa/)) return iconWrapper('☕');
+  if (name.match(/es kopi|kopi dingin/)) return iconWrapper('🧋');
+  
+  // --- MIE & MAKANAN KEMASAN ---
+  if (name.match(/cup|pop mie|mie sedap cup/)) return iconWrapper('🍜');
+  if (name.match(/mie bungkus|indomie|sedap|sarimi|supermi|lemonilo/)) return iconWrapper('🍝'); 
+  
+  // --- ROTI & KUE ---
+  if (name.match(/donat|donut/)) return iconWrapper('🍩');
+  if (name.match(/burger/)) return iconWrapper('🍔');
+  if (name.match(/pizza/)) return iconWrapper('🍕');
+  if (name.match(/roti tawar|sari roti/)) return iconWrapper('🍞');
+  if (name.match(/croissant|roti sobek|baguette/)) return iconWrapper('🥐');
+  if (name.match(/kue|cake|bolu/)) return iconWrapper('🍰');
 
-  // Makanan Berat, Roti & Mie
-  if (name.match(/bakso|pentol|cilok|tahu|soto|kuah|seblak|baso|cuanki/)) return iconWrapper('🍲');
-  if (name.match(/mie|indomie|sedap|noodle|samyang|pop mie|sarimi|supermi|lemonilo|gelas/)) return iconWrapper('🍜');
-  if (name.match(/nasi|makan|lontong|geprek|pecel|ayam|gorengan|penyet|lele/)) return iconWrapper('🍛');
-  if (name.match(/roti|bolu|bakpao|pizza|burger|sari roti|kue|donat|cake/)) return iconWrapper('🍞');
-  if (name.match(/daging|sapi|kambing|sosis|nugget|kornet|bakar|ayam goreng/)) return iconWrapper('🥩');
-  if (name.match(/ikan|lele|nila|udang|seafood|sarden|tuna|teri/)) return iconWrapper('🐟');
+  // --- SNACK & MANISAN ---
+  if (name.match(/kacang|peanut|sukro|garuda|dua kelinci|pilus/)) return iconWrapper('🥜');
+  if (name.match(/wafer|tango|nabati|beng|biskuat|nissin|biskuit|oreo/)) return iconWrapper('🧇');
+  if (name.match(/coklat|chocolate|silverqueen|choki|delfi/)) return iconWrapper('🍫');
+  if (name.match(/lolipop|lollipop/)) return iconWrapper('🍭');
+  if (name.match(/permen|candy|yupi|kopiko|kiss|mint|sugus/)) return iconWrapper('🍬');
+  if (name.match(/popcorn/)) return iconWrapper('🍿');
+  if (name.match(/snack|ciki|chiki|keripik|taro|lays|citato|chitato|qtela|piattos/)) return iconWrapper('🍟');
+  
+  // --- ES KRIM ---
+  if (name.match(/cone|cornetto|campina cone/)) return iconWrapper('🍦');
+  if (name.match(/es krim|ice|campina|walls|aice|magnum|joyday/)) return iconWrapper('🍧');
 
-  // Minuman
-  if (name.match(/kopi|teh|panas|good day|kapal api|nescafe|luwak|pucuk|javana|kotak/)) return iconWrapper('☕');
-  if (name.match(/air|mineral|aqua|le minerale|cleo|vit|nestle|ades|pristine|club/)) return iconWrapper('💧');
-  if (name.match(/minum|coca|susu|jus|sirup|sprite|fanta|soda|nutrisari|floridina|bear brand|yakult|mizone|pocari/)) return iconWrapper('🥤');
+  // --- BAHAN POKOK & BUMBU ---
+  if (name.match(/minyak|goreng|bimoli|sania|filma|sunco/)) return iconWrapper('🛢️');
+  if (name.match(/garam|gula|merica|micin|bumbu|kecap|saus|royco|masako/)) return iconWrapper('🧂');
+  if (name.match(/telur|telor/)) return iconWrapper('🥚');
+  if (name.match(/keju|cheese/)) return iconWrapper('🧀');
 
-  // Kebutuhan, Bumbu & Lainnya
-  if (name.match(/obat|panadol|paramex|bodrex|tolak|vitamin|promag|mixagrip|diapet|antangin/)) return iconWrapper('💊');
-  if (name.match(/sabun|shampo|rinso|sunlight|cuci|odol|pasta gigi|deterjen|pepsodent|biore|lifebuoy|soklin|daia/)) return iconWrapper('🧼');
-  if (name.match(/rokok|korek|mancis|sampoerna|djarum|gudang|surya|magnum|esse|marlboro|camel/)) return iconWrapper('🚬');
+  // --- MAKANAN BERAT ---
+  if (name.match(/bakso|pentol|cilok|tahu|soto|kuah|seblak/)) return iconWrapper('🍲');
+  if (name.match(/nasi|makan|lontong|geprek|pecel|ayam/)) return iconWrapper('🍛');
+  if (name.match(/daging|sapi|kambing|sosis|nugget/)) return iconWrapper('🥩');
+  if (name.match(/ikan|lele|nila|udang|seafood|sarden|tuna/)) return iconWrapper('🐟');
+
+  // --- KEBUTUHAN HARIAN & KAMAR MANDI ---
+  if (name.match(/botol shampo|lotion|sabun cair|body wash/)) return iconWrapper('🧴');
+  if (name.match(/sikat gigi|odol|pasta gigi|pepsodent|ciptadent/)) return iconWrapper('🪥');
+  if (name.match(/sabun|shampo|rinso|sunlight|cuci|deterjen|biore|lifebuoy|soklin/)) return iconWrapper('🧼');
+  if (name.match(/obat|panadol|paramex|bodrex|vitamin|promag/)) return iconWrapper('💊');
+  if (name.match(/rokok|korek|mancis|sampoerna|djarum|gudang garam/)) return iconWrapper('🚬');
+  
   if (name.match(/sayur|bayam|kangkung|wortel|tomat|cabe|bawang/)) return iconWrapper('🥬');
   if (name.match(/buah|apel|jeruk|pisang|mangga|melon|semangka/)) return iconWrapper('🍎');
+  
+  // Default Air & Kopi Kemasan Biasa
+  if (name.match(/air|mineral|aqua|vit|club/)) return iconWrapper('💧');
+  if (name.match(/kopi|teh/)) return iconWrapper('☕');
   
   return iconWrapper('🛍️');
 };
@@ -1527,6 +1560,9 @@ function MainApp() {
                                <span className="text-xs text-slate-400 font-bold text-center">Belum ada QRIS</span>
                              )}
                            </div>
+                           <button onClick={handleDownloadQRIS} className="text-[10px] font-black bg-slate-800 hover:bg-slate-700 text-white px-5 py-2.5 rounded-full transition-colors uppercase tracking-widest flex items-center gap-2 shadow-md">
+                             <Download size={14}/> Unduh QRIS
+                           </button>
                          </div>
 
                          <div className="flex-1 w-full space-y-4">
