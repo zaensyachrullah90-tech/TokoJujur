@@ -761,6 +761,7 @@ function MainApp() {
                 <li>Pilih Barang yang ingin dibeli</li>
                 <li>Pilih Metode Pembayaran di menu Bayar</li>
                 <li>Klik Selesai dan Cetak Struk</li>
+                <li>Terimakasih, Jual Seadanya, Beli lagi Yaa</li>
                 <li>Silakan Melakukan Pembayaran (Transfer / Scan QRIS) yang tertera pada struk</li>
               </ol>
             </div>
