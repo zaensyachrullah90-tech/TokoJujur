@@ -52,7 +52,7 @@ const getDynamicIcon = (namaBarang) => {
   const name = (namaBarang || '').toLowerCase();
   
   const iconWrapper = (emoji) => (
-    <span className="text-3xl md:text-4xl drop-shadow-md transition-transform transform hover:scale-110 will-change-transform">{emoji}</span>
+    <span className="text-5xl md:text-6xl drop-shadow-md transition-transform transform hover:scale-110 will-change-transform">{emoji}</span>
   );
 
   // Snack & Jajanan
@@ -257,7 +257,7 @@ function MainApp() {
   }, [dbReady]);
 
   // =========================================================================
-  // FUNGSI COPY REKENING (TETAP DIAMANKAN UNTUK PENGATURAN)
+  // FUNGSI COPY REKENING
   // =========================================================================
   const handleCopyRekening = () => {
     const amanRekening = settings.rekening || '';
@@ -486,7 +486,7 @@ function MainApp() {
 
   const jumlahItem = Object.values(cart).reduce((a, b) => a + b, 0);
 
-  // TRANSAKSI SEKEJAP MATA - LANGSUNG STRUK (TANPA TRANSFER BANK)
+  // TRANSAKSI SEKEJAP MATA - LANGSUNG STRUK
   const handleSelesaiBayar = async () => {
     if (!supabaseClient) return showToast('Koneksi Database Terputus!', 'error');
     setIsProcessing(true);
@@ -509,7 +509,7 @@ function MainApp() {
       total: totalBelanja, 
       modal: totalModal, 
       profit: totalBelanja - totalModal, 
-      metode: 'QRIS Pembayaran'
+      metode: 'QRIS / Transfer'
     };
 
     setTransactions(prev => [newTransaction, ...prev]);
@@ -894,6 +894,46 @@ function MainApp() {
         </div>
       )}
 
+      {/* MODAL EDIT TRANSAKSI */}
+      {editingTrx && (
+        <div className="fixed inset-0 bg-slate-900/60 z-[999] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+           <div className="bg-white rounded-3xl p-6 w-full max-w-md animate-slide-up shadow-2xl border-4 border-white">
+              <h3 className="font-black text-xl mb-1 text-slate-800">Edit Data Transaksi</h3>
+              <p className="text-xs font-bold text-slate-400 mb-6 pb-4 border-b border-slate-100">Koreksi total harga atau metode pembayaran jika terjadi kesalahan kasir.</p>
+              
+              <form onSubmit={handleSaveEditTrx}>
+                 <div className="space-y-4">
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest font-black text-gray-500 ml-1">Metode Pembayaran</label>
+                      <select value={editingTrx.metode} onChange={e => setEditingTrx({...editingTrx, metode: e.target.value})} className="w-full p-4 mt-1 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm text-slate-700 outline-none focus:ring-4 focus:ring-emerald-500/20">
+                         <option value="QRIS / Transfer">QRIS / Transfer (Default)</option>
+                         <option value="qris">QRIS Cepat</option>
+                         <option value="transfer">Transfer Bank</option>
+                         <option value="tunai">Tunai / Cash</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest font-black text-gray-500 ml-1">Total Belanja (Rp)</label>
+                      <input type="number" value={editingTrx.total} onChange={e => setEditingTrx({...editingTrx, total: parseInt(e.target.value)||0, profit: (parseInt(e.target.value)||0) - editingTrx.modal})} className="w-full p-4 mt-1 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm text-slate-700 outline-none focus:ring-4 focus:ring-emerald-500/20" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest font-black text-gray-500 ml-1">Total Modal (Rp)</label>
+                      <input type="number" value={editingTrx.modal} onChange={e => setEditingTrx({...editingTrx, modal: parseInt(e.target.value)||0, profit: editingTrx.total - (parseInt(e.target.value)||0)})} className="w-full p-4 mt-1 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm text-slate-700 outline-none focus:ring-4 focus:ring-emerald-500/20" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest font-black text-gray-500 ml-1">Keuntungan / Profit (Rp)</label>
+                      <input type="number" value={editingTrx.profit} onChange={e => setEditingTrx({...editingTrx, profit: parseInt(e.target.value)||0})} className="w-full p-4 mt-1 bg-emerald-50 border border-emerald-200 rounded-2xl font-extrabold text-sm text-emerald-700 outline-none focus:ring-4 focus:ring-emerald-500/20" />
+                    </div>
+                 </div>
+                 <div className="flex gap-3 mt-8">
+                    <button type="button" onClick={() => setEditingTrx(null)} className="flex-1 py-4 bg-slate-100 font-bold rounded-2xl text-slate-600 hover:bg-slate-200 transition-colors">Batal</button>
+                    <button type="submit" disabled={isProcessing} className="flex-1 py-4 bg-emerald-600 font-bold rounded-2xl text-white hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">{isProcessing ? 'Menyimpan...' : 'Simpan Edit'}</button>
+                 </div>
+              </form>
+           </div>
+        </div>
+      )}
+
       {/* GLOBAL TOAST */}
       {toast.show && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-slate-900 text-white rounded-full shadow-2xl font-bold flex items-center gap-2 animate-slide-up border border-slate-700 w-max max-w-[90%] text-center text-sm md:text-base">
@@ -930,37 +970,13 @@ function MainApp() {
               <h3 className="font-extrabold text-emerald-100 text-sm md:text-base mb-3 flex items-center gap-2">
                 <Sparkles size={18} className="text-yellow-300" /> Panduan Pembelian (Self-Service)
               </h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                <div className="bg-black/20 rounded-2xl p-3 border border-white/10 backdrop-blur-sm">
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="w-5 h-5 bg-white text-emerald-700 rounded-full flex items-center justify-center font-black text-[10px] shrink-0">1</div>
-                    <p className="text-xs font-bold truncate">Pilih Barang</p>
-                  </div>
-                  <p className="text-[10px] md:text-xs opacity-80 mt-1 leading-tight">Cari nama barang, tekan, lalu atur jumlahnya.</p>
-                </div>
-                <div className="bg-black/20 rounded-2xl p-3 border border-white/10 backdrop-blur-sm">
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="w-5 h-5 bg-white text-emerald-700 rounded-full flex items-center justify-center font-black text-[10px] shrink-0">2</div>
-                    <p className="text-xs font-bold truncate">Review & Bayar</p>
-                  </div>
-                  <p className="text-[10px] md:text-xs opacity-80 mt-1 leading-tight">Cek keranjang belanjaan Anda, lalu klik BAYAR.</p>
-                </div>
-                <div className="bg-black/20 rounded-2xl p-3 border border-white/10 backdrop-blur-sm">
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="w-5 h-5 bg-white text-emerald-700 rounded-full flex items-center justify-center font-black text-[10px] shrink-0">3</div>
-                    <p className="text-xs font-bold truncate">Cetak Struk</p>
-                  </div>
-                  <p className="text-[10px] md:text-xs opacity-80 mt-1 leading-tight">Selesaikan transaksi untuk mencetak & membagikan struk.</p>
-                </div>
-                <div className="bg-black/20 rounded-2xl p-3 border border-white/10 backdrop-blur-sm relative overflow-hidden">
-                  <div className="absolute right-0 top-0 bottom-0 w-1 bg-yellow-400"></div>
-                  <div className="flex items-center gap-2 mb-1">
-                    <div className="w-5 h-5 bg-yellow-400 text-emerald-900 rounded-full flex items-center justify-center font-black text-[10px] shrink-0">4</div>
-                    <p className="text-xs font-bold truncate text-yellow-300">Scan QRIS</p>
-                  </div>
-                  <p className="text-[10px] md:text-xs opacity-90 mt-1 leading-tight">Lakukan pembayaran via QRIS yang muncul di Struk.</p>
-                </div>
-              </div>
+              <ol className="list-decimal list-inside text-xs md:text-sm font-bold text-emerald-100 space-y-1.5 ml-1">
+                <li>Cari barang dengan mengetik di kolom pencarian (search bar), atau klik ikon Kamera untuk scan barang.</li>
+                <li>Klik tombol BAYAR di bawah.</li>
+                <li>Periksa kembali barang Anda (Bisa ditambah/dikurangi).</li>
+                <li>Klik <strong className="text-white">Selesai dan Cetak Struk</strong>.</li>
+                <li className="text-yellow-300 font-extrabold">Silahkan lakukan pembayaran, bisa lewat Struk atau scan QRIS di kaca etalase.</li>
+              </ol>
             </div>
           </div>
 
@@ -969,8 +985,8 @@ function MainApp() {
               <div key={p.id} onClick={() => openProductModal(p)} className="bg-white p-3 md:p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center text-center relative active:scale-95 transition-transform cursor-pointer border-b-4 border-b-slate-100 overflow-hidden w-full">
                 {cart[p.id] > 0 && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] md:text-xs font-black px-2 md:px-3 py-1 rounded-bl-xl shadow-lg z-20">{cart[p.id]}</div>}
                 
-                {/* FALLBACK GAMBAR CERDAS: Emoji ada di belakang, Image di depan. Jika image gagal, otomatis Emoji yg terlihat */}
-                <div className="mb-3 md:mb-4 w-16 h-16 md:w-24 md:h-24 rounded-full border border-slate-100 shadow-inner relative overflow-hidden bg-slate-50 shrink-0">
+                {/* FALLBACK GAMBAR CERDAS DENGAN UKURAN LEBIH BESAR */}
+                <div className="mb-3 md:mb-4 w-28 h-28 md:w-40 md:h-40 rounded-2xl border border-slate-100 shadow-inner relative overflow-hidden bg-slate-50 shrink-0">
                   <div className="absolute inset-0 flex items-center justify-center z-0">
                     {getDynamicIcon(p.nama)}
                   </div>
@@ -1003,8 +1019,8 @@ function MainApp() {
               <div className="bg-white w-full max-w-md rounded-3xl p-6 md:p-8 shadow-2xl animate-slide-up border-4 border-white flex flex-col">
                 <div className="flex justify-between items-start mb-6">
                    <div className="flex items-center gap-4 w-[85%]">
-                     {/* GAMBAR MODAL DENGAN FALLBACK */}
-                     <div className="w-16 h-16 bg-slate-50 rounded-2xl shadow-inner overflow-hidden border shrink-0 relative flex items-center justify-center">
+                     {/* GAMBAR MODAL UKURAN LEBIH BESAR */}
+                     <div className="w-24 h-24 md:w-32 md:h-32 bg-slate-50 rounded-2xl shadow-inner overflow-hidden border shrink-0 relative flex items-center justify-center">
                        <div className="absolute inset-0 flex items-center justify-center z-0 scale-75">{getDynamicIcon(selectedProduct.nama)}</div>
                        {selectedProduct.gambar && (
                          <img loading="lazy" src={formatImageUrl(selectedProduct.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.display = 'none'; }}/>
@@ -1027,7 +1043,7 @@ function MainApp() {
                 <div className="flex items-center justify-between bg-slate-50 p-4 md:p-5 rounded-2xl mb-6 border border-slate-100 w-full">
                    <button onClick={() => setTempQty(Math.max(0, tempQty-1))} className="w-12 h-12 md:w-14 md:h-14 bg-white rounded-xl shadow-sm font-black text-2xl border active:bg-slate-100 transition shrink-0">-</button>
                    <input type="number" value={tempQty === 0 ? '' : tempQty} onChange={e => setTempQty(Math.min(selectedProduct.stok||0, Math.max(0, parseInt(e.target.value)||0)))} className="bg-transparent text-center font-black text-3xl md:text-4xl w-full max-w-[100px] outline-none text-slate-800" placeholder="0"/>
-                   <button onClick={() => setTempQty(Math.min(selectedProduct.stok||0, tempQty+1))} className="w-12 h-12 md:w-14 md:h-14 bg-emerald-600 text-white rounded-xl shadow-sm font-black text-2xl active:bg-emerald-700 transition shrink-0">+</button>
+                   <button onClick={() => setTempQty(Math.min(selectedProduct.stok||0, tempQty+1))} className="w-14 h-14 bg-emerald-600 text-white rounded-2xl shadow-sm font-black text-2xl active:bg-emerald-700 transition shrink-0">+</button>
                 </div>
 
                 <button onClick={saveToCart} className="w-full py-4 md:py-5 bg-slate-900 text-white rounded-2xl font-black text-lg md:text-xl shadow-xl active:scale-95 transition-all hover:bg-slate-800 mt-auto">
@@ -1066,7 +1082,7 @@ function MainApp() {
                   <div key={id} className="flex justify-between items-center border-b border-slate-50 pb-4 last:border-0 last:pb-0">
                     <div className="flex items-center gap-3 w-[60%]">
                       {/* GAMBAR KERANJANG FALLBACK */}
-                      <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 text-2xl overflow-hidden shrink-0 relative">
+                      <div className="w-16 h-16 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 text-2xl overflow-hidden shrink-0 relative">
                         <div className="absolute inset-0 flex items-center justify-center z-0 scale-75">{getDynamicIcon(p.nama)}</div>
                         {p.gambar && <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.display = 'none'; }}/>}
                       </div>
@@ -1149,7 +1165,6 @@ function MainApp() {
               </div>
             </div>
 
-            {/* AREA PEMBAYARAN: HANYA MENAMPILKAN QRIS (SESUAI PERMINTAAN TERBARU) */}
             <div className="bg-emerald-50 p-5 md:p-6 text-center border-t border-emerald-100 border-dashed">
                <p className="text-[9px] md:text-[10px] text-emerald-600 uppercase font-black tracking-widest mb-2">Selesaikan Pembayaran</p>
                <h3 className="font-black text-xs md:text-sm text-emerald-900 tracking-tight leading-snug mb-4">Silahkan bayar dengan scan QRIS resmi toko kami di bawah ini.</h3>
@@ -1312,6 +1327,7 @@ function MainApp() {
 
                        <hr className="border-slate-100"/>
                        
+                       {/* UPLOAD & DOWNLOAD QRIS */}
                        <div className="space-y-3">
                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><QrCode size={14}/> Foto QRIS Pembayaran Utama</label>
                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 bg-slate-50 border border-slate-200 p-6 rounded-[32px]">
