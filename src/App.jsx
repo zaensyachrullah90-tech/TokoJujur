@@ -4,7 +4,7 @@ import {
   CheckCircle, Settings, BarChart3, PlusCircle, 
   Store, QrCode, CreditCard, ChevronRight, ArrowLeft,
   Search, X, Lock, LogOut, TrendingUp, Edit, Trash2, List, TrendingDown,
-  Camera, Download, Power, UploadCloud, AlertTriangle, Copy, Barcode, Share2, ArrowUpDown, Sparkles, Image as ImageIcon, Wand2, ExternalLink
+  Camera, Download, Power, UploadCloud, AlertTriangle, Copy, Barcode, Share2, Sparkles, Image as ImageIcon, Wand2, ExternalLink
 } from 'lucide-react';
 
 // =========================================================================
@@ -38,23 +38,24 @@ const formatRupiah = (angka) => {
 const formatImageUrl = (url) => {
   if (!url) return '';
   if (url.startsWith('data:image') || url.startsWith('blob:')) return url; 
+  // Perbaikan parser Google Drive agar lebih stabil membaca file
   const driveMatch = url.match(/(?:file\/d\/|id=)([a-zA-Z0-9_-]+)/);
-  if (driveMatch && driveMatch[1]) return `https://drive.google.com/uc?export=view&id=${driveMatch[1]}`;
+  if (driveMatch && driveMatch[1]) return `https://drive.google.com/thumbnail?id=${driveMatch[1]}&sz=w800`;
   if (url.includes('github.com') && url.includes('/blob/')) return url.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/');
   return url;
 };
 
 // =========================================================================
-// IKON REALISTIS (3D EMOJI SHADOW) - FALLBACK JIKA GAMBAR G-DRIVE KOSONG
+// IKON REALISTIS (3D EMOJI SHADOW) - FALLBACK JIKA GAMBAR G-DRIVE RUSAK/KOSONG
 // =========================================================================
 const getDynamicIcon = (namaBarang) => {
   const name = (namaBarang || '').toLowerCase();
   
   const iconWrapper = (emoji) => (
-    <span className="text-4xl drop-shadow-md transition-transform transform hover:scale-110 will-change-transform">{emoji}</span>
+    <span className="text-3xl md:text-4xl drop-shadow-md transition-transform transform hover:scale-110 will-change-transform">{emoji}</span>
   );
 
-  // Snack, Jajanan & Manisan
+  // Snack & Jajanan
   if (name.match(/kacang|peanut|sukro|garuda|dua kelinci|pilus|koro|atom/)) return iconWrapper('🥜');
   if (name.match(/wafer|tango|nabati|beng|biskuat|nissin|biskuit|oreo|malkist|roma|gery/)) return iconWrapper('🧇');
   if (name.match(/coklat|chocolate|silverqueen|choki|delfi|milo|cadbury|beng-beng|chocolatos/)) return iconWrapper('🍫');
@@ -62,12 +63,12 @@ const getDynamicIcon = (namaBarang) => {
   if (name.match(/snack|ciki|chiki|keripik|taro|lays|citato|chitato|qtela|piattos|potabee|cheetos|kusuka|jetz/)) return iconWrapper('🍟');
   if (name.match(/es|ice|krim|campina|walls|aice|cornetto|magnum|joyday/)) return iconWrapper('🍦');
 
-  // Makanan Berat, Roti & Mie
+  // Makanan Berat & Mie
   if (name.match(/bakso|pentol|cilok|tahu|soto|kuah|seblak|baso|cuanki/)) return iconWrapper('🍲');
   if (name.match(/mie|indomie|sedap|noodle|samyang|pop mie|sarimi|supermi|lemonilo|gelas/)) return iconWrapper('🍜');
   if (name.match(/nasi|makan|lontong|geprek|pecel|ayam|gorengan|penyet|lele/)) return iconWrapper('🍛');
   if (name.match(/roti|bolu|bakpao|pizza|burger|sari roti|kue|donat|cake/)) return iconWrapper('🍞');
-  if (name.match(/daging|sapi|kambing|sosis|nugget|kornet|bakar|ayam goreng/)) return iconWrapper('🥩');
+  if (name.match(/daging|sapi|kambing|sosis|nugget|kornet|bakar/)) return iconWrapper('🥩');
   if (name.match(/ikan|lele|nila|udang|seafood|sarden|tuna|teri/)) return iconWrapper('🐟');
 
   // Minuman
@@ -75,7 +76,7 @@ const getDynamicIcon = (namaBarang) => {
   if (name.match(/air|mineral|aqua|le minerale|cleo|vit|nestle|ades|pristine|club/)) return iconWrapper('💧');
   if (name.match(/minum|coca|susu|jus|sirup|sprite|fanta|soda|nutrisari|floridina|bear brand|yakult|mizone|pocari/)) return iconWrapper('🥤');
 
-  // Kebutuhan, Bumbu & Lainnya
+  // Kebutuhan Harian
   if (name.match(/obat|panadol|paramex|bodrex|tolak|vitamin|promag|mixagrip|diapet|antangin/)) return iconWrapper('💊');
   if (name.match(/sabun|shampo|rinso|sunlight|cuci|odol|pasta gigi|deterjen|pepsodent|biore|lifebuoy|soklin|daia/)) return iconWrapper('🧼');
   if (name.match(/rokok|korek|mancis|sampoerna|djarum|gudang|surya|magnum|esse|marlboro|camel/)) return iconWrapper('🚬');
@@ -132,6 +133,7 @@ function MainApp() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [tempQty, setTempQty] = useState(0);
+
   const [showShareApp, setShowShareApp] = useState(false);
   const [isScanningModalOpen, setIsScanningModalOpen] = useState(false);
   const [scanTarget, setScanTarget] = useState(''); 
@@ -169,18 +171,10 @@ function MainApp() {
       let link = document.querySelector("link[rel~='icon']");
       if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
       link.href = "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏪</text></svg>";
-      if (!document.querySelector('link[rel="manifest"]')) {
-        const manifest = {
-          name: "Toko Kejujuran", short_name: "Toko", display: "standalone", background_color: "#f8fafc", theme_color: "#059669",
-          icons: [{ src: "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏪</text></svg>", sizes: "192x192", type: "image/svg+xml", purpose: "any maskable" }]
-        };
-        const blob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
-        const manifestLink = document.createElement('link'); manifestLink.rel = 'manifest'; manifestLink.href = URL.createObjectURL(blob); document.head.appendChild(manifestLink);
-      }
     }
   }, []);
 
-  // Menyimpan Cache Lokal (Optimalisasi Low End)
+  // Menyimpan Cache Lokal (Persistent State)
   useEffect(() => { try { localStorage.setItem('tokojujur_view', view); } catch(e){} }, [view]);
   useEffect(() => { try { localStorage.setItem('tokojujur_admintab', adminTab); } catch(e){} }, [adminTab]);
   useEffect(() => { try { localStorage.setItem('tokojujur_cart', JSON.stringify(cart)); } catch(e){} }, [cart]);
@@ -263,102 +257,8 @@ function MainApp() {
   }, [dbReady]);
 
   // =========================================================================
-  // FITUR GEMINI AI (FLASH 2.5) UNTUK MEMBERSIHKAN FOTO KE BACKGROUND PUTIH
+  // FUNGSI COPY REKENING (TETAP DIAMANKAN UNTUK PENGATURAN)
   // =========================================================================
-  const handleGenerateGeminiImage = async () => {
-    if (!geminiKey) return showToast('Harap masukkan API Key Gemini di tab Pengaturan!', 'error');
-    if (!newProduct.nama) return showToast('Isi nama barang terlebih dahulu!', 'error');
-    
-    setIsProcessing(true);
-    showToast('Gemini sedang melukis gambar barang...', 'success');
-    try {
-      const promptText = `A highly detailed, hyper-realistic commercial studio photography of a real product package named "${newProduct.nama}", exact real-world packaging, pure solid white background, vibrant colors, perfect studio lighting, highly realistic texture.`;
-      
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${geminiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ instances: { prompt: promptText }, parameters: { sampleCount: 1 } })
-      });
-      
-      const data = await res.json();
-      if (data.predictions && data.predictions[0] && data.predictions[0].bytesBase64Encoded) {
-        const base64Image = `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}`;
-        setNewProduct(prev => ({ ...prev, gambar: base64Image }));
-        showToast('Gambar AI berhasil dibuat!', 'success');
-      } else {
-        showToast('Gagal generate gambar. Periksa kuota API Key Gemini Anda.', 'error');
-      }
-    } catch (err) {
-      showToast('Koneksi ke Gemini gagal. Periksa jaringan Anda.', 'error');
-    }
-    setIsProcessing(false);
-  };
-
-  const handleEnhanceWithAI = async () => {
-    if (!geminiKey) return showToast('Harap masukkan API Key Gemini di tab Pengaturan!', 'error');
-    if (!newProduct.gambar || !newProduct.gambar.startsWith('data:image')) return showToast('Silakan ambil foto dari kamera terlebih dahulu!', 'error');
-    
-    setIsProcessing(true);
-    showToast('Gemini Flash 2.5 sedang membersihkan foto...', 'success');
-    try {
-      const base64Data = newProduct.gambar.split(',')[1];
-      const mimeType = newProduct.gambar.split(';')[0].split(':')[1];
-      
-      const payload = {
-        contents: [{
-          parts: [
-            { text: "Clean up this product photo perfectly. Remove the background and replace it with a pure solid white background. Improve lighting, clarity, and colors to make it look like a high-quality professional commercial studio product shot." },
-            { inlineData: { mimeType: mimeType, data: base64Data } }
-          ]
-        }],
-        generationConfig: { responseModalities: ['IMAGE'] }
-      };
-
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${geminiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      
-      const data = await res.json();
-      const outputBase64 = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
-      
-      if (outputBase64) {
-        setNewProduct(prev => ({ ...prev, gambar: `data:image/jpeg;base64,${outputBase64}` }));
-        showToast('Foto berhasil dibersihkan AI Gemini!', 'success');
-      } else {
-        showToast('Gagal merapikan gambar. API Key / Kuota bermasalah.', 'error');
-      }
-    } catch (err) {
-      showToast('Koneksi ke Gemini gagal.', 'error');
-    }
-    setIsProcessing(false);
-  };
-
-  const handleDownloadPreviewImage = () => {
-    if (!newProduct.gambar || !newProduct.gambar.startsWith('data:image')) return;
-    const link = document.createElement('a');
-    link.href = newProduct.gambar;
-    link.download = `${newProduct.nama || 'Produk'}_AI_Cleaned.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('Foto didownload! Silakan upload ke folder G-Drive Anda.', 'success');
-  };
-
-  const handleUploadProductImage = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (file.size > 2097152) return showToast('Ukuran maksimal 2MB. Gunakan kamera HP Anda.', 'error');
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewProduct(prev => ({ ...prev, gambar: reader.result }));
-        showToast('Foto berhasil diambil! Silakan klik "Rapihkan dgn AI" jika perlu.', 'success');
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
   const handleCopyRekening = () => {
     const amanRekening = settings.rekening || '';
     const matchAngka = amanRekening.match(/\d+/);
@@ -458,6 +358,90 @@ function MainApp() {
     return () => clearInterval(interval);
   }, [isScanningModalOpen, scanTarget, products]);
 
+  // =========================================================================
+  // API GEMINI (AI IMAGE EDITING & GENERATING)
+  // =========================================================================
+  const handleGenerateGeminiImage = async () => {
+    if (!geminiKey) return showToast('Harap masukkan API Key Gemini di tab Pengaturan!', 'error');
+    if (!newProduct.nama) return showToast('Isi nama barang terlebih dahulu!', 'error');
+    
+    setIsProcessing(true);
+    showToast('Gemini sedang melukis gambar barang...', 'success');
+    try {
+      const promptText = `A highly detailed, hyper-realistic commercial studio photography of a real product package named "${newProduct.nama}", exact real-world packaging, pure solid white background, vibrant colors, perfect studio lighting, highly realistic texture.`;
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${geminiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ instances: { prompt: promptText }, parameters: { sampleCount: 1 } })
+      });
+      const data = await res.json();
+      if (data.predictions && data.predictions[0] && data.predictions[0].bytesBase64Encoded) {
+        setNewProduct(prev => ({ ...prev, gambar: `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}` }));
+        showToast('Gambar AI berhasil dibuat!', 'success');
+      } else showToast('Gagal generate gambar. Periksa kuota/API Key.', 'error');
+    } catch (err) { showToast('Koneksi ke Gemini gagal.', 'error'); }
+    setIsProcessing(false);
+  };
+
+  const handleEnhanceWithAI = async () => {
+    if (!geminiKey) return showToast('Harap masukkan API Key Gemini di tab Pengaturan!', 'error');
+    if (!newProduct.gambar || !newProduct.gambar.startsWith('data:image')) return showToast('Silakan ambil foto dari kamera terlebih dahulu!', 'error');
+    
+    setIsProcessing(true);
+    showToast('Gemini Flash 2.5 sedang membersihkan foto...', 'success');
+    try {
+      const base64Data = newProduct.gambar.split(',')[1];
+      const mimeType = newProduct.gambar.split(';')[0].split(':')[1];
+      const payload = {
+        contents: [{
+          parts: [
+            { text: "Clean up this product photo perfectly. Remove the background and replace it with a pure solid white background. Improve lighting, clarity, and colors to make it look like a high-quality professional commercial studio product shot." },
+            { inlineData: { mimeType: mimeType, data: base64Data } }
+          ]
+        }],
+        generationConfig: { responseModalities: ['IMAGE'] }
+      };
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${geminiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      const outputBase64 = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+      
+      if (outputBase64) {
+        setNewProduct(prev => ({ ...prev, gambar: `data:image/jpeg;base64,${outputBase64}` }));
+        showToast('Foto berhasil dibersihkan AI Gemini!', 'success');
+      } else showToast('Gagal merapikan gambar. Cek API/Kuota.', 'error');
+    } catch (err) { showToast('Koneksi ke Gemini gagal.', 'error'); }
+    setIsProcessing(false);
+  };
+
+  const handleDownloadPreviewImage = () => {
+    if (!newProduct.gambar || !newProduct.gambar.startsWith('data:image')) return;
+    const link = document.createElement('a');
+    link.href = newProduct.gambar;
+    link.download = `${newProduct.nama || 'Produk'}_AI_Cleaned.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('Foto didownload! Silakan upload ke folder G-Drive Anda.', 'success');
+  };
+
+  const handleUploadProductImage = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 2097152) return showToast('Ukuran maksimal 2MB. Gunakan kamera HP Anda.', 'error');
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewProduct(prev => ({ ...prev, gambar: reader.result }));
+        showToast('Foto berhasil diambil! Silakan klik "Rapihkan dgn AI".', 'success');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   // LOGIKA KERANJANG
   const openProductModal = (product) => {
     setSelectedProduct(product);
@@ -502,7 +486,7 @@ function MainApp() {
 
   const jumlahItem = Object.values(cart).reduce((a, b) => a + b, 0);
 
-  // TRANSAKSI SEKEJAP MATA (OPTIMISTIC + BG SYNC) - LANGSUNG STRUK
+  // TRANSAKSI SEKEJAP MATA - LANGSUNG STRUK (TANPA TRANSFER BANK)
   const handleSelesaiBayar = async () => {
     if (!supabaseClient) return showToast('Koneksi Database Terputus!', 'error');
     setIsProcessing(true);
@@ -525,7 +509,7 @@ function MainApp() {
       total: totalBelanja, 
       modal: totalModal, 
       profit: totalBelanja - totalModal, 
-      metode: 'QRIS / Transfer'
+      metode: 'QRIS Pembayaran'
     };
 
     setTransactions(prev => [newTransaction, ...prev]);
@@ -536,7 +520,7 @@ function MainApp() {
     
     setStrukTerakhir(newTransaction);
     setView('struk');
-    setCart({}); 
+    setCart({}); // Keranjang otomatis reset
     setIsProcessing(false);
 
     const { error: trxError } = await supabaseClient.from('transaksi').insert([newTransaction]);
@@ -549,7 +533,6 @@ function MainApp() {
   };
 
   const handleTutupStruk = () => {
-    setCart({});
     setStrukTerakhir(null);
     setView('toko');
   };
@@ -558,7 +541,7 @@ function MainApp() {
     if (!strukTerakhir) return;
     const shareData = {
       title: `Struk - ${settings.nama_toko}`,
-      text: `*${settings.nama_toko}*\nID Transaksi: ${strukTerakhir.id}\nTanggal: ${strukTerakhir.tanggal}\n\nBelanjaan:\n${strukTerakhir.items.map(i => `- ${i.qty}x ${i.nama} = ${formatRupiah(i.totalHarga)}`).join('\n')}\n\n*Total Dibayar: ${formatRupiah(strukTerakhir.total)}*\n\nSilahkan bayar dengan scan QRIS atau Transfer Rekening.\nTerima kasih atas kejujuran Anda!`,
+      text: `*${settings.nama_toko}*\nID Transaksi: ${strukTerakhir.id}\nTanggal: ${strukTerakhir.tanggal}\n\nBelanjaan:\n${strukTerakhir.items.map(i => `- ${i.qty}x ${i.nama} = ${formatRupiah(i.totalHarga)}`).join('\n')}\n\n*Total Dibayar: ${formatRupiah(strukTerakhir.total)}*\n\nSilahkan bayar dengan scan QRIS Resmi. Kejujuran Anda, Kebanggaan Kami!`,
     };
     if (navigator.share) {
       try { await navigator.share(shareData); } catch (err) {}
@@ -604,7 +587,7 @@ function MainApp() {
       const reader = new FileReader();
       reader.onloadend = () => {
         setSettings({ ...settings, qris_url: reader.result });
-        showToast('Gambar siap disimpan!', 'success');
+        showToast('Gambar QRIS siap disimpan!', 'success');
       };
       reader.readAsDataURL(file);
     }
@@ -650,7 +633,6 @@ function MainApp() {
     window.scrollTo({ top: 0, behavior: 'smooth' }); 
   };
 
-  // ADD/EDIT PRODUCT (PENGAMAN KOLOM GAMBAR)
   const handleAddProduct = async (e) => {
     e.preventDefault();
     if (!supabaseClient) return showToast('Database belum terhubung', 'error');
@@ -912,46 +894,6 @@ function MainApp() {
         </div>
       )}
 
-      {/* MODAL EDIT TRANSAKSI */}
-      {editingTrx && (
-        <div className="fixed inset-0 bg-slate-900/60 z-[999] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-           <div className="bg-white rounded-3xl p-6 w-full max-w-md animate-slide-up shadow-2xl border-4 border-white">
-              <h3 className="font-black text-xl mb-1 text-slate-800">Edit Data Transaksi</h3>
-              <p className="text-xs font-bold text-slate-400 mb-6 pb-4 border-b border-slate-100">Koreksi total harga atau metode pembayaran jika terjadi kesalahan kasir.</p>
-              
-              <form onSubmit={handleSaveEditTrx}>
-                 <div className="space-y-4">
-                    <div>
-                      <label className="text-[10px] uppercase tracking-widest font-black text-gray-500 ml-1">Metode Pembayaran</label>
-                      <select value={editingTrx.metode} onChange={e => setEditingTrx({...editingTrx, metode: e.target.value})} className="w-full p-4 mt-1 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm text-slate-700 outline-none focus:ring-4 focus:ring-emerald-500/20">
-                         <option value="QRIS / Transfer">QRIS / Transfer (Default)</option>
-                         <option value="qris">QRIS Cepat</option>
-                         <option value="transfer">Transfer Bank</option>
-                         <option value="tunai">Tunai / Cash</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="text-[10px] uppercase tracking-widest font-black text-gray-500 ml-1">Total Belanja (Rp)</label>
-                      <input type="number" value={editingTrx.total} onChange={e => setEditingTrx({...editingTrx, total: parseInt(e.target.value)||0, profit: (parseInt(e.target.value)||0) - editingTrx.modal})} className="w-full p-4 mt-1 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm text-slate-700 outline-none focus:ring-4 focus:ring-emerald-500/20" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] uppercase tracking-widest font-black text-gray-500 ml-1">Total Modal (Rp)</label>
-                      <input type="number" value={editingTrx.modal} onChange={e => setEditingTrx({...editingTrx, modal: parseInt(e.target.value)||0, profit: editingTrx.total - (parseInt(e.target.value)||0)})} className="w-full p-4 mt-1 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm text-slate-700 outline-none focus:ring-4 focus:ring-emerald-500/20" />
-                    </div>
-                    <div>
-                      <label className="text-[10px] uppercase tracking-widest font-black text-gray-500 ml-1">Keuntungan / Profit (Rp)</label>
-                      <input type="number" value={editingTrx.profit} onChange={e => setEditingTrx({...editingTrx, profit: parseInt(e.target.value)||0})} className="w-full p-4 mt-1 bg-emerald-50 border border-emerald-200 rounded-2xl font-extrabold text-sm text-emerald-700 outline-none focus:ring-4 focus:ring-emerald-500/20" />
-                    </div>
-                 </div>
-                 <div className="flex gap-3 mt-8">
-                    <button type="button" onClick={() => setEditingTrx(null)} className="flex-1 py-4 bg-slate-100 font-bold rounded-2xl text-slate-600 hover:bg-slate-200 transition-colors">Batal</button>
-                    <button type="submit" disabled={isProcessing} className="flex-1 py-4 bg-emerald-600 font-bold rounded-2xl text-white hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">{isProcessing ? 'Menyimpan...' : 'Simpan Edit'}</button>
-                 </div>
-              </form>
-           </div>
-        </div>
-      )}
-
       {/* GLOBAL TOAST */}
       {toast.show && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-slate-900 text-white rounded-full shadow-2xl font-bold flex items-center gap-2 animate-slide-up border border-slate-700 w-max max-w-[90%] text-center text-sm md:text-base">
@@ -960,101 +902,149 @@ function MainApp() {
         </div>
       )}
 
-      {/* VIEW: TOKO (MOBILE FIRST LAYOUT) */}
+      {/* VIEW: TOKO (MOBILE FIRST) */}
       {view === 'toko' && (
         <div className="pb-28">
           <header className="bg-white p-4 shadow-sm sticky top-0 z-40 mb-4">
             <div className="flex justify-between items-center mb-4 max-w-5xl mx-auto">
-              <div className="flex items-center gap-2 text-emerald-600 font-black text-xl"><Store/> {settings.nama_toko}</div>
-              <div className="flex items-center gap-2">
-                {/* TOMBOL DOWNLOAD QRIS DI LUAR */}
-                <button onClick={handleDownloadQRIS} className="p-2 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition shadow-sm" title="Download QRIS Pembayaran"><QrCode size={18}/></button>
-                <button onClick={() => setShowShareApp(true)} className="p-2 bg-emerald-50 text-emerald-600 rounded-full hover:bg-emerald-100 transition shadow-sm" title="Bagikan Link Toko (QR Code)"><Share2 size={18}/></button>
-                <button onClick={() => setView('admin')} className="p-2 bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200 transition shadow-sm" title="Masuk Mode Admin"><Lock size={18}/></button>
-                <button onClick={handleExitApp} className="p-2 bg-rose-50 text-rose-500 rounded-full hover:bg-rose-100 transition shadow-sm" title="Keluar Aplikasi"><Power size={18}/></button>
+              <div className="flex items-center gap-2 text-emerald-600 font-black text-lg md:text-xl truncate max-w-[50%]"><Store className="shrink-0"/> <span className="truncate">{settings.nama_toko}</span></div>
+              <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+                <button onClick={handleDownloadQRIS} className="p-2 md:p-2.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition shadow-sm" title="Download QRIS Pembayaran"><QrCode size={18}/></button>
+                <button onClick={() => setShowShareApp(true)} className="p-2 md:p-2.5 bg-emerald-50 text-emerald-600 rounded-full hover:bg-emerald-100 transition shadow-sm" title="Bagikan Link Toko (QR Code)"><Share2 size={18}/></button>
+                <button onClick={() => setView('admin')} className="p-2 md:p-2.5 bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200 transition shadow-sm" title="Masuk Mode Admin"><Lock size={18}/></button>
+                <button onClick={handleExitApp} className="p-2 md:p-2.5 bg-rose-50 text-rose-500 rounded-full hover:bg-rose-100 transition shadow-sm" title="Keluar Aplikasi"><Power size={18}/></button>
               </div>
             </div>
             <div className="flex gap-2 max-w-5xl mx-auto">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-3 text-slate-400" size={20}/>
-                <input type="text" placeholder="Cari barang atau ketik barcode..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} className="w-full bg-slate-100 rounded-xl pl-10 pr-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500 font-medium transition-all border-none"/>
+                <input type="text" placeholder="Cari / Scan barang..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} className="w-full bg-slate-100 rounded-xl pl-10 pr-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500 font-medium transition-all border-none text-sm md:text-base"/>
               </div>
-              <button onClick={() => startScanner('toko')} className="bg-slate-800 text-white p-3 rounded-xl cursor-pointer hover:bg-slate-700 transition active:scale-95 flex items-center shadow-lg" title="Scan Langsung via Kamera"><Camera size={24}/></button>
+              <button onClick={() => startScanner('toko')} className="bg-slate-800 text-white p-3 rounded-xl cursor-pointer hover:bg-slate-700 transition active:scale-95 flex items-center shadow-lg shrink-0" title="Scan Langsung via Kamera"><Camera size={24}/></button>
             </div>
           </header>
 
-          <div className="max-w-5xl mx-auto px-4 mb-4">
-            <div className="bg-emerald-50 border border-emerald-100 rounded-2xl p-4 shadow-sm">
-              <h3 className="font-extrabold text-emerald-800 text-sm mb-2 flex items-center gap-2">
-                <CheckCircle size={16} /> Panduan Pembelian:
+          {/* PANDUAN PEMBELIAN MENARIK */}
+          <div className="max-w-5xl mx-auto px-4 mb-6">
+            <div className="bg-gradient-to-br from-emerald-600 to-teal-700 rounded-3xl p-5 shadow-lg text-white">
+              <h3 className="font-extrabold text-emerald-100 text-sm md:text-base mb-3 flex items-center gap-2">
+                <Sparkles size={18} className="text-yellow-300" /> Panduan Pembelian (Self-Service)
               </h3>
-              <ol className="list-decimal list-inside text-xs font-bold text-emerald-700 space-y-1 ml-1">
-                <li>Pilih Barang yang ingin dibeli</li>
-                <li>Klik tombol BAYAR di bawah</li>
-                <li>Periksa kembali barang Anda (Bisa ditambah/dikurangi)</li>
-                <li>Klik <strong>Selesai dan Cetak Struk</strong></li>
-                <li>Silahkan bayar dengan scan QRIS atau Transfer</li>
-              </ol>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                <div className="bg-black/20 rounded-2xl p-3 border border-white/10 backdrop-blur-sm">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-5 h-5 bg-white text-emerald-700 rounded-full flex items-center justify-center font-black text-[10px] shrink-0">1</div>
+                    <p className="text-xs font-bold truncate">Pilih Barang</p>
+                  </div>
+                  <p className="text-[10px] md:text-xs opacity-80 mt-1 leading-tight">Cari nama barang, tekan, lalu atur jumlahnya.</p>
+                </div>
+                <div className="bg-black/20 rounded-2xl p-3 border border-white/10 backdrop-blur-sm">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-5 h-5 bg-white text-emerald-700 rounded-full flex items-center justify-center font-black text-[10px] shrink-0">2</div>
+                    <p className="text-xs font-bold truncate">Review & Bayar</p>
+                  </div>
+                  <p className="text-[10px] md:text-xs opacity-80 mt-1 leading-tight">Cek keranjang belanjaan Anda, lalu klik BAYAR.</p>
+                </div>
+                <div className="bg-black/20 rounded-2xl p-3 border border-white/10 backdrop-blur-sm">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-5 h-5 bg-white text-emerald-700 rounded-full flex items-center justify-center font-black text-[10px] shrink-0">3</div>
+                    <p className="text-xs font-bold truncate">Cetak Struk</p>
+                  </div>
+                  <p className="text-[10px] md:text-xs opacity-80 mt-1 leading-tight">Selesaikan transaksi untuk mencetak & membagikan struk.</p>
+                </div>
+                <div className="bg-black/20 rounded-2xl p-3 border border-white/10 backdrop-blur-sm relative overflow-hidden">
+                  <div className="absolute right-0 top-0 bottom-0 w-1 bg-yellow-400"></div>
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="w-5 h-5 bg-yellow-400 text-emerald-900 rounded-full flex items-center justify-center font-black text-[10px] shrink-0">4</div>
+                    <p className="text-xs font-bold truncate text-yellow-300">Scan QRIS</p>
+                  </div>
+                  <p className="text-[10px] md:text-xs opacity-90 mt-1 leading-tight">Lakukan pembayaran via QRIS yang muncul di Struk.</p>
+                </div>
+              </div>
             </div>
           </div>
 
-          <main className="p-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4 max-w-5xl mx-auto pt-0">
+          <main className="p-4 grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-3 md:gap-5 max-w-5xl mx-auto pt-0">
             {searchFilteredProducts.map(p => (
-              <div key={p.id} onClick={() => openProductModal(p)} className="bg-white p-4 rounded-[2rem] shadow-sm border border-slate-100 flex flex-col items-center text-center relative active:scale-95 transition-all group hover:shadow-md cursor-pointer border-b-4 border-b-slate-100 overflow-hidden w-full">
-                {cart[p.id] > 0 && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] font-black px-2 py-1 rounded-bl-xl shadow-lg">{cart[p.id]}</div>}
+              <div key={p.id} onClick={() => openProductModal(p)} className="bg-white p-3 md:p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center text-center relative active:scale-95 transition-transform cursor-pointer border-b-4 border-b-slate-100 overflow-hidden w-full">
+                {cart[p.id] > 0 && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] md:text-xs font-black px-2 md:px-3 py-1 rounded-bl-xl shadow-lg z-20">{cart[p.id]}</div>}
                 
-                <div className="mb-4 w-20 h-20 rounded-full flex items-center justify-center bg-slate-50 border border-slate-100 shadow-inner">
-                  {p.gambar ? (
-                    <img loading="lazy" src={formatImageUrl(p.gambar)} className="w-full h-full object-cover rounded-full" alt={p.nama}/>
-                  ) : (
-                    getDynamicIcon(p.nama)
+                {/* FALLBACK GAMBAR CERDAS: Emoji ada di belakang, Image di depan. Jika image gagal, otomatis Emoji yg terlihat */}
+                <div className="mb-3 md:mb-4 w-16 h-16 md:w-24 md:h-24 rounded-full border border-slate-100 shadow-inner relative overflow-hidden bg-slate-50 shrink-0">
+                  <div className="absolute inset-0 flex items-center justify-center z-0">
+                    {getDynamicIcon(p.nama)}
+                  </div>
+                  {p.gambar && (
+                    <img 
+                      loading="lazy" 
+                      src={formatImageUrl(p.gambar)} 
+                      className="absolute inset-0 w-full h-full object-cover z-10 bg-white" 
+                      alt={p.nama}
+                      onError={(e) => { e.target.style.display = 'none'; }}
+                    />
                   )}
                 </div>
                 
-                <h3 className="font-bold text-sm mb-1 line-clamp-2 h-10 w-full text-slate-700">{p.nama}</h3>
-                <p className="text-emerald-600 font-black mb-2 text-lg w-full truncate">{formatRupiah(p.jual)}</p>
-                {/* Mengunci Teks Sisa Stok agar tidak terpotong ke bawah di HP */}
-                <div className={`text-[10px] font-black px-2 py-1 rounded-full whitespace-nowrap truncate max-w-full ${(p.stok||0) > 5 ? 'bg-blue-50 text-blue-500' : 'bg-rose-50 text-rose-500'}`}>Sisa: {p.stok || 0}</div>
+                <h3 className="font-bold text-xs md:text-sm mb-1 line-clamp-2 h-8 md:h-10 w-full text-slate-700 leading-tight">{p.nama}</h3>
+                <p className="text-emerald-600 font-black mb-2 text-sm md:text-lg w-full truncate">{formatRupiah(p.jual)}</p>
+                
+                <div className="mt-auto w-full flex justify-center">
+                  <div className={`text-[9px] md:text-[10px] font-black px-2 py-0.5 rounded-md truncate max-w-[95%] ${(p.stok||0) > 5 ? 'bg-blue-50 text-blue-500' : 'bg-rose-50 text-rose-500'}`}>
+                    Sisa: {p.stok || 0}
+                  </div>
+                </div>
               </div>
             ))}
-            {searchFilteredProducts.length === 0 && <div className="col-span-full text-center text-slate-400 mt-10 font-bold">Barang tidak ditemukan.</div>}
+            {searchFilteredProducts.length === 0 && <div className="col-span-full text-center text-slate-400 mt-10 font-bold text-sm">Barang tidak ditemukan.</div>}
           </main>
 
           {selectedProduct && (
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-4 animate-fade-in">
-              <div className="bg-white w-full max-w-md rounded-[32px] p-8 shadow-2xl animate-slide-up border-4 border-white flex flex-col">
-                <div className="flex justify-between items-center mb-8">
-                   <div className="flex items-center gap-4 w-[80%]">
-                     <div className="w-16 h-16 bg-slate-50 rounded-2xl flex items-center justify-center shadow-inner overflow-hidden border shrink-0">
-                       {selectedProduct.gambar ? <img src={formatImageUrl(selectedProduct.gambar)} className="w-full h-full object-cover"/> : getDynamicIcon(selectedProduct.nama)}
+              <div className="bg-white w-full max-w-md rounded-3xl p-6 md:p-8 shadow-2xl animate-slide-up border-4 border-white flex flex-col">
+                <div className="flex justify-between items-start mb-6">
+                   <div className="flex items-center gap-4 w-[85%]">
+                     {/* GAMBAR MODAL DENGAN FALLBACK */}
+                     <div className="w-16 h-16 bg-slate-50 rounded-2xl shadow-inner overflow-hidden border shrink-0 relative flex items-center justify-center">
+                       <div className="absolute inset-0 flex items-center justify-center z-0 scale-75">{getDynamicIcon(selectedProduct.nama)}</div>
+                       {selectedProduct.gambar && (
+                         <img loading="lazy" src={formatImageUrl(selectedProduct.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.display = 'none'; }}/>
+                       )}
                      </div>
                      <div className="flex flex-col flex-1 overflow-hidden">
-                        <h3 className="font-black text-xl text-slate-800 leading-tight truncate">{selectedProduct.nama}</h3>
-                        <p className="text-emerald-600 font-black text-lg">{formatRupiah(selectedProduct.jual)}</p>
+                        <h3 className="font-black text-lg md:text-xl text-slate-800 leading-tight line-clamp-2">{selectedProduct.nama}</h3>
+                        <p className="text-emerald-600 font-black text-base md:text-lg">{formatRupiah(selectedProduct.jual)}</p>
                      </div>
                    </div>
-                   <button onClick={() => setSelectedProduct(null)} className="p-2 bg-slate-100 rounded-full shrink-0"><X/></button>
+                   <button onClick={() => setSelectedProduct(null)} className="p-2 bg-slate-100 rounded-full shrink-0 hover:bg-slate-200 transition"><X size={18}/></button>
                 </div>
+                
                 {selectedProduct.diskon && (
-                  <div className="bg-orange-50 text-orange-700 p-4 rounded-2xl text-sm mb-6 border border-orange-200 text-center font-black w-full">
+                  <div className="bg-orange-50 text-orange-700 p-3 md:p-4 rounded-xl text-xs md:text-sm mb-6 border border-orange-200 text-center font-black w-full">
                     🔥 Beli {selectedProduct.diskon.min_qty} bayar {formatRupiah(selectedProduct.diskon.harga_total)}
                   </div>
                 )}
-                <div className="flex items-center justify-between bg-slate-50 p-5 rounded-3xl mb-8 border border-slate-100 w-full">
-                   <button onClick={() => setTempQty(Math.max(0, tempQty-1))} className="w-14 h-14 bg-white rounded-2xl shadow-sm font-black text-2xl border active:bg-slate-100 transition shrink-0">-</button>
-                   <input type="number" value={tempQty === 0 ? '' : tempQty} onChange={e => setTempQty(Math.min(selectedProduct.stok||0, Math.max(0, parseInt(e.target.value)||0)))} className="bg-transparent text-center font-black text-4xl w-full max-w-[100px] outline-none text-slate-800" placeholder="0"/>
-                   <button onClick={() => setTempQty(Math.min(selectedProduct.stok||0, tempQty+1))} className="w-14 h-14 bg-emerald-600 text-white rounded-2xl shadow-sm font-black text-2xl active:bg-emerald-700 transition shrink-0">+</button>
+
+                <div className="flex items-center justify-between bg-slate-50 p-4 md:p-5 rounded-2xl mb-6 border border-slate-100 w-full">
+                   <button onClick={() => setTempQty(Math.max(0, tempQty-1))} className="w-12 h-12 md:w-14 md:h-14 bg-white rounded-xl shadow-sm font-black text-2xl border active:bg-slate-100 transition shrink-0">-</button>
+                   <input type="number" value={tempQty === 0 ? '' : tempQty} onChange={e => setTempQty(Math.min(selectedProduct.stok||0, Math.max(0, parseInt(e.target.value)||0)))} className="bg-transparent text-center font-black text-3xl md:text-4xl w-full max-w-[100px] outline-none text-slate-800" placeholder="0"/>
+                   <button onClick={() => setTempQty(Math.min(selectedProduct.stok||0, tempQty+1))} className="w-12 h-12 md:w-14 md:h-14 bg-emerald-600 text-white rounded-xl shadow-sm font-black text-2xl active:bg-emerald-700 transition shrink-0">+</button>
                 </div>
-                <button onClick={saveToCart} className="w-full py-5 bg-slate-900 text-white rounded-3xl font-black text-xl shadow-xl active:scale-95 transition-all hover:bg-slate-800 mt-auto">Simpan ke Keranjang</button>
+
+                <button onClick={saveToCart} className="w-full py-4 md:py-5 bg-slate-900 text-white rounded-2xl font-black text-lg md:text-xl shadow-xl active:scale-95 transition-all hover:bg-slate-800 mt-auto">
+                  Simpan Keranjang
+                </button>
               </div>
             </div>
           )}
 
           {jumlahItem > 0 && !selectedProduct && (
             <div className="fixed bottom-6 left-4 right-4 z-50 max-w-md mx-auto">
-              <button onClick={() => setView('checkout')} className="w-full bg-emerald-600 text-white p-5 rounded-[2rem] shadow-2xl flex justify-between items-center active:scale-95 transition-all border-4 border-emerald-500/20">
-                <div className="text-left"><p className="text-[10px] opacity-80 font-black uppercase tracking-widest mb-1">{jumlahItem} Barang Terpilih</p><p className="text-2xl font-black">{formatRupiah(totalBelanja)}</p></div>
-                <div className="flex items-center gap-2 font-black bg-white/20 px-4 py-2 rounded-2xl shrink-0">BAYAR <ChevronRight/></div>
+              <button onClick={() => setView('checkout')} className="w-full bg-emerald-600 text-white p-4 md:p-5 rounded-3xl shadow-2xl flex justify-between items-center active:scale-95 transition-all border border-emerald-400">
+                <div className="text-left overflow-hidden">
+                  <p className="text-[9px] md:text-[10px] opacity-90 font-black uppercase tracking-widest mb-0.5">{jumlahItem} Barang Dibeli</p>
+                  <p className="text-xl md:text-2xl font-black truncate">{formatRupiah(totalBelanja)}</p>
+                </div>
+                <div className="flex items-center gap-2 font-black bg-white/20 px-3 py-2 md:px-4 md:py-2.5 rounded-xl shrink-0 text-sm md:text-base">BAYAR <ChevronRight size={18}/></div>
               </button>
             </div>
           )}
@@ -1064,10 +1054,10 @@ function MainApp() {
       {/* VIEW: CHECKOUT (LANGSUNG SELESAI TANPA PILIH PEMBAYARAN) */}
       {view === 'checkout' && (
         <div className="max-w-md mx-auto p-4 md:p-6 min-h-screen flex flex-col pb-32">
-          <button onClick={() => setView('toko')} className="flex items-center gap-2 font-black mb-6 text-slate-400 hover:text-slate-600 transition"><ArrowLeft/> Kembali Belanja</button>
+          <button onClick={() => setView('toko')} className="flex items-center gap-2 font-black mb-6 text-slate-400 hover:text-slate-600 transition w-max"><ArrowLeft size={18}/> Kembali Belanja</button>
           
-          <div className="bg-white rounded-[32px] p-5 shadow-sm border border-slate-100 mb-6">
-            <h3 className="font-black text-lg mb-4 text-slate-800 border-b border-slate-100 pb-3">Review Keranjang</h3>
+          <div className="bg-white rounded-3xl p-5 md:p-6 shadow-sm border border-slate-100 mb-6">
+            <h3 className="font-black text-base md:text-lg mb-4 text-slate-800 border-b border-slate-100 pb-3">Review Keranjang</h3>
             <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2">
               {Object.entries(cart).map(([id, qty]) => {
                 const p = products.find(prod => prod.id === parseInt(id));
@@ -1075,12 +1065,14 @@ function MainApp() {
                 return (
                   <div key={id} className="flex justify-between items-center border-b border-slate-50 pb-4 last:border-0 last:pb-0">
                     <div className="flex items-center gap-3 w-[60%]">
-                      <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 text-2xl overflow-hidden shrink-0">
-                        {p.gambar ? <img src={formatImageUrl(p.gambar)} className="w-full h-full object-cover"/> : getDynamicIcon(p.nama)}
+                      {/* GAMBAR KERANJANG FALLBACK */}
+                      <div className="w-12 h-12 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 text-2xl overflow-hidden shrink-0 relative">
+                        <div className="absolute inset-0 flex items-center justify-center z-0 scale-75">{getDynamicIcon(p.nama)}</div>
+                        {p.gambar && <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.display = 'none'; }}/>}
                       </div>
                       <div className="overflow-hidden">
                         <p className="font-bold text-xs md:text-sm text-slate-800 line-clamp-1">{p.nama}</p>
-                        <p className="text-[10px] text-emerald-600 font-black">{formatRupiah(p.jual)} / pcs</p>
+                        <p className="text-[10px] text-emerald-600 font-black">{formatRupiah(p.jual)}</p>
                       </div>
                     </div>
                     <div className="flex items-center gap-1 bg-slate-50 rounded-xl p-1 border border-slate-100 shrink-0">
@@ -1094,104 +1086,98 @@ function MainApp() {
             </div>
           </div>
 
-          <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-[40px] p-6 md:p-8 mb-8 shadow-2xl text-white relative overflow-hidden mt-auto">
+          <div className="bg-gradient-to-r from-emerald-600 to-teal-600 rounded-[32px] md:rounded-[40px] p-6 md:p-8 mb-8 shadow-2xl text-white relative overflow-hidden mt-auto">
              <div className="absolute -top-10 -right-10 opacity-10 rotate-12"><CreditCard size={150}/></div>
-             <p className="text-[10px] opacity-70 font-black uppercase tracking-widest mb-1">Total Tagihan Anda</p>
+             <p className="text-[10px] md:text-xs opacity-70 font-black uppercase tracking-widest mb-1">Total Tagihan Anda</p>
              <h2 className="text-3xl md:text-5xl font-black tracking-tighter truncate">{formatRupiah(totalBelanja)}</h2>
           </div>
 
           <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-sm border-t border-slate-100 z-50">
-            <button onClick={handleSelesaiBayar} disabled={isProcessing || jumlahItem === 0} className="w-full max-w-md mx-auto block py-4 md:py-5 bg-slate-900 text-white rounded-[24px] font-black text-lg md:text-xl shadow-2xl disabled:opacity-30 active:scale-95 transition-all hover:bg-slate-800">
+            <button onClick={handleSelesaiBayar} disabled={isProcessing || jumlahItem === 0} className="w-full max-w-md mx-auto block py-4 md:py-5 bg-slate-900 text-white rounded-[20px] font-black text-lg md:text-xl shadow-2xl disabled:opacity-30 active:scale-95 transition-all hover:bg-slate-800">
               {isProcessing ? 'MENYIMPAN...' : 'Selesai & Cetak Struk'}
             </button>
           </div>
         </div>
       )}
 
-      {/* VIEW: STRUK (MODERN + SHARE/PRINT + PEMBAYARAN) */}
+      {/* VIEW: STRUK (MODERN + HANYA QRIS) */}
       {view === 'struk' && (
-        <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4 pb-10">
-          <div className="mb-6 flex flex-col items-center animate-slide-up">
-            <div className="w-16 h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center mb-3 shadow-lg shadow-emerald-200">
-              <CheckCircle size={36} />
+        <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-start pt-10 px-4 pb-10">
+          <div className="mb-6 flex flex-col items-center animate-slide-up text-center">
+            <div className="w-14 h-14 md:w-16 md:h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center mb-3 shadow-lg shadow-emerald-200">
+              <CheckCircle size={32} />
             </div>
-            <h2 className="text-2xl font-extrabold text-slate-800">Struk Tersimpan!</h2>
-            <p className="text-slate-500 text-sm mt-1 font-bold">Lanjutkan dengan pembayaran di bawah.</p>
+            <h2 className="text-xl md:text-2xl font-extrabold text-slate-800">Struk Tersimpan!</h2>
+            <p className="text-slate-500 text-xs md:text-sm mt-1 font-bold">Lanjutkan dengan pembayaran di bawah.</p>
           </div>
 
           <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden animate-fade-in relative mb-6 border border-slate-200">
-            <div className="bg-slate-900 p-6 text-center text-white">
-              <Store className="mx-auto mb-2 opacity-80" size={32} />
-              <h3 className="font-bold text-xl tracking-wide">{settings.nama_toko}</h3>
-              <p className="text-xs text-slate-400 mt-1 opacity-80">E-Receipt • {strukTerakhir?.tanggal}</p>
+            <div className="bg-slate-900 p-5 md:p-6 text-center text-white">
+              <Store className="mx-auto mb-2 opacity-80" size={28} />
+              <h3 className="font-bold text-lg md:text-xl tracking-wide truncate px-4">{settings.nama_toko}</h3>
+              <p className="text-[10px] md:text-xs text-slate-400 mt-1 opacity-80">E-Receipt • {strukTerakhir?.tanggal}</p>
             </div>
             
-            <div className="p-6">
+            <div className="p-5 md:p-6">
               <div className="flex justify-between items-center mb-4 pb-4 border-b border-dashed border-gray-200">
-                <span className="text-xs text-gray-400 uppercase tracking-wider font-bold">ID Transaksi</span>
-                <span className="text-xs font-mono text-slate-700 font-bold truncate max-w-[150px]">{strukTerakhir?.id}</span>
+                <span className="text-[10px] md:text-xs text-gray-400 uppercase tracking-wider font-bold">ID Transaksi</span>
+                <span className="text-[10px] md:text-xs font-mono text-slate-700 font-bold truncate max-w-[150px]">{strukTerakhir?.id}</span>
               </div>
               
               <div className="space-y-4 mb-6">
                 {strukTerakhir?.items?.map((item, idx) => (
                   <div key={idx} className="flex justify-between items-start gap-2">
                     <div className="flex items-start gap-3 w-[70%]">
-                      <div className="w-10 h-10 rounded-xl bg-slate-50 flex items-center justify-center border text-2xl overflow-hidden shrink-0">
-                        {item.gambar ? <img src={formatImageUrl(item.gambar)} className="w-full h-full object-cover"/> : getDynamicIcon(item.nama)}
+                      {/* GAMBAR STRUK FALLBACK */}
+                      <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-slate-50 flex items-center justify-center border text-xl overflow-hidden shrink-0 relative">
+                        <div className="absolute inset-0 flex items-center justify-center z-0 scale-75">{getDynamicIcon(item.nama)}</div>
+                        {item.gambar && <img loading="lazy" src={formatImageUrl(item.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.display = 'none'; }}/>}
                       </div>
                       <div className="overflow-hidden">
-                        <p className="font-semibold text-slate-800 text-xs md:text-sm line-clamp-2">{item.nama}</p>
-                        <p className="text-[10px] text-gray-500 mt-0.5 font-bold">{item.qty} x {formatRupiah(item.jual)}</p>
+                        <p className="font-semibold text-slate-800 text-[11px] md:text-sm line-clamp-2 leading-tight">{item.nama}</p>
+                        <p className="text-[9px] md:text-[10px] text-gray-500 mt-0.5 font-bold">{item.qty} x {formatRupiah(item.jual)}</p>
                       </div>
                     </div>
-                    <p className="font-bold text-slate-800 text-xs md:text-sm shrink-0">{formatRupiah(item.totalHarga)}</p>
+                    <p className="font-bold text-slate-800 text-[11px] md:text-sm shrink-0 mt-1">{formatRupiah(item.totalHarga)}</p>
                   </div>
                 ))}
               </div>
 
               <div className="bg-slate-50 p-4 rounded-2xl flex justify-between items-center border border-slate-100">
-                <span className="font-bold text-slate-600 text-sm">Total Tagihan</span>
-                <span className="font-extrabold text-emerald-600 text-lg md:text-xl truncate">{formatRupiah(strukTerakhir?.total)}</span>
+                <span className="font-bold text-slate-600 text-xs md:text-sm">Total Tagihan</span>
+                <span className="font-extrabold text-emerald-600 text-base md:text-xl truncate">{formatRupiah(strukTerakhir?.total)}</span>
               </div>
             </div>
 
-            <div className="bg-emerald-50 p-6 text-center border-t border-emerald-100 border-dashed">
-               <p className="text-[10px] text-emerald-600 uppercase font-black tracking-widest mb-3">Selesaikan Pembayaran Sekarang</p>
-               <h3 className="font-black text-sm text-emerald-900 tracking-tight leading-tight mb-4">Silahkan bayar dengan scan QRIS atau Transfer ke rekening di bawah ini.</h3>
+            {/* AREA PEMBAYARAN: HANYA MENAMPILKAN QRIS (SESUAI PERMINTAAN TERBARU) */}
+            <div className="bg-emerald-50 p-5 md:p-6 text-center border-t border-emerald-100 border-dashed">
+               <p className="text-[9px] md:text-[10px] text-emerald-600 uppercase font-black tracking-widest mb-2">Selesaikan Pembayaran</p>
+               <h3 className="font-black text-xs md:text-sm text-emerald-900 tracking-tight leading-snug mb-4">Silahkan bayar dengan scan QRIS resmi toko kami di bawah ini.</h3>
                
                <div className="flex flex-col gap-4">
-                 {settings.qris_url && (
-                   <div className="bg-white p-4 rounded-2xl border shadow-sm flex flex-col items-center w-full">
-                     <p className="text-[10px] uppercase font-black text-slate-500 mb-2 tracking-widest">Scan QRIS</p>
-                     <img src={formatImageUrl(settings.qris_url)} className="w-40 h-40 object-contain mb-3" alt="QRIS"/>
-                     <button onClick={handleDownloadQRIS} className="w-full py-3 bg-emerald-100 text-emerald-800 rounded-xl font-bold text-[10px] flex justify-center items-center gap-2 hover:bg-emerald-200 transition uppercase tracking-widest"><Download size={14}/> Simpan QRIS ke HP</button>
+                 {settings.qris_url ? (
+                   <div className="bg-white p-4 rounded-2xl border shadow-sm flex flex-col items-center w-full relative overflow-hidden">
+                     <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 via-yellow-400 to-red-500"></div>
+                     <p className="text-[10px] md:text-xs uppercase font-black text-slate-800 mb-3 mt-1 tracking-widest">QRIS Nasional</p>
+                     <img src={formatImageUrl(settings.qris_url)} className="w-40 h-40 md:w-48 md:h-48 object-contain mb-4 border border-slate-100 p-1 rounded-xl" alt="QRIS Pembayaran"/>
+                     <button onClick={handleDownloadQRIS} className="w-full py-2.5 md:py-3 bg-emerald-100 text-emerald-800 rounded-xl font-bold text-[9px] md:text-[10px] flex justify-center items-center gap-2 hover:bg-emerald-200 transition uppercase tracking-widest active:scale-95"><Download size={14}/> Simpan QRIS ke HP</button>
                    </div>
-                 )}
-                 {settings.rekening && (
-                   <div className="bg-white p-4 rounded-2xl border shadow-sm w-full">
-                     <p className="text-[10px] uppercase font-black text-slate-500 mb-2 tracking-widest">Transfer Bank</p>
-                     <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border w-full">
-                        <div className="overflow-hidden text-left">
-                          <p className="font-black text-base md:text-lg text-slate-800">{settings.rekening.match(/\d+/) ? settings.rekening.match(/\d+/)[0] : '-'}</p>
-                          <p className="text-[10px] font-bold text-slate-500 truncate max-w-full">{settings.rekening.split(/a\.?n\.?/i)[1] ? 'a.n ' + settings.rekening.split(/a\.?n\.?/i)[1].trim() : 'Toko'}</p>
-                        </div>
-                        <button onClick={handleCopyRekening} className="p-2 bg-slate-900 text-white rounded-lg hover:bg-slate-800 shrink-0"><Copy size={16}/></button>
-                     </div>
-                   </div>
+                 ) : (
+                   <p className="text-xs font-bold text-red-500 bg-red-50 p-3 rounded-xl border border-red-100">Admin belum mengunggah foto QRIS.</p>
                  )}
                </div>
             </div>
             
-            <div className="absolute top-[80px] -left-4 w-8 h-8 bg-slate-100 rounded-full"></div>
-            <div className="absolute top-[80px] -right-4 w-8 h-8 bg-slate-100 rounded-full"></div>
+            <div className="absolute top-[80px] -left-3 md:-left-4 w-6 h-6 md:w-8 md:h-8 bg-slate-100 rounded-full"></div>
+            <div className="absolute top-[80px] -right-3 md:-right-4 w-6 h-6 md:w-8 md:h-8 bg-slate-100 rounded-full"></div>
           </div>
 
-          <div className="flex gap-4 w-full max-w-md">
-            <button onClick={handleShareStruk} className="flex-1 py-4 bg-blue-100 text-blue-700 rounded-2xl font-bold shadow-sm hover:shadow-md hover:bg-blue-200 transition-all active:scale-95 flex flex-col items-center justify-center gap-1 text-xs">
-              <Share2 size={20}/> Bagikan Struk
+          <div className="flex gap-3 md:gap-4 w-full max-w-md pb-4">
+            <button onClick={handleShareStruk} className="flex-1 py-3 md:py-4 bg-blue-100 text-blue-700 rounded-2xl font-bold shadow-sm hover:shadow-md hover:bg-blue-200 transition-all active:scale-95 flex flex-col items-center justify-center gap-1 text-[10px] md:text-xs">
+              <Share2 size={18}/> Bagikan Struk
             </button>
-            <button onClick={handleTutupStruk} className="flex-1 py-4 bg-slate-900 text-white rounded-2xl font-bold shadow-lg hover:shadow-xl hover:bg-slate-800 transition-all active:scale-95 flex flex-col items-center justify-center gap-1 text-xs">
-               <Store size={20}/> Kembali ke Toko
+            <button onClick={handleTutupStruk} className="flex-1 py-3 md:py-4 bg-slate-900 text-white rounded-2xl font-bold shadow-lg hover:shadow-xl hover:bg-slate-800 transition-all active:scale-95 flex flex-col items-center justify-center gap-1 text-[10px] md:text-xs">
+               <Store size={18}/> Kembali ke Toko
             </button>
           </div>
         </div>
@@ -1213,7 +1199,7 @@ function MainApp() {
 
       {/* VIEW: ADMIN DASHBOARD */}
       {view === 'admin' && isAdminLogged && (() => {
-        // FILTER TRANSAKSI LOGIC
+        // FILTER TRANSAKSI
         const filteredTransactions = transactions.filter(t => {
           if (!filterStart && !filterEnd) return true;
           let tDate;
@@ -1225,7 +1211,6 @@ function MainApp() {
           return tDate >= sDate && tDate <= eDate;
         });
 
-        // FITUR SORTING TRANSAKSI
         const sortedTransactions = [...filteredTransactions].sort((a, b) => {
           if (sortTrx === 'terbaru') return b.id.localeCompare(a.id);
           if (sortTrx === 'terlama') return a.id.localeCompare(b.id);
@@ -1234,12 +1219,10 @@ function MainApp() {
           return 0;
         });
 
-        // KALKULASI PENJUALAN
         const totalPendapatanKotor = filteredTransactions.reduce((sum, t) => sum + (t.total || 0), 0);
         const totalKeuntunganBersih = filteredTransactions.reduce((sum, t) => sum + (t.profit || 0), 0);
         const totalModalTerjual = filteredTransactions.reduce((sum, t) => sum + (t.modal || 0), 0);
 
-        // FILTER BARANG INPUT
         const filteredProductsInput = products.filter(p => {
           if (!filterStart && !filterEnd) return true;
           const pDate = new Date(p.tanggal_dibuat || new Date());
@@ -1253,7 +1236,6 @@ function MainApp() {
         const totalModalInput = filteredProductsInput.reduce((sum, p) => sum + ((p.modal || 0) * (p.stok || 0)), 0);
         const potensiKeuntungan = filteredProductsInput.reduce((sum, p) => sum + (((p.jual || 0) - (p.modal || 0)) * (p.stok || 0)), 0);
 
-        // LOGIKA PERINGKAT BARANG
         const itemSalesMap = {};
         filteredTransactions.forEach(t => {
           t.items.forEach(item => {
@@ -1330,12 +1312,11 @@ function MainApp() {
 
                        <hr className="border-slate-100"/>
                        
-                       {/* UPLOAD & DOWNLOAD QRIS */}
                        <div className="space-y-3">
-                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><QrCode size={14}/> Foto QRIS Pembayaran</label>
-                         <div className="flex flex-col md:flex-row items-center gap-6 bg-slate-50 border border-slate-200 p-6 rounded-[32px]">
+                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><QrCode size={14}/> Foto QRIS Pembayaran Utama</label>
+                         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 bg-slate-50 border border-slate-200 p-6 rounded-[32px]">
                            
-                           <div className="flex flex-col items-center gap-3 w-full md:w-auto shrink-0">
+                           <div className="flex flex-col items-center gap-3 w-full sm:w-auto shrink-0">
                              <div className="w-40 h-40 bg-white rounded-3xl border-2 border-dashed border-emerald-300 flex items-center justify-center p-2 overflow-hidden shadow-sm relative">
                                {settings.qris_url ? (
                                  <img src={formatImageUrl(settings.qris_url)} className="w-full h-full object-contain" alt="QRIS Preview"/>
@@ -1363,7 +1344,7 @@ function MainApp() {
                        <hr className="border-slate-100"/>
                        
                        <div className="space-y-3">
-                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><CreditCard size={14}/> Info Rekening Manual</label>
+                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><CreditCard size={14}/> Info Rekening Manual (Cadangan)</label>
                          <input value={settings.rekening || ''} onChange={e => setSettings({...settings, rekening: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-3xl font-bold focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all text-xs md:text-sm"/>
                          <p className="text-[10px] text-slate-400 font-bold ml-2">Format: NAMA BANK [SPASI] NO REKENING [SPASI] a.n NAMA PEMILIK</p>
                        </div>
@@ -1398,7 +1379,7 @@ function MainApp() {
                       <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-slate-800">Ikhtisar Penjualan & Stok</h1>
                       <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto">
                         <div className="flex flex-wrap items-center gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm w-full md:w-auto">
-                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Filter:</span>
+                          <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Filter Waktu:</span>
                           <input type="date" value={filterStart} onChange={e => setFilterStart(e.target.value)} className="bg-slate-50 px-2 py-2 rounded-xl text-xs md:text-sm font-bold outline-none text-slate-700 border border-slate-100 flex-1 md:flex-none"/>
                           <span className="text-slate-300 font-black hidden md:inline">-</span>
                           <input type="date" value={filterEnd} onChange={e => setFilterEnd(e.target.value)} className="bg-slate-50 px-2 py-2 rounded-xl text-xs md:text-sm font-bold outline-none text-slate-700 border border-slate-100 flex-1 md:flex-none"/>
@@ -1430,6 +1411,25 @@ function MainApp() {
                        </div>
                     </div>
 
+                    <h2 className="text-base md:text-xl font-bold text-slate-800 mb-4 flex items-center gap-2"><Package className="text-blue-500" size={20}/> Rekap Input Barang (Filter Tanggal)</h2>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-12">
+                       <div className="bg-white p-4 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden">
+                         <div className="absolute top-0 right-0 p-4 opacity-5"><Package size={48}/></div>
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Barang (Pcs)</p>
+                         <p className="text-lg md:text-3xl font-extrabold text-slate-800 truncate">{totalBarangInput}</p>
+                       </div>
+                       <div className="bg-white p-4 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden">
+                         <div className="absolute top-0 right-0 p-4 opacity-5"><Store size={48}/></div>
+                         <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Modal (Stok)</p>
+                         <p className="text-lg md:text-3xl font-extrabold text-blue-600 truncate">{formatRupiah(totalModalInput)}</p>
+                       </div>
+                       <div className="col-span-2 md:col-span-1 bg-gradient-to-br from-blue-500 to-indigo-600 p-4 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm text-white relative overflow-hidden">
+                         <div className="absolute top-0 right-0 p-4 opacity-10"><TrendingUp size={48}/></div>
+                         <p className="text-[10px] font-black text-blue-100 uppercase tracking-widest mb-1">Potensi Keuntungan</p>
+                         <p className="text-xl md:text-3xl font-extrabold drop-shadow-sm truncate">{formatRupiah(potensiKeuntungan)}</p>
+                       </div>
+                    </div>
+
                     <div className="bg-white rounded-3xl md:rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col mb-8">
                       <div className="p-4 md:p-6 border-b border-slate-100">
                         <h2 className="font-black text-base md:text-xl text-slate-800 flex items-center gap-2"><Package className="text-emerald-500" size={20}/> Rekap Keseluruhan per Barang</h2>
@@ -1450,8 +1450,9 @@ function MainApp() {
                              {productRankings.map((p) => (
                                <tr key={p.id} className="text-xs md:text-sm font-bold hover:bg-slate-50 transition-colors">
                                  <td className="p-3 md:p-4 flex items-center gap-3">
-                                   <div className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center bg-white shrink-0 overflow-hidden">
-                                      {p.gambar ? <img loading="lazy" src={formatImageUrl(p.gambar)} className="w-full h-full object-cover"/> : getDynamicIcon(p.nama)}
+                                   <div className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center bg-white shrink-0 overflow-hidden relative">
+                                      <div className="absolute inset-0 flex items-center justify-center z-0 scale-75">{getDynamicIcon(p.nama)}</div>
+                                      {p.gambar && <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.display = 'none'; }}/>}
                                    </div>
                                    <span className="truncate max-w-[120px] md:max-w-xs text-slate-700">{p.nama}</span>
                                  </td>
@@ -1537,9 +1538,9 @@ function MainApp() {
                               ))}
                             </div>
                             <div className="flex flex-col sm:flex-row justify-between sm:items-end mt-2 pt-2 border-t border-gray-200 gap-3">
-                              <div className="flex items-center gap-2">
-                                 <button onClick={() => setEditingTrx(t)} className="flex items-center justify-center gap-1 px-2 py-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors text-[10px] font-bold"><Edit size={12}/> Edit</button>
-                                 <button onClick={() => handleDeleteSingleTransaction(t.id)} className="flex items-center justify-center gap-1 px-2 py-1.5 bg-rose-50 text-rose-600 rounded hover:bg-rose-100 transition-colors text-[10px] font-bold"><Trash2 size={12}/> Batal & Kembalikan Stok</button>
+                              <div className="flex items-center gap-2 w-full sm:w-auto">
+                                 <button onClick={() => setEditingTrx(t)} className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-2 py-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors text-[10px] font-bold"><Edit size={12}/> Edit</button>
+                                 <button onClick={() => handleDeleteSingleTransaction(t.id)} className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-2 py-1.5 bg-rose-50 text-rose-600 rounded hover:bg-rose-100 transition-colors text-[10px] font-bold"><Trash2 size={12}/> Batal & Kembalikan Stok</button>
                               </div>
                               <div className="flex justify-between sm:justify-end items-end gap-3 w-full sm:w-auto">
                                 <span className="text-[9px] uppercase font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">Untung {formatRupiah(t.profit)}</span>
@@ -1706,8 +1707,9 @@ function MainApp() {
                            {products.map(p => (
                              <tr key={p.id} className={`transition-colors ${editingId === p.id ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
                                <td className="p-4 md:p-6 flex items-center gap-3 md:gap-4">
-                                 <div className="w-10 h-10 md:w-14 md:h-14 bg-white rounded-xl md:rounded-2xl border shadow-sm flex items-center justify-center shrink-0 overflow-hidden text-xl md:text-2xl">
-                                    {p.gambar ? <img loading="lazy" src={formatImageUrl(p.gambar)} className="w-full h-full object-cover"/> : getDynamicIcon(p.nama)}
+                                 <div className="w-10 h-10 md:w-14 md:h-14 bg-white rounded-xl md:rounded-2xl border shadow-sm flex items-center justify-center shrink-0 overflow-hidden relative">
+                                    <div className="absolute inset-0 flex items-center justify-center z-0 scale-75">{getDynamicIcon(p.nama)}</div>
+                                    {p.gambar && <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.display = 'none'; }}/>}
                                  </div>
                                  <div className="min-w-0">
                                    <p className="font-extrabold text-xs md:text-sm text-slate-900 line-clamp-2 max-w-[150px] md:max-w-xs">{p.nama}</p>
