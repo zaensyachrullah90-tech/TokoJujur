@@ -4,7 +4,7 @@ import {
   CheckCircle, Settings, BarChart3, PlusCircle, 
   Store, QrCode, CreditCard, ChevronRight, ArrowLeft,
   Search, X, Lock, LogOut, TrendingUp, Edit, Trash2, List, TrendingDown,
-  Camera, Download, Power, UploadCloud, AlertTriangle, Copy, Barcode, Share2, ArrowUpDown, Sparkles, Image as ImageIcon
+  Camera, Download, Power, UploadCloud, AlertTriangle, Copy, Barcode, Share2, ArrowUpDown, Sparkles, Image as ImageIcon, Wand2
 } from 'lucide-react';
 
 // =========================================================================
@@ -179,7 +179,6 @@ function MainApp() {
   
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null); 
-  // Ditambahkan field `gambar` pada state newProduct
   const [newProduct, setNewProduct] = useState({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '', gambar: '' });
   const [useDiskon, setUseDiskon] = useState(false);
   const [editingTrx, setEditingTrx] = useState(null);
@@ -359,7 +358,7 @@ function MainApp() {
         setNewProduct(prev => ({ 
           ...prev, 
           nama: data.product.product_name,
-          gambar: data.product.image_url || prev.gambar // Otomatis ambil foto asli jika ada
+          gambar: data.product.image_url || prev.gambar 
         }));
         showToast('Nama dan Foto otomatis berhasil terisi!', 'success');
       }
@@ -389,7 +388,7 @@ function MainApp() {
   }, [isScanningModalOpen, scanTarget, products]);
 
   // =========================================================================
-  // FITUR BARU: GENERATE GAMBAR VIA GEMINI API (IMAGEN)
+  // FITUR BARU: GENERATE GAMBAR VIA GEMINI API (IMAGEN) DENGAN PROMPT REALISTIS
   // =========================================================================
   const handleGenerateGeminiImage = async () => {
     if (!geminiKey) return showToast('Harap masukkan API Key Gemini di tab Pengaturan terlebih dahulu!', 'error');
@@ -398,7 +397,7 @@ function MainApp() {
     setIsProcessing(true);
     showToast('AI sedang melukis gambar realistis...', 'success');
     try {
-      const promptText = `A highly detailed, hyper-realistic studio photography of a commercial product package named "${newProduct.nama}", isolated on a pure solid white background, vibrant colors, 4k resolution, perfect lighting.`;
+      const promptText = `A highly detailed, hyper-realistic commercial studio photography of a real product package named "${newProduct.nama}", exact real-world packaging, pure solid white background, vibrant colors, 4k resolution, perfect studio lighting, highly realistic texture.`;
       
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${geminiKey}`, {
         method: 'POST',
@@ -423,15 +422,68 @@ function MainApp() {
     setIsProcessing(false);
   };
 
-  // FITUR BARU: UPLOAD FOTO KAMERA LANGSUNG
+  // FITUR BARU: MERAPIHKAN FOTO KAMERA DENGAN GEMINI AI (IMAGE-TO-IMAGE)
+  const handleEnhanceWithAI = async () => {
+    if (!geminiKey) return showToast('Harap masukkan API Key Gemini di tab Pengaturan!', 'error');
+    if (!newProduct.gambar || !newProduct.gambar.startsWith('data:image')) return showToast('Silakan ambil foto dari kamera terlebih dahulu!', 'error');
+    
+    setIsProcessing(true);
+    showToast('AI sedang membersihkan dan merapikan foto Anda...', 'success');
+    try {
+      const base64Data = newProduct.gambar.split(',')[1];
+      const mimeType = newProduct.gambar.split(';')[0].split(':')[1];
+      
+      const payload = {
+        contents: [{
+          parts: [
+            { text: "Clean up this product photo. Remove the background and replace it with a pure white background. Improve lighting, sharpness, and colors to make it look like a high-quality professional commercial studio product shot." },
+            { inlineData: { mimeType: mimeType, data: base64Data } }
+          ]
+        }],
+        generationConfig: { responseModalities: ['IMAGE'] }
+      };
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${geminiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      
+      const data = await res.json();
+      const outputBase64 = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+      
+      if (outputBase64) {
+        setNewProduct(prev => ({ ...prev, gambar: `data:image/jpeg;base64,${outputBase64}` }));
+        showToast('Foto berhasil dirapikan oleh AI!', 'success');
+      } else {
+        showToast('Gagal merapikan gambar. Coba lagi atau periksa API Key Anda.', 'error');
+      }
+    } catch (err) {
+      showToast('Koneksi ke Gemini gagal. Periksa jaringan Anda.', 'error');
+    }
+    setIsProcessing(false);
+  };
+
+  // FITUR BARU: DOWNLOAD FOTO HASIL AI AGAR BISA DIUPLOAD KE G-DRIVE
+  const handleDownloadPreviewImage = () => {
+    if (!newProduct.gambar || !newProduct.gambar.startsWith('data:image')) return;
+    const link = document.createElement('a');
+    link.href = newProduct.gambar;
+    link.download = `Foto_${newProduct.nama || 'Produk'}_AI.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('Gambar didownload! Silakan upload ke G-Drive Anda.', 'success');
+  };
+
   const handleUploadProductImage = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 524288) return showToast('Ukuran gambar terlalu besar. Maksimal 500KB.', 'error');
+      if (file.size > 2097152) return showToast('Ukuran gambar terlalu besar. Maksimal 2MB.', 'error');
       const reader = new FileReader();
       reader.onloadend = () => {
         setNewProduct(prev => ({ ...prev, gambar: reader.result }));
-        showToast('Foto berhasil ditambahkan!', 'success');
+        showToast('Foto berhasil ditambahkan! Silakan klik "Rapihkan dgn AI".', 'success');
       };
       reader.readAsDataURL(file);
     }
@@ -604,7 +656,6 @@ function MainApp() {
     setIsProcessing(true);
     setSettings(settings);
     
-    // Save API Key locally
     try { localStorage.setItem('tokojujur_gemini_key', geminiKey); } catch(e){}
 
     const { error } = await supabaseClient.from('pengaturan').update({
@@ -629,7 +680,6 @@ function MainApp() {
     window.scrollTo({ top: 0, behavior: 'smooth' }); 
   };
 
-  // ADD PRODUCT DENGAN PENGAMAN KOLOM GAMBAR
   const handleAddProduct = async (e) => {
     e.preventDefault();
     if (!supabaseClient) return showToast('Database belum terhubung', 'error');
@@ -654,7 +704,6 @@ function MainApp() {
       gambar: newProduct.gambar || null
     };
     
-    // OPTIMISTIC UI
     if (editingId) setProducts(p => p.map(item => item.id === editingId ? { ...item, ...tempProd } : item));
     else setProducts(p => [...p, { ...tempProd, id: targetId, tanggal_dibuat: new Date().toISOString() }]);
 
@@ -663,11 +712,9 @@ function MainApp() {
     setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '', gambar: '' });
     setUseDiskon(false);
     
-    // BACKGROUND SYNC DENGAN PENGAMAN (JIKA USER BELUM BIKIN KOLOM GAMBAR DI SUPABASE)
     if (editingId) {
       let { error } = await supabaseClient.from('produk').update(tempProd).eq('id', editingId);
       if (error && error.message.includes('gambar')) {
-        // Fallback jika kolom gambar tidak ada di DB
         const { gambar, ...prodNoImg } = tempProd;
         const res = await supabaseClient.from('produk').update(prodNoImg).eq('id', editingId);
         error = res.error;
@@ -1039,7 +1086,7 @@ function MainApp() {
         </div>
       )}
 
-      {/* VIEW: CHECKOUT (LANGSUNG SELESAI TANPA PILIH PEMBAYARAN) */}
+      {/* VIEW: CHECKOUT */}
       {view === 'checkout' && (
         <div className="max-w-md mx-auto p-6 min-h-screen flex flex-col pb-32">
           <button onClick={() => setView('toko')} className="flex items-center gap-2 font-black mb-6 text-slate-400 hover:text-slate-600 transition"><ArrowLeft/> Kembali Belanja</button>
@@ -1086,7 +1133,7 @@ function MainApp() {
         </div>
       )}
 
-      {/* VIEW: STRUK (MODERN + SHARE/PRINT) */}
+      {/* VIEW: STRUK */}
       {view === 'struk' && (
         <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-4 pb-10">
           <div className="mb-6 flex flex-col items-center animate-slide-up">
@@ -1135,9 +1182,8 @@ function MainApp() {
 
             <div className="bg-emerald-50 p-6 text-center border-t border-emerald-100 border-dashed">
                <p className="text-[10px] text-emerald-600 uppercase font-black tracking-widest mb-3">Selesaikan Pembayaran Sekarang</p>
-               <h3 className="font-black text-sm text-emerald-900 tracking-tight leading-tight mb-4">Silahkan bayar dengan scan QRIS atau Transfer ke rekening di bawah ini.</h3>
+               <h3 className="font-black text-sm text-emerald-900 tracking-tight leading-tight mb-4">Silakan bayar dengan scan QRIS atau Transfer ke rekening di bawah ini.</h3>
                
-               {/* MUNCULKAN QRIS DAN REKENING DI STRUK */}
                <div className="flex flex-col gap-4">
                  {settings.qris_url && (
                    <div className="bg-white p-4 rounded-2xl border shadow-sm flex flex-col items-center">
@@ -1218,7 +1264,7 @@ function MainApp() {
         const totalKeuntunganBersih = filteredTransactions.reduce((sum, t) => sum + (t.profit || 0), 0);
         const totalModalTerjual = filteredTransactions.reduce((sum, t) => sum + (t.modal || 0), 0);
 
-        // FILTER BARANG INPUT (BERDASARKAN TANGGAL)
+        // FILTER BARANG INPUT
         const filteredProductsInput = products.filter(p => {
           if (!filterStart && !filterEnd) return true;
           const pDate = new Date(p.tanggal_dibuat || new Date());
@@ -1228,12 +1274,11 @@ function MainApp() {
           return pDate >= sDate && pDate <= eDate;
         });
 
-        // KALKULASI REKAP INPUT BARANG
         const totalBarangInput = filteredProductsInput.reduce((sum, p) => sum + (p.stok || 0), 0);
         const totalModalInput = filteredProductsInput.reduce((sum, p) => sum + ((p.modal || 0) * (p.stok || 0)), 0);
         const potensiKeuntungan = filteredProductsInput.reduce((sum, p) => sum + (((p.jual || 0) - (p.modal || 0)) * (p.stok || 0)), 0);
 
-        // LOGIKA PERINGKAT BARANG & REKAP KESELURUHAN
+        // LOGIKA PERINGKAT BARANG & REKAP
         const itemSalesMap = {};
         filteredTransactions.forEach(t => {
           t.items.forEach(item => {
@@ -1298,7 +1343,7 @@ function MainApp() {
             
             <main className="flex-1 p-4 md:p-10 overflow-y-auto">
                
-               {/* TAB: PENGATURAN (API GEMINI ADA DI SINI) */}
+               {/* TAB: PENGATURAN */}
                {adminTab === 'pengaturan' && (
                  <div className="max-w-3xl animate-fade-in mx-auto md:mx-0">
                     <h1 className="text-3xl font-black tracking-tighter text-slate-800 mb-8">Konfigurasi Toko</h1>
@@ -1311,6 +1356,7 @@ function MainApp() {
 
                        <hr className="border-slate-100"/>
                        
+                       {/* FITUR BARU: UPLOAD & DOWNLOAD QRIS */}
                        <div className="space-y-3">
                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><QrCode size={14}/> Foto QRIS Pembayaran</label>
                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 bg-slate-50 border border-slate-200 p-6 rounded-[32px]">
@@ -1579,6 +1625,7 @@ function MainApp() {
                       </div>
                     </div>
 
+                    {/* CARD SUMMARY DATA BARANG */}
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                         <div className="bg-white p-6 rounded-[32px] shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center">
                           <span className="text-slate-400 text-[10px] font-black uppercase tracking-widest mb-1">Total Produk</span>
@@ -1606,7 +1653,7 @@ function MainApp() {
                            </h3>
                          </div>
                          
-                         {/* FITUR BARU: GAMBAR ASLI DARI GEMINI & UPLOAD KAMERA */}
+                         {/* FITUR BARU: GAMBAR ASLI DARI GEMINI, UPLOAD KAMERA & LINK GOOGLE DRIVE */}
                          <div className="md:col-span-4 flex flex-col md:flex-row gap-6 bg-slate-50 p-6 rounded-3xl border border-slate-200 mb-2">
                            <div className="w-full md:w-32 h-32 bg-white rounded-2xl border-2 border-dashed border-emerald-300 flex items-center justify-center shrink-0 overflow-hidden shadow-sm relative">
                              {newProduct.gambar ? (
@@ -1617,15 +1664,43 @@ function MainApp() {
                            </div>
                            <div className="flex-1 space-y-3">
                              <p className="text-[10px] font-black uppercase text-slate-500 tracking-widest">Gambar / Foto Barang Asli (Opsional)</p>
-                             <div className="flex flex-wrap gap-2">
-                               <button type="button" onClick={handleGenerateGeminiImage} disabled={isProcessing} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-3 rounded-xl font-bold text-xs flex items-center gap-2 shadow-md transition-all active:scale-95 disabled:opacity-50">
-                                 <Sparkles size={16}/> Buat Gambar AI
-                               </button>
-                               <label className="bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-4 py-3 rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm transition-all active:scale-95 cursor-pointer">
-                                 <Camera size={16}/> Ambil / Upload Foto
-                                 <input type="file" accept="image/*" className="hidden" onChange={handleUploadProductImage} />
-                               </label>
+                             
+                             <div className="flex flex-col gap-3">
+                               <div className="flex flex-wrap gap-2">
+                                 <button type="button" onClick={handleGenerateGeminiImage} disabled={isProcessing} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white px-4 py-3 rounded-xl font-bold text-xs flex items-center gap-2 shadow-md transition-all active:scale-95 disabled:opacity-50">
+                                   <Sparkles size={16}/> Buat Gambar AI
+                                 </button>
+                                 <label className="bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-4 py-3 rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm transition-all active:scale-95 cursor-pointer">
+                                   <Camera size={16}/> Ambil / Upload Foto
+                                   <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleUploadProductImage} />
+                                 </label>
+                                 {newProduct.gambar && newProduct.gambar.startsWith('data:image') && (
+                                   <>
+                                     <button type="button" onClick={handleEnhanceWithAI} disabled={isProcessing} className="bg-emerald-100 text-emerald-700 hover:bg-emerald-200 px-4 py-3 rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm transition-all active:scale-95 disabled:opacity-50">
+                                       <Wand2 size={16}/> Rapihkan dgn AI
+                                     </button>
+                                     <button type="button" onClick={handleDownloadPreviewImage} disabled={isProcessing} className="bg-slate-800 text-white hover:bg-slate-700 px-4 py-3 rounded-xl font-bold text-xs flex items-center gap-2 shadow-sm transition-all active:scale-95 disabled:opacity-50">
+                                       <Download size={16}/> Download ke HP
+                                     </button>
+                                   </>
+                                 )}
+                               </div>
+                               
+                               <div className="flex items-center gap-3">
+                                 <div className="h-[1px] bg-slate-300 flex-1"></div>
+                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ATAU PASTE LINK GOOGLE DRIVE</span>
+                                 <div className="h-[1px] bg-slate-300 flex-1"></div>
+                               </div>
+                               
+                               <input 
+                                 type="text" 
+                                 placeholder="Paste Link Gambar / Google Drive disini..." 
+                                 value={newProduct.gambar || ''} 
+                                 onChange={e => setNewProduct({...newProduct, gambar: e.target.value})} 
+                                 className="w-full bg-white border border-slate-300 rounded-xl px-4 py-3 text-xs focus:ring-2 focus:ring-emerald-500 outline-none font-semibold text-slate-700 shadow-sm"
+                               />
                              </div>
+
                              <p className="text-xs text-slate-400 italic">PENTING: Agar gambar tersimpan di server, Anda wajib menambahkan kolom <strong>gambar</strong> dengan tipe <strong>text</strong> pada tabel <strong>produk</strong> di Supabase Anda.</p>
                            </div>
                          </div>
