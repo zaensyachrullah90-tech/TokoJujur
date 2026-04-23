@@ -38,7 +38,6 @@ const formatRupiah = (angka) => {
 const formatImageUrl = (url) => {
   if (!url) return '';
   if (url.startsWith('data:image') || url.startsWith('blob:')) return url; 
-  // Perbaikan parser Google Drive agar stabil baca file asli
   const driveMatch = url.match(/(?:file\/d\/|id=)([a-zA-Z0-9_-]+)/);
   if (driveMatch && driveMatch[1]) return `https://drive.google.com/thumbnail?id=${driveMatch[1]}&sz=w800`;
   if (url.includes('github.com') && url.includes('/blob/')) return url.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/');
@@ -115,7 +114,6 @@ function MainApp() {
     try { return localStorage.getItem('tokojujur_gemini_key') || ''; } catch(e) { return ''; }
   });
   
-  // KERANJANG TERSIMPAN DI LOKAL HP MASING-MASING
   const [cart, setCart] = useState(() => {
     try {
       const savedCart = localStorage.getItem('tokojujur_cart');
@@ -154,10 +152,9 @@ function MainApp() {
 
   const showToast = (msg, type = 'success') => {
     setToast({ show: true, msg: String(msg), type });
-    setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 4000); 
+    setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 5000); 
   };
 
-  // SYSTEM PWA & NOTIFIKASI
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') Notification.requestPermission();
@@ -167,15 +164,17 @@ function MainApp() {
     }
   }, []);
 
-  // Menyimpan Cache Lokal (Persistent State)
   useEffect(() => { try { localStorage.setItem('tokojujur_view', view); } catch(e){} }, [view]);
   useEffect(() => { try { localStorage.setItem('tokojujur_admintab', adminTab); } catch(e){} }, [adminTab]);
   useEffect(() => { try { localStorage.setItem('tokojujur_cart', JSON.stringify(cart)); } catch(e){} }, [cart]);
   useEffect(() => { try { localStorage.setItem('tokojujur_gemini_key', geminiKey); } catch(e){} }, [geminiKey]);
 
-  // INISIALISASI SUPABASE (DENGAN FALLBACK FORM)
+  // INISIALISASI SUPABASE (DIPERBAIKI)
   useEffect(() => {
+    let isMounted = true;
+    
     const initSupabase = () => {
+      if (!isMounted) return;
       try {
         const env = typeof import.meta !== 'undefined' ? import.meta.env : {};
         const url = env.VITE_SUPABASE_URL || localStorage.getItem('tokojujur_sb_url') || '';
@@ -188,6 +187,7 @@ function MainApp() {
           setIsConnected(false);
         }
       } catch(e) {
+        console.error("Supabase Init Error:", e);
         setIsConnected(false);
       }
       setDbReady(true);
@@ -197,28 +197,40 @@ function MainApp() {
       const script = document.createElement('script');
       script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
       script.onload = initSupabase;
+      script.onerror = () => { if(isMounted) { setIsConnected(false); setDbReady(true); } };
       document.head.appendChild(script);
     } else {
       initSupabase();
     }
+    
+    return () => { isMounted = false; };
   }, []);
 
-  // REALTIME INSTAN & SINKRONISASI
+  // REALTIME INSTAN & SINKRONISASI (DIPERBAIKI DENGAN ERROR LOGGING)
   useEffect(() => {
     if (!dbReady || !isConnected || !supabaseClient) return;
     
     const loadInitialData = async () => {
       setIsLoadingDB(true);
-      const [prodRes, trxRes, setRes] = await Promise.all([
-        supabaseClient.from('produk').select('*').order('id', { ascending: true }),
-        supabaseClient.from('transaksi').select('*').order('id', { ascending: false }),
-        supabaseClient.from('pengaturan').select('*').eq('id', 1).single()
-      ]);
-      
-      if (prodRes.data) setProducts(prodRes.data);
-      if (trxRes.data) setTransactions(trxRes.data);
-      if (setRes.data) setSettings(setRes.data);
-      setIsLoadingDB(false);
+      try {
+        const [prodRes, trxRes, setRes] = await Promise.all([
+          supabaseClient.from('produk').select('*').order('id', { ascending: true }),
+          supabaseClient.from('transaksi').select('*').order('id', { ascending: false }),
+          supabaseClient.from('pengaturan').select('*').eq('id', 1).single()
+        ]);
+        
+        // Peringatan otomatis jika tabel RLS bermasalah
+        if (prodRes.error) showToast(`Gagal muat barang: ${prodRes.error.message}`, 'error');
+        if (trxRes.error) showToast(`Gagal muat transaksi: ${trxRes.error.message}`, 'error');
+        
+        if (prodRes.data) setProducts(prodRes.data);
+        if (trxRes.data) setTransactions(trxRes.data);
+        if (setRes.data) setSettings(setRes.data);
+      } catch (err) {
+         showToast(`Terjadi masalah fetching database: ${err.message}`, 'error');
+      } finally {
+         setIsLoadingDB(false);
+      }
     };
     loadInitialData();
 
@@ -250,7 +262,9 @@ function MainApp() {
       .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'pengaturan' }, (payload) => {
         setSettings(payload.new);
       })
-      .subscribe();
+      .subscribe((status) => {
+        if (status === 'CHANNEL_ERROR') showToast('Peringatan: Realtime Channel gagal tersambung. Refresh halaman.', 'error');
+      });
       
     return () => { supabaseClient.removeChannel(channel); }
   }, [dbReady, isConnected]);
@@ -353,7 +367,6 @@ function MainApp() {
     return () => clearInterval(interval);
   }, [isScanningModalOpen, scanTarget, products]);
 
-  // AI & IMAGE PROCESSING
   const handleGenerateGeminiImage = async () => {
     if (!geminiKey) return showToast('Harap masukkan API Key Gemini di tab Pengaturan!', 'error');
     if (!newProduct.nama) return showToast('Isi nama barang terlebih dahulu!', 'error');
@@ -435,7 +448,6 @@ function MainApp() {
     }
   };
 
-  // LOGIKA KERANJANG
   const openProductModal = (product) => {
     setSelectedProduct(product);
     setTempQty(cart[product.id] || 0);
@@ -489,7 +501,7 @@ function MainApp() {
 
   const jumlahItem = Object.values(cart).reduce((a, b) => a + b, 0);
 
-  // TRANSAKSI SEKEJAP MATA - LANGSUNG STRUK
+  // TRANSAKSI SEKEJAP MATA
   const handleSelesaiBayar = async () => {
     if (!supabaseClient) return showToast('Koneksi Database Terputus!', 'error');
     setIsProcessing(true);
@@ -634,6 +646,7 @@ function MainApp() {
     window.scrollTo({ top: 0, behavior: 'smooth' }); 
   };
 
+  // DIPERBAIKI: Mengatasi Limitasi Integer SQL yang menolak Date.now() 
   const handleAddProduct = async (e) => {
     e.preventDefault();
     if (!supabaseClient) return showToast('Database belum terhubung', 'error');
@@ -651,7 +664,10 @@ function MainApp() {
     let disc = null;
     if (useDiskon) disc = { min_qty: parseInt(newProduct.diskonQty) || 1, harga_total: parseInt(newProduct.diskonHarga) || 0 };
     
-    const targetId = editingId ? editingId : Date.now();
+    // Perbaikan ID: Memotong panjang milidetik ke Unix Timestamp standard agar aman di database int4/integer biasa.
+    const safeGeneratedId = Math.floor(Date.now() / 1000); 
+    const targetId = editingId ? editingId : safeGeneratedId;
+    
     const tempProd = { 
       nama: newProduct.nama, barcode: newProduct.barcode, modal: newProduct.modal||0, 
       jual: newProduct.jual||0, stok: newProduct.stok||0, diskon: disc,
@@ -674,7 +690,7 @@ function MainApp() {
         error = res.error;
         if (!error) showToast('Data diupdate. (Gambar diabaikan karena kolom "gambar" blm ada di DB)', 'error');
       } else if (error) {
-        showToast(`Gagal Edit Server: ${error.message}`, 'error');
+        showToast(`Gagal Edit Server: ${error.message}. Kemungkinan tipe data kolom salah.`, 'error');
       } else {
         showToast('Berhasil update server!', 'success');
       }
@@ -686,7 +702,7 @@ function MainApp() {
         error = res.error;
         if (!error) showToast('Barang tersimpan. (Gambar diabaikan karena kolom "gambar" blm ada di DB)', 'error');
       } else if (error) {
-        showToast(`Gagal Tambah Server: ${error.message}`, 'error');
+        showToast(`Gagal Tambah Server: ${error.message}. Pastikan tipe data kolom id adalah int8/bigint.`, 'error');
       } else {
         showToast('Berhasil simpan ke server!', 'success');
       }
