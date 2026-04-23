@@ -4,7 +4,7 @@ import {
   CheckCircle, Settings, BarChart3, PlusCircle, 
   Store, QrCode, CreditCard, ChevronRight, ArrowLeft,
   Search, X, Lock, LogOut, TrendingUp, Edit, Trash2, List, TrendingDown,
-  Camera, Download, Power, UploadCloud, AlertTriangle, Copy, Barcode, Share2, Sparkles, Image as ImageIcon, Wand2, ExternalLink, RefreshCw
+  Camera, Download, Power, UploadCloud, AlertTriangle, Copy, Barcode, Share2, ArrowUpDown, Sparkles, Image as ImageIcon, Wand2, ExternalLink, RefreshCw
 } from 'lucide-react';
 
 // =========================================================================
@@ -45,7 +45,7 @@ const formatImageUrl = (url) => {
 };
 
 // =========================================================================
-// IKON REALISTIS (3D EMOJI SHADOW) - FALLBACK JIKA GAMBAR G-DRIVE RUSAK/KOSONG
+// IKON REALISTIS (3D EMOJI SHADOW)
 // =========================================================================
 const getDynamicIcon = (namaBarang) => {
   const name = (namaBarang || '').toLowerCase();
@@ -54,7 +54,6 @@ const getDynamicIcon = (namaBarang) => {
     <span className="text-5xl md:text-6xl drop-shadow-md transition-transform transform hover:scale-110 will-change-transform">{emoji}</span>
   );
 
-  // Snack & Jajanan
   if (name.match(/kacang|peanut|sukro|garuda|dua kelinci|pilus|koro|atom/)) return iconWrapper('🥜');
   if (name.match(/wafer|tango|nabati|beng|biskuat|nissin|biskuit|oreo|malkist|roma|gery/)) return iconWrapper('🧇');
   if (name.match(/coklat|chocolate|silverqueen|choki|delfi|milo|cadbury|beng-beng|chocolatos/)) return iconWrapper('🍫');
@@ -62,7 +61,6 @@ const getDynamicIcon = (namaBarang) => {
   if (name.match(/snack|ciki|chiki|keripik|taro|lays|citato|chitato|qtela|piattos|potabee|cheetos|kusuka|jetz/)) return iconWrapper('🍟');
   if (name.match(/es|ice|krim|campina|walls|aice|cornetto|magnum|joyday/)) return iconWrapper('🍦');
 
-  // Makanan Berat & Mie
   if (name.match(/bakso|pentol|cilok|tahu|soto|kuah|seblak|baso|cuanki/)) return iconWrapper('🍲');
   if (name.match(/mie|indomie|sedap|noodle|samyang|pop mie|sarimi|supermi|lemonilo|gelas/)) return iconWrapper('🍜');
   if (name.match(/nasi|makan|lontong|geprek|pecel|ayam|gorengan|penyet|lele/)) return iconWrapper('🍛');
@@ -70,12 +68,10 @@ const getDynamicIcon = (namaBarang) => {
   if (name.match(/daging|sapi|kambing|sosis|nugget|kornet|bakar/)) return iconWrapper('🥩');
   if (name.match(/ikan|lele|nila|udang|seafood|sarden|tuna|teri/)) return iconWrapper('🐟');
 
-  // Minuman
   if (name.match(/kopi|teh|panas|good day|kapal api|nescafe|luwak|pucuk|javana|kotak/)) return iconWrapper('☕');
   if (name.match(/air|mineral|aqua|le minerale|cleo|vit|nestle|ades|pristine|club/)) return iconWrapper('💧');
   if (name.match(/minum|coca|susu|jus|sirup|sprite|fanta|soda|nutrisari|floridina|bear brand|yakult|mizone|pocari/)) return iconWrapper('🥤');
 
-  // Kebutuhan Harian
   if (name.match(/obat|panadol|paramex|bodrex|tolak|vitamin|promag|mixagrip|diapet|antangin/)) return iconWrapper('💊');
   if (name.match(/sabun|shampo|rinso|sunlight|cuci|odol|pasta gigi|deterjen|pepsodent|biore|lifebuoy|soklin|daia/)) return iconWrapper('🧼');
   if (name.match(/rokok|korek|mancis|sampoerna|djarum|gudang|surya|magnum|esse|marlboro|camel/)) return iconWrapper('🚬');
@@ -118,6 +114,7 @@ function MainApp() {
     try { return localStorage.getItem('tokojujur_gemini_key') || ''; } catch(e) { return ''; }
   });
   
+  // Fitur Keranjang Tersimpan di HP
   const [cart, setCart] = useState(() => {
     try {
       if (typeof window !== 'undefined') {
@@ -173,13 +170,13 @@ function MainApp() {
     }
   }, []);
 
-  // Menyimpan Cache Lokal
+  // Menyimpan Cache Lokal (Optimalisasi Low End)
   useEffect(() => { try { localStorage.setItem('tokojujur_view', view); } catch(e){} }, [view]);
   useEffect(() => { try { localStorage.setItem('tokojujur_admintab', adminTab); } catch(e){} }, [adminTab]);
   useEffect(() => { try { localStorage.setItem('tokojujur_cart', JSON.stringify(cart)); } catch(e){} }, [cart]);
   useEffect(() => { try { localStorage.setItem('tokojujur_gemini_key', geminiKey); } catch(e){} }, [geminiKey]);
 
-  // INISIALISASI SUPABASE KLIEN
+  // INISIALISASI SUPABASE KLIEN (KONEKSI SERVER)
   useEffect(() => {
     const initSupabase = () => {
       try {
@@ -203,7 +200,7 @@ function MainApp() {
     }
   }, []);
 
-  // REALTIME INSTAN & SINKRONISASI
+  // REALTIME INSTAN & SINKRONISASI SUPABASE
   useEffect(() => {
     if (!dbReady) return;
     if (!supabaseClient) { setIsLoadingDB(false); return; }
@@ -215,6 +212,8 @@ function MainApp() {
         supabaseClient.from('transaksi').select('*').order('id', { ascending: false }),
         supabaseClient.from('pengaturan').select('*').eq('id', 1).single()
       ]);
+      
+      // Jika berhasil ambil data dari server, gunakan data tersebut
       if (prodRes.data) setProducts(prodRes.data);
       if (trxRes.data) setTransactions(trxRes.data);
       if (setRes.data) setSettings(setRes.data);
@@ -222,6 +221,7 @@ function MainApp() {
     };
     loadInitialData();
 
+    // Berlangganan ke perubahan server secara sekejap mata
     const channel = supabaseClient.channel('toko-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'produk' }, (payload) => {
         setProducts(prev => {
@@ -255,6 +255,7 @@ function MainApp() {
     return () => { supabaseClient.removeChannel(channel); }
   }, [dbReady]);
 
+  // FUNGSI BANTUAN
   const handleCopyRekening = () => {
     const amanRekening = settings.rekening || '';
     const matchAngka = amanRekening.match(/\d+/);
@@ -354,9 +355,7 @@ function MainApp() {
     return () => clearInterval(interval);
   }, [isScanningModalOpen, scanTarget, products]);
 
-  // =========================================================================
-  // API GEMINI (AI IMAGE EDITING & GENERATING)
-  // =========================================================================
+  // AI & IMAGE PROCESSING
   const handleGenerateGeminiImage = async () => {
     if (!geminiKey) return showToast('Harap masukkan API Key Gemini di tab Pengaturan!', 'error');
     if (!newProduct.nama) return showToast('Isi nama barang terlebih dahulu!', 'error');
@@ -482,7 +481,7 @@ function MainApp() {
 
   const jumlahItem = Object.values(cart).reduce((a, b) => a + b, 0);
 
-  // TRANSAKSI SEKEJAP MATA
+  // TRANSAKSI SEKEJAP MATA (LANGSUNG STRUK, TANPA HALAMAN METODE)
   const handleSelesaiBayar = async () => {
     if (!supabaseClient) return showToast('Koneksi Database Terputus!', 'error');
     setIsProcessing(true);
@@ -505,7 +504,7 @@ function MainApp() {
       total: totalBelanja, 
       modal: totalModal, 
       profit: totalBelanja - totalModal, 
-      metode: 'QRIS / Transfer'
+      metode: 'QRIS / Kasir Etalase' // Sesuai permintaan di poin 5
     };
 
     setTransactions(prev => [newTransaction, ...prev]);
@@ -938,7 +937,7 @@ function MainApp() {
         </div>
       )}
 
-      {/* VIEW: TOKO (MOBILE FIRST) */}
+      {/* VIEW: TOKO (MOBILE FIRST & OPTIMALISASI KARTU PRODUK) */}
       {view === 'toko' && (
         <div className="pb-28">
           <header className="bg-white p-4 shadow-sm sticky top-0 z-40 mb-4">
@@ -981,7 +980,7 @@ function MainApp() {
               <div key={p.id} onClick={() => openProductModal(p)} className="bg-white p-3 md:p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center text-center relative active:scale-95 transition-transform cursor-pointer border-b-4 border-b-slate-100 overflow-hidden w-full">
                 {cart[p.id] > 0 && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] md:text-xs font-black px-2 md:px-3 py-1 rounded-bl-xl shadow-lg z-20">{cart[p.id]}</div>}
                 
-                {/* FALLBACK GAMBAR CERDAS DENGAN UKURAN RAKSASA */}
+                {/* GAMBAR PRODUK RAKSASA DENGAN FALLBACK EMOJI */}
                 <div className="mb-3 md:mb-4 w-32 h-32 md:w-48 md:h-48 rounded-2xl border border-slate-100 shadow-inner relative overflow-hidden bg-slate-50 shrink-0">
                   <div className="absolute inset-0 flex items-center justify-center z-0">
                     {getDynamicIcon(p.nama)}
@@ -990,7 +989,7 @@ function MainApp() {
                     <img 
                       loading="lazy" 
                       src={formatImageUrl(p.gambar)} 
-                      className="absolute inset-0 w-full h-full object-cover z-10 bg-white" 
+                      className="absolute inset-0 w-full h-full object-cover z-10 bg-white will-change-transform" 
                       alt={p.nama}
                       onError={(e) => { e.target.style.display = 'none'; }}
                     />
@@ -1000,8 +999,9 @@ function MainApp() {
                 <h3 className="font-bold text-xs md:text-sm mb-1 line-clamp-2 h-8 md:h-10 w-full text-slate-700 leading-tight">{p.nama}</h3>
                 <p className="text-emerald-600 font-black mb-2 text-sm md:text-lg w-full truncate">{formatRupiah(p.jual)}</p>
                 
+                {/* STOK ANTI TERPOTONG KE BAWAH */}
                 <div className="mt-auto w-full flex justify-center">
-                  <div className={`text-[9px] md:text-[10px] font-black px-2 py-0.5 rounded-md truncate max-w-[95%] ${(p.stok||0) > 5 ? 'bg-blue-50 text-blue-500' : 'bg-rose-50 text-rose-500'}`}>
+                  <div className={`text-[9px] md:text-[10px] font-black px-2 py-0.5 rounded-md truncate max-w-full ${(p.stok||0) > 5 ? 'bg-blue-50 text-blue-500' : 'bg-rose-50 text-rose-500'}`}>
                     Sisa: {p.stok || 0}
                   </div>
                 </div>
@@ -1015,7 +1015,6 @@ function MainApp() {
               <div className="bg-white w-full max-w-md rounded-3xl p-6 md:p-8 shadow-2xl animate-slide-up border-4 border-white flex flex-col">
                 <div className="flex justify-between items-start mb-6">
                    <div className="flex items-center gap-4 w-[85%]">
-                     {/* GAMBAR MODAL UKURAN LEBIH BESAR */}
                      <div className="w-24 h-24 md:w-32 md:h-32 bg-slate-50 rounded-2xl shadow-inner overflow-hidden border shrink-0 relative flex items-center justify-center">
                        <div className="absolute inset-0 flex items-center justify-center z-0 scale-75">{getDynamicIcon(selectedProduct.nama)}</div>
                        {selectedProduct.gambar && (
@@ -1077,7 +1076,6 @@ function MainApp() {
                 return (
                   <div key={id} className="flex justify-between items-center border-b border-slate-50 pb-4 last:border-0 last:pb-0">
                     <div className="flex items-center gap-3 w-[60%]">
-                      {/* GAMBAR KERANJANG FALLBACK */}
                       <div className="w-16 h-16 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 text-2xl overflow-hidden shrink-0 relative">
                         <div className="absolute inset-0 flex items-center justify-center z-0 scale-75">{getDynamicIcon(p.nama)}</div>
                         {p.gambar && <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.display = 'none'; }}/>}
@@ -1249,6 +1247,7 @@ function MainApp() {
         const totalModalInput = filteredProductsInput.reduce((sum, p) => sum + ((p.modal || 0) * (p.stok || 0)), 0);
         const potensiKeuntungan = filteredProductsInput.reduce((sum, p) => sum + (((p.jual || 0) - (p.modal || 0)) * (p.stok || 0)), 0);
 
+        // LOGIKA PERINGKAT BARANG
         const itemSalesMap = {};
         filteredTransactions.forEach(t => {
           t.items.forEach(item => {
@@ -1281,6 +1280,7 @@ function MainApp() {
         return (
           <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row relative">
             
+            {/* MENU ADMIN SIMETRIS GRID 4 KOTAK DI HP */}
             <aside className="bg-slate-950 text-white w-full md:w-64 flex-shrink-0 flex flex-col shadow-2xl sticky top-0 z-40 md:h-screen">
               <div className="hidden md:flex p-6 items-center gap-3 border-b border-slate-800 flex-shrink-0">
                  <Store className="text-emerald-400 shrink-0" size={28} />
