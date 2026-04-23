@@ -4,7 +4,7 @@ import {
   CheckCircle, Settings, BarChart3, PlusCircle, 
   Store, QrCode, CreditCard, ChevronRight, ArrowLeft,
   Search, X, Lock, LogOut, TrendingUp, Edit, Trash2, List, TrendingDown,
-  Camera, Download, Power, UploadCloud, AlertTriangle, Copy, Barcode, Share2, ArrowUpDown, Sparkles, Image as ImageIcon, Wand2, ExternalLink, RefreshCw
+  Camera, Download, Power, UploadCloud, AlertTriangle, Copy, Barcode, Share2, Sparkles, Image as ImageIcon, Wand2, ExternalLink, ShoppingCart
 } from 'lucide-react';
 
 // =========================================================================
@@ -38,6 +38,7 @@ const formatRupiah = (angka) => {
 const formatImageUrl = (url) => {
   if (!url) return '';
   if (url.startsWith('data:image') || url.startsWith('blob:')) return url; 
+  // Perbaikan parser Google Drive agar lebih stabil membaca file
   const driveMatch = url.match(/(?:file\/d\/|id=)([a-zA-Z0-9_-]+)/);
   if (driveMatch && driveMatch[1]) return `https://drive.google.com/thumbnail?id=${driveMatch[1]}&sz=w800`;
   if (url.includes('github.com') && url.includes('/blob/')) return url.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/');
@@ -45,7 +46,7 @@ const formatImageUrl = (url) => {
 };
 
 // =========================================================================
-// IKON REALISTIS (3D EMOJI SHADOW)
+// IKON REALISTIS (3D EMOJI SHADOW) - FALLBACK JIKA GAMBAR G-DRIVE RUSAK/KOSONG
 // =========================================================================
 const getDynamicIcon = (namaBarang) => {
   const name = (namaBarang || '').toLowerCase();
@@ -54,6 +55,7 @@ const getDynamicIcon = (namaBarang) => {
     <span className="text-5xl md:text-6xl drop-shadow-md transition-transform transform hover:scale-110 will-change-transform">{emoji}</span>
   );
 
+  // Snack & Jajanan
   if (name.match(/kacang|peanut|sukro|garuda|dua kelinci|pilus|koro|atom/)) return iconWrapper('🥜');
   if (name.match(/wafer|tango|nabati|beng|biskuat|nissin|biskuit|oreo|malkist|roma|gery/)) return iconWrapper('🧇');
   if (name.match(/coklat|chocolate|silverqueen|choki|delfi|milo|cadbury|beng-beng|chocolatos/)) return iconWrapper('🍫');
@@ -61,6 +63,7 @@ const getDynamicIcon = (namaBarang) => {
   if (name.match(/snack|ciki|chiki|keripik|taro|lays|citato|chitato|qtela|piattos|potabee|cheetos|kusuka|jetz/)) return iconWrapper('🍟');
   if (name.match(/es|ice|krim|campina|walls|aice|cornetto|magnum|joyday/)) return iconWrapper('🍦');
 
+  // Makanan Berat & Mie
   if (name.match(/bakso|pentol|cilok|tahu|soto|kuah|seblak|baso|cuanki/)) return iconWrapper('🍲');
   if (name.match(/mie|indomie|sedap|noodle|samyang|pop mie|sarimi|supermi|lemonilo|gelas/)) return iconWrapper('🍜');
   if (name.match(/nasi|makan|lontong|geprek|pecel|ayam|gorengan|penyet|lele/)) return iconWrapper('🍛');
@@ -68,10 +71,12 @@ const getDynamicIcon = (namaBarang) => {
   if (name.match(/daging|sapi|kambing|sosis|nugget|kornet|bakar/)) return iconWrapper('🥩');
   if (name.match(/ikan|lele|nila|udang|seafood|sarden|tuna|teri/)) return iconWrapper('🐟');
 
+  // Minuman
   if (name.match(/kopi|teh|panas|good day|kapal api|nescafe|luwak|pucuk|javana|kotak/)) return iconWrapper('☕');
   if (name.match(/air|mineral|aqua|le minerale|cleo|vit|nestle|ades|pristine|club/)) return iconWrapper('💧');
   if (name.match(/minum|coca|susu|jus|sirup|sprite|fanta|soda|nutrisari|floridina|bear brand|yakult|mizone|pocari/)) return iconWrapper('🥤');
 
+  // Kebutuhan Harian
   if (name.match(/obat|panadol|paramex|bodrex|tolak|vitamin|promag|mixagrip|diapet|antangin/)) return iconWrapper('💊');
   if (name.match(/sabun|shampo|rinso|sunlight|cuci|odol|pasta gigi|deterjen|pepsodent|biore|lifebuoy|soklin|daia/)) return iconWrapper('🧼');
   if (name.match(/rokok|korek|mancis|sampoerna|djarum|gudang|surya|magnum|esse|marlboro|camel/)) return iconWrapper('🚬');
@@ -114,7 +119,7 @@ function MainApp() {
     try { return localStorage.getItem('tokojujur_gemini_key') || ''; } catch(e) { return ''; }
   });
   
-  // Fitur Keranjang Tersimpan di HP
+  // FITUR KERANJANG DISIMPAN DI LOKAL HP MASING-MASING
   const [cart, setCart] = useState(() => {
     try {
       if (typeof window !== 'undefined') {
@@ -170,7 +175,7 @@ function MainApp() {
     }
   }, []);
 
-  // Menyimpan Cache Lokal (Optimalisasi Low End)
+  // Menyimpan Cache Lokal (Persistent State) - KERANJANG TERSIMPAN DI HP
   useEffect(() => { try { localStorage.setItem('tokojujur_view', view); } catch(e){} }, [view]);
   useEffect(() => { try { localStorage.setItem('tokojujur_admintab', adminTab); } catch(e){} }, [adminTab]);
   useEffect(() => { try { localStorage.setItem('tokojujur_cart', JSON.stringify(cart)); } catch(e){} }, [cart]);
@@ -213,7 +218,6 @@ function MainApp() {
         supabaseClient.from('pengaturan').select('*').eq('id', 1).single()
       ]);
       
-      // Jika berhasil ambil data dari server, gunakan data tersebut
       if (prodRes.data) setProducts(prodRes.data);
       if (trxRes.data) setTransactions(trxRes.data);
       if (setRes.data) setSettings(setRes.data);
@@ -221,7 +225,6 @@ function MainApp() {
     };
     loadInitialData();
 
-    // Berlangganan ke perubahan server secara sekejap mata
     const channel = supabaseClient.channel('toko-realtime')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'produk' }, (payload) => {
         setProducts(prev => {
@@ -255,7 +258,7 @@ function MainApp() {
     return () => { supabaseClient.removeChannel(channel); }
   }, [dbReady]);
 
-  // FUNGSI BANTUAN
+  // FUNGSI COPY REKENING (ANTI CRASH)
   const handleCopyRekening = () => {
     const amanRekening = settings.rekening || '';
     const matchAngka = amanRekening.match(/\d+/);
@@ -448,8 +451,10 @@ function MainApp() {
       const newCart = { ...cart };
       delete newCart[selectedProduct.id];
       setCart(newCart);
+      showToast('Barang dihapus dari keranjang.', 'success');
     } else {
       setCart({ ...cart, [selectedProduct.id]: tempQty });
+      showToast('Barang tersimpan di keranjang!', 'success');
     }
     setSelectedProduct(null);
   };
@@ -472,6 +477,15 @@ function MainApp() {
     }
   };
 
+  // FITUR BARU: HAPUS KERANJANG
+  const handleClearCart = () => {
+    if(window.confirm('Yakin ingin mengosongkan seluruh isi keranjang Anda?')) {
+      setCart({});
+      setView('toko');
+      showToast('Keranjang berhasil dikosongkan.', 'success');
+    }
+  };
+
   const totalBelanja = useMemo(() => {
     return Object.entries(cart).reduce((total, [id, qty]) => {
       const p = products.find(prod => prod.id === parseInt(id));
@@ -481,7 +495,7 @@ function MainApp() {
 
   const jumlahItem = Object.values(cart).reduce((a, b) => a + b, 0);
 
-  // TRANSAKSI SEKEJAP MATA (LANGSUNG STRUK, TANPA HALAMAN METODE)
+  // TRANSAKSI SEKEJAP MATA - LANGSUNG STRUK
   const handleSelesaiBayar = async () => {
     if (!supabaseClient) return showToast('Koneksi Database Terputus!', 'error');
     setIsProcessing(true);
@@ -504,7 +518,7 @@ function MainApp() {
       total: totalBelanja, 
       modal: totalModal, 
       profit: totalBelanja - totalModal, 
-      metode: 'QRIS / Kasir Etalase' // Sesuai permintaan di poin 5
+      metode: 'QRIS / Kasir Etalase'
     };
 
     setTransactions(prev => [newTransaction, ...prev]);
@@ -515,7 +529,7 @@ function MainApp() {
     
     setStrukTerakhir(newTransaction);
     setView('struk');
-    setCart({}); 
+    setCart({}); // Keranjang otomatis reset setelah bayar
     setIsProcessing(false);
 
     const { error: trxError } = await supabaseClient.from('transaksi').insert([newTransaction]);
@@ -550,7 +564,6 @@ function MainApp() {
       try { window.close(); } catch (e) {}
       setTimeout(() => {
         showToast('Tutup tab/browser Anda secara manual jika jendela tidak menutup.', 'success');
-        setCart({});
         setView('toko');
         setIsAdminLogged(false);
       }, 500);
@@ -901,10 +914,10 @@ function MainApp() {
                     <div>
                       <label className="text-[10px] uppercase tracking-widest font-black text-gray-500 ml-1">Metode Pembayaran</label>
                       <select value={editingTrx.metode} onChange={e => setEditingTrx({...editingTrx, metode: e.target.value})} className="w-full p-4 mt-1 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm text-slate-700 outline-none focus:ring-4 focus:ring-emerald-500/20">
-                         <option value="QRIS / Transfer">QRIS / Transfer (Default)</option>
-                         <option value="qris">QRIS Cepat</option>
-                         <option value="transfer">Transfer Bank</option>
-                         <option value="tunai">Tunai / Cash</option>
+                         <option value="QRIS / Kasir Etalase">QRIS / Kasir Etalase</option>
+                         <option value="QRIS Cepat">QRIS Cepat</option>
+                         <option value="Transfer Bank">Transfer Bank</option>
+                         <option value="Tunai">Tunai / Cash</option>
                       </select>
                     </div>
                     <div>
@@ -944,6 +957,11 @@ function MainApp() {
             <div className="flex justify-between items-center mb-4 max-w-5xl mx-auto">
               <div className="flex items-center gap-2 text-emerald-600 font-black text-lg md:text-xl truncate max-w-[50%]"><Store className="shrink-0"/> <span className="truncate">{settings.nama_toko}</span></div>
               <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
+                {/* MENU KERANJANG DI HEADER */}
+                <button onClick={() => setView('checkout')} className="p-2 md:p-2.5 bg-orange-50 text-orange-600 rounded-full hover:bg-orange-100 transition shadow-sm relative" title="Lihat Keranjang">
+                  <ShoppingCart size={18}/>
+                  {jumlahItem > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center animate-bounce">{jumlahItem}</span>}
+                </button>
                 <button onClick={handleDownloadQRIS} className="p-2 md:p-2.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition shadow-sm" title="Download QRIS Pembayaran"><QrCode size={18}/></button>
                 <button onClick={() => setShowShareApp(true)} className="p-2 md:p-2.5 bg-emerald-50 text-emerald-600 rounded-full hover:bg-emerald-100 transition shadow-sm" title="Bagikan Link Toko (QR Code)"><Share2 size={18}/></button>
                 <button onClick={() => setView('admin')} className="p-2 md:p-2.5 bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200 transition shadow-sm" title="Masuk Mode Admin"><Lock size={18}/></button>
@@ -980,7 +998,7 @@ function MainApp() {
               <div key={p.id} onClick={() => openProductModal(p)} className="bg-white p-3 md:p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center text-center relative active:scale-95 transition-transform cursor-pointer border-b-4 border-b-slate-100 overflow-hidden w-full">
                 {cart[p.id] > 0 && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] md:text-xs font-black px-2 md:px-3 py-1 rounded-bl-xl shadow-lg z-20">{cart[p.id]}</div>}
                 
-                {/* GAMBAR PRODUK RAKSASA DENGAN FALLBACK EMOJI */}
+                {/* FALLBACK GAMBAR CERDAS DENGAN PENGHILANG ERROR VISUAL */}
                 <div className="mb-3 md:mb-4 w-32 h-32 md:w-48 md:h-48 rounded-2xl border border-slate-100 shadow-inner relative overflow-hidden bg-slate-50 shrink-0">
                   <div className="absolute inset-0 flex items-center justify-center z-0">
                     {getDynamicIcon(p.nama)}
@@ -991,7 +1009,10 @@ function MainApp() {
                       src={formatImageUrl(p.gambar)} 
                       className="absolute inset-0 w-full h-full object-cover z-10 bg-white will-change-transform" 
                       alt={p.nama}
-                      onError={(e) => { e.target.style.display = 'none'; }}
+                      onError={(e) => { 
+                        e.target.style.visibility = 'hidden'; 
+                        e.target.style.opacity = '0';
+                      }}
                     />
                   )}
                 </div>
@@ -1018,7 +1039,7 @@ function MainApp() {
                      <div className="w-24 h-24 md:w-32 md:h-32 bg-slate-50 rounded-2xl shadow-inner overflow-hidden border shrink-0 relative flex items-center justify-center">
                        <div className="absolute inset-0 flex items-center justify-center z-0 scale-75">{getDynamicIcon(selectedProduct.nama)}</div>
                        {selectedProduct.gambar && (
-                         <img loading="lazy" src={formatImageUrl(selectedProduct.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.display = 'none'; }}/>
+                         <img loading="lazy" src={formatImageUrl(selectedProduct.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.visibility = 'hidden'; }}/>
                        )}
                      </div>
                      <div className="flex flex-col flex-1 overflow-hidden">
@@ -1068,17 +1089,23 @@ function MainApp() {
           <button onClick={() => setView('toko')} className="flex items-center gap-2 font-black mb-6 text-slate-400 hover:text-slate-600 transition w-max"><ArrowLeft size={18}/> Kembali Belanja</button>
           
           <div className="bg-white rounded-3xl p-5 md:p-6 shadow-sm border border-slate-100 mb-6">
-            <h3 className="font-black text-base md:text-lg mb-4 text-slate-800 border-b border-slate-100 pb-3">Review Keranjang</h3>
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
+              <h3 className="font-black text-base md:text-lg text-slate-800">Review Keranjang</h3>
+              <button onClick={handleClearCart} className="flex items-center gap-1 text-[10px] md:text-xs font-bold text-red-500 bg-red-50 px-2 py-1 rounded hover:bg-red-100 transition"><Trash2 size={14}/> Bersihkan</button>
+            </div>
+            
             <div className="space-y-4 max-h-[350px] overflow-y-auto pr-2">
+              {Object.keys(cart).length === 0 && <p className="text-center text-sm font-bold text-slate-400 py-10">Keranjang Anda Kosong.</p>}
               {Object.entries(cart).map(([id, qty]) => {
                 const p = products.find(prod => prod.id === parseInt(id));
                 if (!p) return null;
                 return (
                   <div key={id} className="flex justify-between items-center border-b border-slate-50 pb-4 last:border-0 last:pb-0">
                     <div className="flex items-center gap-3 w-[60%]">
+                      {/* GAMBAR KERANJANG FALLBACK */}
                       <div className="w-16 h-16 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 text-2xl overflow-hidden shrink-0 relative">
                         <div className="absolute inset-0 flex items-center justify-center z-0 scale-75">{getDynamicIcon(p.nama)}</div>
-                        {p.gambar && <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.display = 'none'; }}/>}
+                        {p.gambar && <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.visibility = 'hidden'; }}/>}
                       </div>
                       <div className="overflow-hidden">
                         <p className="font-bold text-xs md:text-sm text-slate-800 line-clamp-1">{p.nama}</p>
@@ -1140,7 +1167,7 @@ function MainApp() {
                     <div className="flex items-start gap-3 w-[70%]">
                       <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-slate-50 flex items-center justify-center border text-xl overflow-hidden shrink-0 relative">
                         <div className="absolute inset-0 flex items-center justify-center z-0 scale-75">{getDynamicIcon(item.nama)}</div>
-                        {item.gambar && <img loading="lazy" src={formatImageUrl(item.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.display = 'none'; }}/>}
+                        {item.gambar && <img loading="lazy" src={formatImageUrl(item.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.visibility = 'hidden'; }}/>}
                       </div>
                       <div className="overflow-hidden">
                         <p className="font-semibold text-slate-800 text-[11px] md:text-sm line-clamp-2 leading-tight">{item.nama}</p>
@@ -1280,7 +1307,6 @@ function MainApp() {
         return (
           <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row relative">
             
-            {/* MENU ADMIN SIMETRIS GRID 4 KOTAK DI HP */}
             <aside className="bg-slate-950 text-white w-full md:w-64 flex-shrink-0 flex flex-col shadow-2xl sticky top-0 z-40 md:h-screen">
               <div className="hidden md:flex p-6 items-center gap-3 border-b border-slate-800 flex-shrink-0">
                  <Store className="text-emerald-400 shrink-0" size={28} />
@@ -1379,7 +1405,6 @@ function MainApp() {
                          <input type="text" value={settings.admin_password || ''} onChange={e => setSettings({...settings, admin_password: e.target.value})} className="w-full p-4 bg-rose-50/50 text-rose-900 rounded-3xl font-black border border-rose-200 focus:border-rose-400 focus:ring-4 focus:ring-rose-500/20 outline-none transition-all tracking-[0.5em] text-lg md:text-xl text-center"/>
                        </div>
 
-                       {/* FITUR BARU: TOMBOL HAPUS CACHE / ANTI NYANGKUT */}
                        <div className="space-y-3 pt-4 border-t border-slate-100 mt-6">
                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Settings size={14}/> Sistem & Perbaikan</label>
                          <button onClick={() => { 
@@ -1480,7 +1505,7 @@ function MainApp() {
                                  <td className="p-3 md:p-4 flex items-center gap-3">
                                    <div className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center bg-white shrink-0 overflow-hidden relative">
                                       <div className="absolute inset-0 flex items-center justify-center z-0 scale-75">{getDynamicIcon(p.nama)}</div>
-                                      {p.gambar && <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.display = 'none'; }}/>}
+                                      {p.gambar && <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.visibility = 'hidden'; }}/>}
                                    </div>
                                    <span className="truncate max-w-[120px] md:max-w-xs text-slate-700">{p.nama}</span>
                                  </td>
@@ -1736,7 +1761,7 @@ function MainApp() {
                                <td className="p-4 md:p-6 flex items-center gap-3 md:gap-4">
                                  <div className="w-10 h-10 md:w-14 md:h-14 bg-white rounded-xl md:rounded-2xl border shadow-sm flex items-center justify-center shrink-0 overflow-hidden relative">
                                     <div className="absolute inset-0 flex items-center justify-center z-0 scale-75">{getDynamicIcon(p.nama)}</div>
-                                    {p.gambar && <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.display = 'none'; }}/>}
+                                    {p.gambar && <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.visibility = 'hidden'; }}/>}
                                  </div>
                                  <div className="min-w-0">
                                    <p className="font-extrabold text-xs md:text-sm text-slate-900 line-clamp-2 max-w-[150px] md:max-w-xs">{p.nama}</p>
