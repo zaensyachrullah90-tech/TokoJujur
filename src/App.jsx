@@ -4,7 +4,7 @@ import {
   CheckCircle, Settings, BarChart3, PlusCircle, 
   Store, QrCode, CreditCard, ChevronRight, ArrowLeft,
   Search, X, Lock, LogOut, TrendingUp, Edit, Trash2, List, TrendingDown,
-  Camera, Download, Power, UploadCloud, AlertTriangle, Copy, Barcode, Share2, Sparkles, Image as ImageIcon, Wand2, ExternalLink
+  Camera, Download, Power, UploadCloud, AlertTriangle, Copy, Barcode, Share2, Sparkles, Image as ImageIcon, Wand2, ExternalLink, RefreshCw
 } from 'lucide-react';
 
 // =========================================================================
@@ -38,7 +38,6 @@ const formatRupiah = (angka) => {
 const formatImageUrl = (url) => {
   if (!url) return '';
   if (url.startsWith('data:image') || url.startsWith('blob:')) return url; 
-  // Perbaikan parser Google Drive agar lebih stabil membaca file
   const driveMatch = url.match(/(?:file\/d\/|id=)([a-zA-Z0-9_-]+)/);
   if (driveMatch && driveMatch[1]) return `https://drive.google.com/thumbnail?id=${driveMatch[1]}&sz=w800`;
   if (url.includes('github.com') && url.includes('/blob/')) return url.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/');
@@ -174,7 +173,7 @@ function MainApp() {
     }
   }, []);
 
-  // Menyimpan Cache Lokal (Persistent State)
+  // Menyimpan Cache Lokal
   useEffect(() => { try { localStorage.setItem('tokojujur_view', view); } catch(e){} }, [view]);
   useEffect(() => { try { localStorage.setItem('tokojujur_admintab', adminTab); } catch(e){} }, [adminTab]);
   useEffect(() => { try { localStorage.setItem('tokojujur_cart', JSON.stringify(cart)); } catch(e){} }, [cart]);
@@ -483,7 +482,7 @@ function MainApp() {
 
   const jumlahItem = Object.values(cart).reduce((a, b) => a + b, 0);
 
-  // TRANSAKSI SEKEJAP MATA - LANGSUNG STRUK
+  // TRANSAKSI SEKEJAP MATA
   const handleSelesaiBayar = async () => {
     if (!supabaseClient) return showToast('Koneksi Database Terputus!', 'error');
     setIsProcessing(true);
@@ -517,7 +516,7 @@ function MainApp() {
     
     setStrukTerakhir(newTransaction);
     setView('struk');
-    setCart({}); // Keranjang otomatis reset
+    setCart({}); 
     setIsProcessing(false);
 
     const { error: trxError } = await supabaseClient.from('transaksi').insert([newTransaction]);
@@ -538,7 +537,7 @@ function MainApp() {
     if (!strukTerakhir) return;
     const shareData = {
       title: `Struk - ${settings.nama_toko}`,
-      text: `*${settings.nama_toko}*\nID Transaksi: ${strukTerakhir.id}\nTanggal: ${strukTerakhir.tanggal}\n\nBelanjaan:\n${strukTerakhir.items.map(i => `- ${i.qty}x ${i.nama} = ${formatRupiah(i.totalHarga)}`).join('\n')}\n\n*Total Dibayar: ${formatRupiah(strukTerakhir.total)}*\n\nSilahkan bayar dengan scan QRIS Resmi. Kejujuran Anda, Kebanggaan Kami!`,
+      text: `*${settings.nama_toko}*\nID Transaksi: ${strukTerakhir.id}\nTanggal: ${strukTerakhir.tanggal}\n\nBelanjaan:\n${strukTerakhir.items.map(i => `- ${i.qty}x ${i.nama} = ${formatRupiah(i.totalHarga)}`).join('\n')}\n\n*Total Dibayar: ${formatRupiah(strukTerakhir.total)}*\n\nSilahkan bayar dengan scan QRIS Resmi di kaca etalase. Kejujuran Anda, Kebanggaan Kami!`,
     };
     if (navigator.share) {
       try { await navigator.share(shareData); } catch (err) {}
@@ -982,8 +981,8 @@ function MainApp() {
               <div key={p.id} onClick={() => openProductModal(p)} className="bg-white p-3 md:p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center text-center relative active:scale-95 transition-transform cursor-pointer border-b-4 border-b-slate-100 overflow-hidden w-full">
                 {cart[p.id] > 0 && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] md:text-xs font-black px-2 md:px-3 py-1 rounded-bl-xl shadow-lg z-20">{cart[p.id]}</div>}
                 
-                {/* FALLBACK GAMBAR CERDAS DENGAN UKURAN LEBIH BESAR */}
-                <div className="mb-3 md:mb-4 w-28 h-28 md:w-40 md:h-40 rounded-2xl border border-slate-100 shadow-inner relative overflow-hidden bg-slate-50 shrink-0">
+                {/* FALLBACK GAMBAR CERDAS DENGAN UKURAN RAKSASA */}
+                <div className="mb-3 md:mb-4 w-32 h-32 md:w-48 md:h-48 rounded-2xl border border-slate-100 shadow-inner relative overflow-hidden bg-slate-50 shrink-0">
                   <div className="absolute inset-0 flex items-center justify-center z-0">
                     {getDynamicIcon(p.nama)}
                   </div>
@@ -1141,7 +1140,6 @@ function MainApp() {
                 {strukTerakhir?.items?.map((item, idx) => (
                   <div key={idx} className="flex justify-between items-start gap-2">
                     <div className="flex items-start gap-3 w-[70%]">
-                      {/* GAMBAR STRUK FALLBACK */}
                       <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-slate-50 flex items-center justify-center border text-xl overflow-hidden shrink-0 relative">
                         <div className="absolute inset-0 flex items-center justify-center z-0 scale-75">{getDynamicIcon(item.nama)}</div>
                         {item.gambar && <img loading="lazy" src={formatImageUrl(item.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.display = 'none'; }}/>}
@@ -1211,7 +1209,7 @@ function MainApp() {
 
       {/* VIEW: ADMIN DASHBOARD */}
       {view === 'admin' && isAdminLogged && (() => {
-        // FILTER TRANSAKSI
+        // FILTER TRANSAKSI LOGIC
         const filteredTransactions = transactions.filter(t => {
           if (!filterStart && !filterEnd) return true;
           let tDate;
@@ -1223,6 +1221,7 @@ function MainApp() {
           return tDate >= sDate && tDate <= eDate;
         });
 
+        // FITUR SORTING TRANSAKSI
         const sortedTransactions = [...filteredTransactions].sort((a, b) => {
           if (sortTrx === 'terbaru') return b.id.localeCompare(a.id);
           if (sortTrx === 'terlama') return a.id.localeCompare(b.id);
@@ -1231,10 +1230,12 @@ function MainApp() {
           return 0;
         });
 
+        // KALKULASI PENJUALAN
         const totalPendapatanKotor = filteredTransactions.reduce((sum, t) => sum + (t.total || 0), 0);
         const totalKeuntunganBersih = filteredTransactions.reduce((sum, t) => sum + (t.profit || 0), 0);
         const totalModalTerjual = filteredTransactions.reduce((sum, t) => sum + (t.modal || 0), 0);
 
+        // FILTER BARANG INPUT
         const filteredProductsInput = products.filter(p => {
           if (!filterStart && !filterEnd) return true;
           const pDate = new Date(p.tanggal_dibuat || new Date());
@@ -1376,6 +1377,20 @@ function MainApp() {
                        <div className="space-y-3">
                          <label className="text-[10px] font-black text-rose-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Lock size={14}/> Sandi Rahasia Admin</label>
                          <input type="text" value={settings.admin_password || ''} onChange={e => setSettings({...settings, admin_password: e.target.value})} className="w-full p-4 bg-rose-50/50 text-rose-900 rounded-3xl font-black border border-rose-200 focus:border-rose-400 focus:ring-4 focus:ring-rose-500/20 outline-none transition-all tracking-[0.5em] text-lg md:text-xl text-center"/>
+                       </div>
+
+                       {/* FITUR BARU: TOMBOL HAPUS CACHE / ANTI NYANGKUT */}
+                       <div className="space-y-3 pt-4 border-t border-slate-100 mt-6">
+                         <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Settings size={14}/> Sistem & Perbaikan</label>
+                         <button onClick={() => { 
+                             if(window.confirm('Aplikasi akan memuat ulang dan menghapus memori sementara. Lanjutkan?')) {
+                               localStorage.clear(); 
+                               window.location.reload(true); 
+                             }
+                           }} className="w-full py-4 bg-orange-100 text-orange-700 rounded-[24px] font-bold text-sm hover:bg-orange-200 transition-all flex items-center justify-center gap-2 active:scale-95 shadow-sm">
+                           <RefreshCw size={18}/> Hapus Cache & Refresh Aplikasi
+                         </button>
+                         <p className="text-[10px] text-slate-400 font-bold ml-2 text-center">Gunakan tombol ini jika tampilan toko tidak berubah setelah pembaruan.</p>
                        </div>
                        
                        <button disabled={isProcessing} onClick={handleSaveSettings} className="w-full py-5 bg-slate-900 text-white rounded-[32px] font-black text-sm md:text-lg shadow-xl shadow-slate-300 hover:bg-slate-800 transition-all active:scale-95 mt-8 disabled:opacity-50">
