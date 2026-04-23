@@ -256,9 +256,6 @@ function MainApp() {
     return () => { supabaseClient.removeChannel(channel); }
   }, [dbReady]);
 
-  // =========================================================================
-  // FUNGSI COPY REKENING
-  // =========================================================================
   const handleCopyRekening = () => {
     const amanRekening = settings.rekening || '';
     const matchAngka = amanRekening.match(/\d+/);
@@ -971,11 +968,11 @@ function MainApp() {
                 <Sparkles size={18} className="text-yellow-300" /> Panduan Pembelian (Self-Service)
               </h3>
               <ol className="list-decimal list-inside text-xs md:text-sm font-bold text-emerald-100 space-y-1.5 ml-1">
-                <li>Cari barang dengan mengetik di kolom pencarian (search bar), atau klik ikon Kamera untuk scan barang.</li>
+                <li>Cari barang dengan menuliskan di kolom pencarian (search bar), atau klik kamera untuk scan barang.</li>
                 <li>Klik tombol BAYAR di bawah.</li>
                 <li>Periksa kembali barang Anda (Bisa ditambah/dikurangi).</li>
                 <li>Klik <strong className="text-white">Selesai dan Cetak Struk</strong>.</li>
-                <li className="text-yellow-300 font-extrabold">Silahkan lakukan pembayaran, bisa lewat Struk atau scan QRIS di kaca etalase.</li>
+                <li className="text-yellow-300 font-extrabold">Silahkan lakukan pembayaran, bisa lewat Struk atau QRIS di kaca etalase.</li>
               </ol>
             </div>
           </div>
@@ -1145,7 +1142,7 @@ function MainApp() {
                   <div key={idx} className="flex justify-between items-start gap-2">
                     <div className="flex items-start gap-3 w-[70%]">
                       {/* GAMBAR STRUK FALLBACK */}
-                      <div className="w-8 h-8 md:w-10 md:h-10 rounded-xl bg-slate-50 flex items-center justify-center border text-xl overflow-hidden shrink-0 relative">
+                      <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-slate-50 flex items-center justify-center border text-xl overflow-hidden shrink-0 relative">
                         <div className="absolute inset-0 flex items-center justify-center z-0 scale-75">{getDynamicIcon(item.nama)}</div>
                         {item.gambar && <img loading="lazy" src={formatImageUrl(item.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.display = 'none'; }}/>}
                       </div>
@@ -1608,7 +1605,6 @@ function MainApp() {
                            </h3>
                          </div>
                          
-                         {/* FITUR BARU: GAMBAR ASLI DARI GEMINI, UPLOAD KAMERA & LINK GOOGLE DRIVE */}
                          <div className="md:col-span-4 flex flex-col md:flex-row gap-4 md:gap-6 bg-slate-50 p-4 md:p-6 rounded-2xl border border-slate-200">
                            <div className="w-full md:w-32 h-32 bg-white rounded-2xl border-2 border-dashed border-emerald-300 flex items-center justify-center shrink-0 overflow-hidden shadow-sm relative">
                              {newProduct.gambar ? (
