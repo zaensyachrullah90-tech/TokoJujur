@@ -4,11 +4,11 @@ import {
   CheckCircle, Settings, BarChart3, PlusCircle, 
   Store, QrCode, CreditCard, ChevronRight, ArrowLeft,
   Search, X, Lock, LogOut, TrendingUp, Edit, Trash2, List, TrendingDown,
-  Camera, Download, Power, UploadCloud, AlertTriangle, Copy, Barcode, Share2, Sparkles, Image as ImageIcon, Wand2, ExternalLink, ShoppingCart
+  Camera, Download, Power, UploadCloud, AlertTriangle, Copy, Barcode, Share2, Sparkles, Image as ImageIcon, Wand2, ExternalLink, ShoppingCart, RefreshCw
 } from 'lucide-react';
 
 // =========================================================================
-// PENGATURAN KONEKSI SUPABASE (DYNAMIC SCRIPT - BLUEPRINT TERKUNCI 100%)
+// PENGATURAN KONEKSI SUPABASE (BLUEPRINT TERKUNCI & ANTI-CRASH)
 // =========================================================================
 let supabaseClient = null;
 
@@ -38,7 +38,6 @@ const formatRupiah = (angka) => {
 const formatImageUrl = (url) => {
   if (!url) return '';
   if (url.startsWith('data:image') || url.startsWith('blob:')) return url; 
-  // Perbaikan parser Google Drive agar lebih stabil membaca file
   const driveMatch = url.match(/(?:file\/d\/|id=)([a-zA-Z0-9_-]+)/);
   if (driveMatch && driveMatch[1]) return `https://drive.google.com/thumbnail?id=${driveMatch[1]}&sz=w800`;
   if (url.includes('github.com') && url.includes('/blob/')) return url.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/');
@@ -46,16 +45,14 @@ const formatImageUrl = (url) => {
 };
 
 // =========================================================================
-// IKON REALISTIS (3D EMOJI SHADOW) - FALLBACK JIKA GAMBAR G-DRIVE RUSAK/KOSONG
+// IKON REALISTIS (3D EMOJI SHADOW)
 // =========================================================================
 const getDynamicIcon = (namaBarang) => {
   const name = (namaBarang || '').toLowerCase();
-  
   const iconWrapper = (emoji) => (
     <span className="text-5xl md:text-6xl drop-shadow-md transition-transform transform hover:scale-110 will-change-transform">{emoji}</span>
   );
 
-  // Snack & Jajanan
   if (name.match(/kacang|peanut|sukro|garuda|dua kelinci|pilus|koro|atom/)) return iconWrapper('🥜');
   if (name.match(/wafer|tango|nabati|beng|biskuat|nissin|biskuit|oreo|malkist|roma|gery/)) return iconWrapper('🧇');
   if (name.match(/coklat|chocolate|silverqueen|choki|delfi|milo|cadbury|beng-beng|chocolatos/)) return iconWrapper('🍫');
@@ -63,7 +60,6 @@ const getDynamicIcon = (namaBarang) => {
   if (name.match(/snack|ciki|chiki|keripik|taro|lays|citato|chitato|qtela|piattos|potabee|cheetos|kusuka|jetz/)) return iconWrapper('🍟');
   if (name.match(/es|ice|krim|campina|walls|aice|cornetto|magnum|joyday/)) return iconWrapper('🍦');
 
-  // Makanan Berat & Mie
   if (name.match(/bakso|pentol|cilok|tahu|soto|kuah|seblak|baso|cuanki/)) return iconWrapper('🍲');
   if (name.match(/mie|indomie|sedap|noodle|samyang|pop mie|sarimi|supermi|lemonilo|gelas/)) return iconWrapper('🍜');
   if (name.match(/nasi|makan|lontong|geprek|pecel|ayam|gorengan|penyet|lele/)) return iconWrapper('🍛');
@@ -71,12 +67,10 @@ const getDynamicIcon = (namaBarang) => {
   if (name.match(/daging|sapi|kambing|sosis|nugget|kornet|bakar/)) return iconWrapper('🥩');
   if (name.match(/ikan|lele|nila|udang|seafood|sarden|tuna|teri/)) return iconWrapper('🐟');
 
-  // Minuman
   if (name.match(/kopi|teh|panas|good day|kapal api|nescafe|luwak|pucuk|javana|kotak/)) return iconWrapper('☕');
   if (name.match(/air|mineral|aqua|le minerale|cleo|vit|nestle|ades|pristine|club/)) return iconWrapper('💧');
   if (name.match(/minum|coca|susu|jus|sirup|sprite|fanta|soda|nutrisari|floridina|bear brand|yakult|mizone|pocari/)) return iconWrapper('🥤');
 
-  // Kebutuhan Harian
   if (name.match(/obat|panadol|paramex|bodrex|tolak|vitamin|promag|mixagrip|diapet|antangin/)) return iconWrapper('💊');
   if (name.match(/sabun|shampo|rinso|sunlight|cuci|odol|pasta gigi|deterjen|pepsodent|biore|lifebuoy|soklin|daia/)) return iconWrapper('🧼');
   if (name.match(/rokok|korek|mancis|sampoerna|djarum|gudang|surya|magnum|esse|marlboro|camel/)) return iconWrapper('🚬');
@@ -101,12 +95,12 @@ const hitungTotalHargaItem = (item, qty) => {
 function MainApp() {
   const [dbReady, setDbReady] = useState(false);
   const [isLoadingDB, setIsLoadingDB] = useState(true);
+  const [isConnected, setIsConnected] = useState(true); 
   const [isProcessing, setIsProcessing] = useState(false);
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' });
   
   const [view, setView] = useState(() => {
-    try { if (typeof window !== 'undefined') return localStorage.getItem('tokojujur_view') || 'toko'; } catch(e) {}
-    return 'toko';
+    try { return localStorage.getItem('tokojujur_view') || 'toko'; } catch(e) { return 'toko'; }
   }); 
   
   const [products, setProducts] = useState([]);
@@ -119,15 +113,12 @@ function MainApp() {
     try { return localStorage.getItem('tokojujur_gemini_key') || ''; } catch(e) { return ''; }
   });
   
-  // FITUR KERANJANG DISIMPAN DI LOKAL HP MASING-MASING
+  // KERANJANG TERSIMPAN DI LOKAL HP MASING-MASING
   const [cart, setCart] = useState(() => {
     try {
-      if (typeof window !== 'undefined') {
-        const savedCart = localStorage.getItem('tokojujur_cart');
-        return savedCart ? JSON.parse(savedCart) : {};
-      }
-    } catch(e) {}
-    return {};
+      const savedCart = localStorage.getItem('tokojujur_cart');
+      return savedCart ? JSON.parse(savedCart) : {};
+    } catch(e) { return {}; }
   });
 
   const [strukTerakhir, setStrukTerakhir] = useState(null);
@@ -142,11 +133,10 @@ function MainApp() {
   const streamRef = useRef(null);
 
   const [isAdminLogged, setIsAdminLogged] = useState(() => {
-    try { return typeof window !== 'undefined' && localStorage.getItem('tokojujur_admin') === 'true'; } catch(e) { return false; }
+    try { return localStorage.getItem('tokojujur_admin') === 'true'; } catch(e) { return false; }
   });
   const [adminTab, setAdminTab] = useState(() => {
-    try { if (typeof window !== 'undefined') return localStorage.getItem('tokojujur_admintab') || 'analisa'; } catch(e){}
-    return 'analisa';
+    try { return localStorage.getItem('tokojujur_admintab') || 'analisa'; } catch(e){ return 'analisa'; }
   }); 
   
   const [loginInput, setLoginInput] = useState('');
@@ -175,23 +165,29 @@ function MainApp() {
     }
   }, []);
 
-  // Menyimpan Cache Lokal (Persistent State) - KERANJANG TERSIMPAN DI HP
+  // Menyimpan Cache Lokal (Persistent State)
   useEffect(() => { try { localStorage.setItem('tokojujur_view', view); } catch(e){} }, [view]);
   useEffect(() => { try { localStorage.setItem('tokojujur_admintab', adminTab); } catch(e){} }, [adminTab]);
   useEffect(() => { try { localStorage.setItem('tokojujur_cart', JSON.stringify(cart)); } catch(e){} }, [cart]);
   useEffect(() => { try { localStorage.setItem('tokojujur_gemini_key', geminiKey); } catch(e){} }, [geminiKey]);
 
-  // INISIALISASI SUPABASE KLIEN (KONEKSI SERVER)
+  // INISIALISASI SUPABASE (DENGAN FALLBACK FORM JIKA GAGAL)
   useEffect(() => {
     const initSupabase = () => {
       try {
         const env = typeof import.meta !== 'undefined' ? import.meta.env : {};
-        const url = env.VITE_SUPABASE_URL || '';
-        const key = env.VITE_SUPABASE_ANON_KEY || '';
-        if (url && key && window.supabase && !supabaseClient) {
+        const url = env.VITE_SUPABASE_URL || localStorage.getItem('tokojujur_sb_url') || '';
+        const key = env.VITE_SUPABASE_ANON_KEY || localStorage.getItem('tokojujur_sb_key') || '';
+        
+        if (url && key && window.supabase) {
           supabaseClient = window.supabase.createClient(url, key);
+          setIsConnected(true);
+        } else {
+          setIsConnected(false);
         }
-      } catch(e) {}
+      } catch(e) {
+        setIsConnected(false);
+      }
       setDbReady(true);
     };
 
@@ -205,10 +201,9 @@ function MainApp() {
     }
   }, []);
 
-  // REALTIME INSTAN & SINKRONISASI SUPABASE
+  // REALTIME INSTAN & SINKRONISASI
   useEffect(() => {
-    if (!dbReady) return;
-    if (!supabaseClient) { setIsLoadingDB(false); return; }
+    if (!dbReady || !isConnected || !supabaseClient) return;
     
     const loadInitialData = async () => {
       setIsLoadingDB(true);
@@ -256,9 +251,8 @@ function MainApp() {
       .subscribe();
       
     return () => { supabaseClient.removeChannel(channel); }
-  }, [dbReady]);
+  }, [dbReady, isConnected]);
 
-  // FUNGSI COPY REKENING (ANTI CRASH)
   const handleCopyRekening = () => {
     const amanRekening = settings.rekening || '';
     const matchAngka = amanRekening.match(/\d+/);
@@ -277,7 +271,6 @@ function MainApp() {
     }
   };
 
-  // LOGIKA LIVE BARCODE SCANNER
   const startScanner = async (target) => {
     if (!('BarcodeDetector' in window)) {
       showToast('Browser HP Anda belum mendukung pemindaian kamera otomatis.', 'error');
@@ -477,7 +470,6 @@ function MainApp() {
     }
   };
 
-  // FITUR BARU: HAPUS KERANJANG
   const handleClearCart = () => {
     if(window.confirm('Yakin ingin mengosongkan seluruh isi keranjang Anda?')) {
       setCart({});
@@ -529,7 +521,7 @@ function MainApp() {
     
     setStrukTerakhir(newTransaction);
     setView('struk');
-    setCart({}); // Keranjang otomatis reset setelah bayar
+    setCart({}); 
     setIsProcessing(false);
 
     const { error: trxError } = await supabaseClient.from('transaksi').insert([newTransaction]);
@@ -835,19 +827,40 @@ function MainApp() {
 
   // --- RENDER UI AMAN ---
 
-  if (!dbReady) return <div className="min-h-screen bg-slate-900 flex items-center justify-center font-sans"></div>;
-
-  if (!supabaseClient) {
+  // TAMPILAN JIKA SUPABASE GAGAL KONEK KARENA ENV HILANG DARI CLOUDFLARE
+  if (!isConnected || !supabaseClient) {
     return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-8 text-white text-center font-sans">
-        <AlertTriangle size={80} className="text-amber-500 mb-6 animate-pulse" />
-        <h1 className="text-2xl font-bold mb-4 text-rose-500 uppercase tracking-tighter">Database Belum Terhubung!</h1>
-        <p className="text-slate-400 max-w-md mb-8 font-medium">Aplikasi Anda sudah siap. Namun variabel lingkungan <code className="text-emerald-400">VITE_SUPABASE_URL</code> dan <code className="text-emerald-400">VITE_SUPABASE_ANON_KEY</code> belum terbaca.</p>
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center font-sans">
+        <AlertTriangle size={64} className="text-rose-500 mb-4 animate-pulse" />
+        <h1 className="text-2xl font-black mb-2 text-white uppercase tracking-tighter">Database Terputus!</h1>
+        <p className="text-slate-400 text-xs md:text-sm max-w-md mb-8 leading-relaxed">Aplikasi Toko Kejujuran Anda membutuhkan URL dan Anon Key dari Supabase agar data tersimpan dan tersinkronisasi realtime ke semua HP.</p>
+        
+        <div className="bg-slate-800 p-6 rounded-3xl w-full max-w-sm text-left shadow-2xl border border-slate-700">
+           <div className="mb-4">
+             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Supabase URL</label>
+             <input type="text" id="sbUrl" defaultValue={localStorage.getItem('tokojujur_sb_url') || ''} className="w-full mt-1 p-3 rounded-xl bg-slate-900 border border-slate-700 text-white outline-none focus:border-emerald-500 text-sm font-mono" placeholder="https://xxxx.supabase.co" />
+           </div>
+           <div className="mb-6">
+             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Supabase Anon Key</label>
+             <input type="password" id="sbKey" defaultValue={localStorage.getItem('tokojujur_sb_key') || ''} className="w-full mt-1 p-3 rounded-xl bg-slate-900 border border-slate-700 text-white outline-none focus:border-emerald-500 text-sm font-mono" placeholder="eyJhbG..." />
+           </div>
+           <button onClick={() => {
+              const url = document.getElementById('sbUrl').value.trim();
+              const key = document.getElementById('sbKey').value.trim();
+              if(url && key) {
+                 localStorage.setItem('tokojujur_sb_url', url);
+                 localStorage.setItem('tokojujur_sb_key', key);
+                 window.location.reload(true);
+              } else {
+                 alert("URL dan Key wajib diisi!");
+              }
+           }} className="w-full bg-emerald-600 hover:bg-emerald-500 p-4 rounded-xl font-black transition-all active:scale-95 shadow-lg shadow-emerald-900/50">Hubungkan Database</button>
+        </div>
       </div>
     );
   }
 
-  if (isLoadingDB) {
+  if (!dbReady || isLoadingDB) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center font-sans">
         <Store className="text-emerald-500 animate-bounce relative z-10" size={80} />
@@ -957,7 +970,6 @@ function MainApp() {
             <div className="flex justify-between items-center mb-4 max-w-5xl mx-auto">
               <div className="flex items-center gap-2 text-emerald-600 font-black text-lg md:text-xl truncate max-w-[50%]"><Store className="shrink-0"/> <span className="truncate">{settings.nama_toko}</span></div>
               <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
-                {/* MENU KERANJANG DI HEADER */}
                 <button onClick={() => setView('checkout')} className="p-2 md:p-2.5 bg-orange-50 text-orange-600 rounded-full hover:bg-orange-100 transition shadow-sm relative" title="Lihat Keranjang">
                   <ShoppingCart size={18}/>
                   {jumlahItem > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center animate-bounce">{jumlahItem}</span>}
@@ -998,7 +1010,7 @@ function MainApp() {
               <div key={p.id} onClick={() => openProductModal(p)} className="bg-white p-3 md:p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center text-center relative active:scale-95 transition-transform cursor-pointer border-b-4 border-b-slate-100 overflow-hidden w-full">
                 {cart[p.id] > 0 && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] md:text-xs font-black px-2 md:px-3 py-1 rounded-bl-xl shadow-lg z-20">{cart[p.id]}</div>}
                 
-                {/* FALLBACK GAMBAR CERDAS DENGAN PENGHILANG ERROR VISUAL */}
+                {/* GAMBAR PRODUK RAKSASA DENGAN FALLBACK EMOJI */}
                 <div className="mb-3 md:mb-4 w-32 h-32 md:w-48 md:h-48 rounded-2xl border border-slate-100 shadow-inner relative overflow-hidden bg-slate-50 shrink-0">
                   <div className="absolute inset-0 flex items-center justify-center z-0">
                     {getDynamicIcon(p.nama)}
@@ -1020,7 +1032,6 @@ function MainApp() {
                 <h3 className="font-bold text-xs md:text-sm mb-1 line-clamp-2 h-8 md:h-10 w-full text-slate-700 leading-tight">{p.nama}</h3>
                 <p className="text-emerald-600 font-black mb-2 text-sm md:text-lg w-full truncate">{formatRupiah(p.jual)}</p>
                 
-                {/* STOK ANTI TERPOTONG KE BAWAH */}
                 <div className="mt-auto w-full flex justify-center">
                   <div className={`text-[9px] md:text-[10px] font-black px-2 py-0.5 rounded-md truncate max-w-full ${(p.stok||0) > 5 ? 'bg-blue-50 text-blue-500' : 'bg-rose-50 text-rose-500'}`}>
                     Sisa: {p.stok || 0}
@@ -1102,7 +1113,6 @@ function MainApp() {
                 return (
                   <div key={id} className="flex justify-between items-center border-b border-slate-50 pb-4 last:border-0 last:pb-0">
                     <div className="flex items-center gap-3 w-[60%]">
-                      {/* GAMBAR KERANJANG FALLBACK */}
                       <div className="w-16 h-16 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 text-2xl overflow-hidden shrink-0 relative">
                         <div className="absolute inset-0 flex items-center justify-center z-0 scale-75">{getDynamicIcon(p.nama)}</div>
                         {p.gambar && <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.visibility = 'hidden'; }}/>}
@@ -1234,7 +1244,6 @@ function MainApp() {
 
       {/* VIEW: ADMIN DASHBOARD */}
       {view === 'admin' && isAdminLogged && (() => {
-        // FILTER TRANSAKSI LOGIC
         const filteredTransactions = transactions.filter(t => {
           if (!filterStart && !filterEnd) return true;
           let tDate;
@@ -1246,7 +1255,6 @@ function MainApp() {
           return tDate >= sDate && tDate <= eDate;
         });
 
-        // FITUR SORTING TRANSAKSI
         const sortedTransactions = [...filteredTransactions].sort((a, b) => {
           if (sortTrx === 'terbaru') return b.id.localeCompare(a.id);
           if (sortTrx === 'terlama') return a.id.localeCompare(b.id);
@@ -1255,12 +1263,10 @@ function MainApp() {
           return 0;
         });
 
-        // KALKULASI PENJUALAN
         const totalPendapatanKotor = filteredTransactions.reduce((sum, t) => sum + (t.total || 0), 0);
         const totalKeuntunganBersih = filteredTransactions.reduce((sum, t) => sum + (t.profit || 0), 0);
         const totalModalTerjual = filteredTransactions.reduce((sum, t) => sum + (t.modal || 0), 0);
 
-        // FILTER BARANG INPUT
         const filteredProductsInput = products.filter(p => {
           if (!filterStart && !filterEnd) return true;
           const pDate = new Date(p.tanggal_dibuat || new Date());
@@ -1274,7 +1280,6 @@ function MainApp() {
         const totalModalInput = filteredProductsInput.reduce((sum, p) => sum + ((p.modal || 0) * (p.stok || 0)), 0);
         const potensiKeuntungan = filteredProductsInput.reduce((sum, p) => sum + (((p.jual || 0) - (p.modal || 0)) * (p.stok || 0)), 0);
 
-        // LOGIKA PERINGKAT BARANG
         const itemSalesMap = {};
         filteredTransactions.forEach(t => {
           t.items.forEach(item => {
@@ -1351,11 +1356,9 @@ function MainApp() {
 
                        <hr className="border-slate-100"/>
                        
-                       {/* UPLOAD & DOWNLOAD QRIS */}
                        <div className="space-y-3">
                          <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><QrCode size={14}/> Foto QRIS Pembayaran Utama</label>
                          <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 bg-slate-50 border border-slate-200 p-6 rounded-[32px]">
-                           
                            <div className="flex flex-col items-center gap-3 w-full sm:w-auto shrink-0">
                              <div className="w-40 h-40 bg-white rounded-3xl border-2 border-dashed border-emerald-300 flex items-center justify-center p-2 overflow-hidden shadow-sm relative">
                                {settings.qris_url ? (
@@ -1391,7 +1394,6 @@ function MainApp() {
 
                        <hr className="border-slate-100"/>
 
-                       {/* API GEMINI */}
                        <div className="space-y-3">
                          <label className="text-[10px] font-black text-blue-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Sparkles size={14}/> Gemini API Key (Untuk AI Gambar)</label>
                          <input type="password" value={geminiKey} onChange={e => setGeminiKey(e.target.value)} placeholder="AIzaSy..." className="w-full p-4 bg-blue-50/50 text-blue-900 rounded-3xl font-bold border border-blue-200 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/20 outline-none transition-all text-xs md:text-sm"/>
