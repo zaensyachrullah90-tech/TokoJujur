@@ -82,7 +82,7 @@ function MainApp() {
   const [products, setProducts] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [settings, setSettings] = useState({ 
-    nama_toko: 'Memuat Toko...', qris_url: '', rekening: '', admin_password: '' 
+    nama_toko: 'Memuat Toko...', qris_url: '', rekening: '', admin_password: '', logo_url: '' 
   });
   
   const [geminiKey, setGeminiKey] = useState(() => {
@@ -227,14 +227,26 @@ function MainApp() {
     setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 4000); 
   };
 
+  // SYSTEM PWA & NOTIFIKASI & AUTO-UPDATE FAVICON
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') Notification.requestPermission();
+      
+      // Update Favicon dan Apple Touch Icon Secara Dinamis
+      const logoUrl = settings.logo_url ? formatImageUrl(settings.logo_url) : "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏪</text></svg>";
+      
       let link = document.querySelector("link[rel~='icon']");
       if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
-      link.href = "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏪</text></svg>";
+      link.href = logoUrl;
+
+      let appleIcon = document.querySelector("link[rel='apple-touch-icon']");
+      if (!appleIcon) { appleIcon = document.createElement('link'); appleIcon.rel = 'apple-touch-icon'; document.head.appendChild(appleIcon); }
+      appleIcon.href = logoUrl;
+      
+      // Update Title Web
+      document.title = settings.nama_toko || 'Toko Kejujuran';
     }
-  }, []);
+  }, [settings.logo_url, settings.nama_toko]);
 
   useEffect(() => { try { localStorage.setItem('tokojujur_view', view); } catch(e){} }, [view]);
   useEffect(() => { try { localStorage.setItem('tokojujur_admintab', adminTab); } catch(e){} }, [adminTab]);
@@ -288,6 +300,10 @@ function MainApp() {
           supabaseClient.from('transaksi').select('*').order('id', { ascending: false }),
           supabaseClient.from('pengaturan').select('*').eq('id', 1).single()
         ]);
+        
+        if (prodRes.error) {
+           console.error(prodRes.error);
+        }
         
         if (prodRes.data) setProducts(prodRes.data);
         if (trxRes.data) setTransactions(trxRes.data);
@@ -493,6 +509,20 @@ function MainApp() {
     }
   };
 
+  // UPLOAD LOGO HANDLER
+  const handleUploadLogo = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 2097152) return showToast('Ukuran logo maksimal 2MB.', 'error');
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSettings(prev => ({ ...prev, logo_url: reader.result }));
+        showToast('Logo berhasil diunggah, silakan simpan pengaturan.', 'success');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const openProductModal = (product) => {
     setSelectedProduct(product);
     setTempQty(cart[product.id] || 0);
@@ -667,13 +697,29 @@ function MainApp() {
     
     try { localStorage.setItem('tokojujur_gemini_key', geminiKey); } catch(e){}
 
-    const { error } = await supabaseClient.from('pengaturan').update({
-      nama_toko: settings.nama_toko, qris_url: settings.qris_url,
-      rekening: settings.rekening, admin_password: settings.admin_password
+    let { error } = await supabaseClient.from('pengaturan').update({
+      nama_toko: settings.nama_toko, 
+      qris_url: settings.qris_url,
+      rekening: settings.rekening, 
+      admin_password: settings.admin_password,
+      logo_url: settings.logo_url
     }).eq('id', 1);
     
-    if (error) showToast(`Gagal: ${error.message} (Cek RLS Supabase)`, 'error');
-    else showToast('Pengaturan Disimpan', 'success');
+    if (error && error.message.includes('logo_url')) {
+       const { error: fallbackError } = await supabaseClient.from('pengaturan').update({
+          nama_toko: settings.nama_toko, 
+          qris_url: settings.qris_url,
+          rekening: settings.rekening, 
+          admin_password: settings.admin_password
+       }).eq('id', 1);
+       error = fallbackError;
+       if (!error) showToast('Pengaturan disimpan. (Kolom "logo_url" belum ada di Supabase).', 'error');
+    } else if (error) {
+       showToast(`Gagal: ${error.message}`, 'error');
+    } else {
+       showToast('Pengaturan Disimpan ke Database', 'success');
+    }
+    
     setIsProcessing(false);
   };
 
@@ -845,7 +891,15 @@ function MainApp() {
     link.click();
   };
 
-  // --- RENDER UI ---
+  // Komponen Logo Dinamis
+  const renderLogo = (sizeCls = "w-8 h-8") => {
+    if (settings.logo_url) {
+      return <img src={formatImageUrl(settings.logo_url)} className={`${sizeCls} object-contain rounded-lg shadow-sm`} alt="Logo" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }} />
+    }
+    return <Store className="text-emerald-500 shrink-0" size={28} />;
+  };
+
+  // --- RENDER UTAMA ---
   if (!isConnected || !supabaseClient) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center font-sans">
@@ -900,11 +954,12 @@ function MainApp() {
         </div>
       )}
 
+      {/* MODAL SHARE TOKO */}
       {showShareApp && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[999] flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white w-full max-w-sm rounded-[32px] p-8 shadow-2xl flex flex-col items-center relative text-center animate-slide-up">
             <button onClick={() => setShowShareApp(false)} className="absolute top-4 right-4 p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition"><X size={20}/></button>
-            <Store className="text-emerald-500 mb-3" size={48}/>
+            {renderLogo("w-16 h-16 mb-2")}
             <h3 className="font-black text-2xl text-slate-800 mb-1">{settings.nama_toko}</h3>
             <p className="text-xs text-slate-500 font-bold mb-6">Scan QR Code ini untuk membuka toko di HP Pembeli</p>
             <div className="bg-white p-4 rounded-3xl shadow-sm border-2 border-dashed border-emerald-300 mb-6">
@@ -918,6 +973,7 @@ function MainApp() {
         </div>
       )}
 
+      {/* MODAL EDIT TRANSAKSI */}
       {editingTrx && (
         <div className="fixed inset-0 bg-slate-900/60 z-[999] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
            <div className="bg-white rounded-3xl p-6 w-full max-w-md animate-slide-up shadow-2xl border-4 border-white">
@@ -964,12 +1020,13 @@ function MainApp() {
         </div>
       )}
 
-      {/* HEADER UMUM (Tampil jika bukan di halaman admin/struk) */}
+      {/* HEADER UMUM */}
       {view !== 'admin' && view !== 'struk' && (
         <header className="bg-white p-4 shadow-sm sticky top-0 z-40 mb-4 border-b">
           <div className="flex justify-between items-center mb-4 max-w-5xl mx-auto">
             <div className="flex items-center gap-2 text-emerald-600 font-black text-lg md:text-xl truncate max-w-[50%]">
-              <Store className="shrink-0"/> <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v2.1 (Live)</span></span>
+              {renderLogo("w-8 h-8")}
+              <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v3.0</span></span>
             </div>
             <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
               <button onClick={() => setView('riwayat')} className="p-2 md:p-2.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition shadow-sm relative" title="Riwayat Pembelian">
@@ -1094,8 +1151,10 @@ function MainApp() {
 
       {/* VIEW: CHECKOUT */}
       {view === 'checkout' && (
-        <div className="max-w-md mx-auto p-4 md:p-6 flex flex-col pb-32">
-          <div className="bg-white rounded-3xl p-5 md:p-6 shadow-sm border border-slate-100 mb-6 mt-4">
+        <div className="max-w-md mx-auto p-4 md:p-6 min-h-screen flex flex-col pb-32">
+          <button onClick={() => setView('toko')} className="flex items-center gap-2 font-black mb-6 text-slate-400 hover:text-slate-600 transition w-max"><ArrowLeft size={18}/> Kembali Belanja</button>
+          
+          <div className="bg-white rounded-3xl p-5 md:p-6 shadow-sm border border-slate-100 mb-6">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
               <h3 className="font-black text-base md:text-lg text-slate-800">Review Keranjang</h3>
               <button onClick={handleClearCart} className="flex items-center gap-1 text-[10px] md:text-xs font-bold text-red-500 bg-red-50 px-2 py-1 rounded hover:bg-red-100 transition"><Trash2 size={14}/> Bersihkan</button>
@@ -1153,7 +1212,7 @@ function MainApp() {
 
           <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden animate-fade-in relative mb-6 border border-slate-200">
             <div className="bg-slate-900 p-5 md:p-6 text-center text-white">
-              <Store className="mx-auto mb-2 opacity-80" size={28} />
+              {renderLogo("w-14 h-14 mb-2 mx-auto")}
               <h3 className="font-bold text-lg md:text-xl tracking-wide truncate px-4">{settings.nama_toko}</h3>
               <p className="text-[10px] md:text-xs text-slate-400 mt-1 opacity-80">E-Receipt • {strukTerakhir?.tanggal}</p>
             </div>
@@ -1286,7 +1345,7 @@ function MainApp() {
         <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row relative w-full overflow-hidden">
           <aside className="bg-slate-950 text-white w-full md:w-64 flex-shrink-0 flex flex-col shadow-2xl sticky top-0 z-40 md:h-screen">
             <div className="hidden md:flex p-6 items-center gap-3 border-b border-slate-800 flex-shrink-0">
-               <Store className="text-emerald-400 shrink-0" size={28} />
+               {renderLogo("w-8 h-8")}
                <div><h2 className="font-extrabold text-xl text-white leading-tight tracking-wide">Admin Area</h2><p className="text-[10px] text-emerald-400 font-black uppercase tracking-widest mt-1">Toko Kejujuran</p></div>
             </div>
             <nav className="p-2 md:p-4 grid grid-cols-4 md:flex md:flex-col gap-2 w-full">
@@ -1306,10 +1365,30 @@ function MainApp() {
                   <div className="bg-white p-6 md:p-10 rounded-[40px] border border-slate-200 shadow-sm space-y-8">
                      <div className="space-y-3"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Store size={14}/> Nama Toko Digital</label><input value={settings.nama_toko || ''} onChange={e => setSettings({...settings, nama_toko: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-3xl font-black focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all text-sm md:text-lg"/></div>
                      <hr className="border-slate-100"/>
+                     
+                     {/* PENGATURAN LOGO TOKO / FAVICON */}
+                     <div className="space-y-3">
+                       <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><ImageIcon size={14}/> Logo Toko & Ikon Aplikasi (PWA)</label>
+                       <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 bg-slate-50 border border-slate-200 p-6 rounded-[32px]">
+                         <div className="flex flex-col items-center gap-3 w-full sm:w-auto shrink-0">
+                           <div className="w-40 h-40 bg-white rounded-3xl border-2 border-dashed border-emerald-300 flex items-center justify-center p-2 overflow-hidden shadow-sm relative">
+                             {settings.logo_url ? (<img referrerPolicy="no-referrer" src={formatImageUrl(settings.logo_url)} className="w-full h-full object-contain" alt="Logo Preview" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/>) : (<span className="text-xs text-slate-400 font-bold text-center">Belum ada Logo</span>)}
+                           </div>
+                         </div>
+                         <div className="flex-1 w-full space-y-4">
+                           <p className="text-[10px] text-slate-500 font-bold leading-relaxed">Penting: Logo ini akan mengubah Ikon Aplikasi di layar HP (PWA) dan Tab Browser (Favicon). Format rasio 1:1.</p>
+                           <label className="w-full flex items-center justify-center gap-2 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 p-4 rounded-2xl font-black cursor-pointer transition-all active:scale-95 border border-emerald-200 text-xs md:text-sm"><UploadCloud size={18}/> Upload Logo dari Galeri<input type="file" accept="image/*" className="hidden" onChange={handleUploadLogo} /></label>
+                           <div className="flex items-center gap-3"><div className="h-[1px] bg-slate-300 flex-1"></div><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ATAU PASTE LINK</span><div className="h-[1px] bg-slate-300 flex-1"></div></div>
+                           <input placeholder="Link G-Drive/GitHub..." value={settings.logo_url || ''} onChange={e => setSettings({...settings, logo_url: e.target.value})} className="w-full p-4 bg-white border border-slate-200 rounded-2xl font-bold focus:ring-4 focus:ring-emerald-500/20 outline-none text-xs"/>
+                         </div>
+                       </div>
+                     </div>
+
+                     <hr className="border-slate-100"/>
                      <div className="space-y-3">
                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><QrCode size={14}/> Foto QRIS Pembayaran Utama</label>
                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 bg-slate-50 border border-slate-200 p-6 rounded-[32px]">
-                         <div className="flex flex-col items-center gap-3 w-full sm:w-auto shrink-0"><div className="w-40 h-40 bg-white rounded-3xl border-2 border-dashed border-emerald-300 flex items-center justify-center p-2 overflow-hidden shadow-sm relative">{settings.qris_url ? (<img referrerPolicy="no-referrer" src={formatImageUrl(settings.qris_url)} className="w-full h-full object-contain" alt="QRIS Preview"/>) : (<span className="text-xs text-slate-400 font-bold text-center">Belum ada QRIS</span>)}</div></div>
+                         <div className="flex flex-col items-center gap-3 w-full sm:w-auto shrink-0"><div className="w-40 h-40 bg-white rounded-3xl border-2 border-dashed border-emerald-300 flex items-center justify-center p-2 overflow-hidden shadow-sm relative">{settings.qris_url ? (<img referrerPolicy="no-referrer" src={formatImageUrl(settings.qris_url)} className="w-full h-full object-contain" alt="QRIS Preview" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/>) : (<span className="text-xs text-slate-400 font-bold text-center">Belum ada QRIS</span>)}</div></div>
                          <div className="flex-1 w-full space-y-4">
                            <label className="w-full flex items-center justify-center gap-2 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 p-4 rounded-2xl font-black cursor-pointer transition-all active:scale-95 border border-emerald-200 text-xs md:text-sm"><UploadCloud size={18}/> Upload QRIS dari Galeri<input type="file" accept="image/*" className="hidden" onChange={handleUploadQRIS} /></label>
                            <div className="flex items-center gap-3"><div className="h-[1px] bg-slate-300 flex-1"></div><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ATAU PASTE LINK</span><div className="h-[1px] bg-slate-300 flex-1"></div></div>
