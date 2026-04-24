@@ -38,15 +38,15 @@ const formatRupiah = (angka) => {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka || 0);
 };
 
-// FORMATTER GAMBAR GOOGLE DRIVE (METODE TERBAIK 2024 - BISA LANGSUNG TAMPIL)
+// FORMATTER GAMBAR GOOGLE DRIVE (METODE TERBAIK & PENEMBUS BLOKIR)
 const formatImageUrl = (url) => {
   if (!url) return '';
   if (url.startsWith('data:image') || url.startsWith('blob:')) return url; 
   
   const driveMatch = url.match(/(?:file\/d\/|id=)([a-zA-Z0-9_-]+)/);
   if (driveMatch && driveMatch[1]) {
-    // Menggunakan API uc?export=view yang paling stabil untuk web
-    return `https://drive.google.com/uc?export=view&id=${driveMatch[1]}`;
+    // Menggunakan API lh3.googleusercontent yang merupakan Jalur VIP gambar Google (Anti-CORS / Anti-Blokir)
+    return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
   }
   
   if (url.includes('github.com') && url.includes('/blob/')) return url.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/');
@@ -242,6 +242,7 @@ function MainApp() {
   useEffect(() => { try { localStorage.setItem('tokojujur_local_history', JSON.stringify(localHistory)); } catch(e){} }, [localHistory]);
   useEffect(() => { try { localStorage.setItem('tokojujur_gemini_key', geminiKey); } catch(e){} }, [geminiKey]);
 
+  // INISIALISASI SUPABASE LANGSUNG MENGGUNAKAN KEY
   useEffect(() => {
     const initSupabase = () => {
       try {
@@ -275,6 +276,7 @@ function MainApp() {
     }
   }, []);
 
+  // REALTIME INSTAN & SINKRONISASI
   useEffect(() => {
     if (!dbReady || !isConnected || !supabaseClient) return;
     
@@ -847,11 +849,46 @@ function MainApp() {
     link.click();
   };
 
-  // --- RENDERING ---
+  // --- RENDER UI ---
+  if (!isConnected || !supabaseClient) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center font-sans">
+        <AlertTriangle size={64} className="text-rose-500 mb-4 animate-pulse" />
+        <h1 className="text-2xl font-black mb-2 uppercase tracking-tighter">Database Terputus!</h1>
+        <p className="text-slate-400 text-xs md:text-sm max-w-md mb-8 leading-relaxed">Hubungkan URL dan Anon Key dari Supabase Anda untuk mengaktifkan fitur Realtime Online.</p>
+        <div className="bg-slate-800 p-6 rounded-3xl w-full max-w-sm text-left shadow-2xl border border-slate-700">
+           <div className="mb-4">
+             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Supabase URL</label>
+             <input type="text" id="sbUrl" defaultValue={localStorage.getItem('tokojujur_sb_url') || ''} className="w-full mt-1 p-3 rounded-xl bg-slate-900 border border-slate-700 text-white outline-none focus:border-emerald-500 text-sm font-mono" placeholder="https://xxxx.supabase.co" />
+           </div>
+           <div className="mb-6">
+             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Supabase Anon Key</label>
+             <input type="password" id="sbKey" defaultValue={localStorage.getItem('tokojujur_sb_key') || ''} className="w-full mt-1 p-3 rounded-xl bg-slate-900 border border-slate-700 text-white outline-none focus:border-emerald-500 text-sm font-mono" placeholder="eyJhbG..." />
+           </div>
+           <button onClick={() => {
+              const url = document.getElementById('sbUrl').value.trim();
+              const key = document.getElementById('sbKey').value.trim();
+              if(url && key) { localStorage.setItem('tokojujur_sb_url', url); localStorage.setItem('tokojujur_sb_key', key); window.location.reload(true); }
+              else alert('Wajib diisi!');
+           }} className="w-full bg-emerald-600 hover:bg-emerald-500 p-4 rounded-xl font-black transition-all active:scale-95 shadow-lg shadow-emerald-900/50">Hubungkan Sekarang</button>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoadingDB) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center font-sans">
+        <Store className="text-emerald-500 animate-bounce relative z-10" size={80} />
+        <h2 className="text-emerald-500 font-black text-2xl mt-4 tracking-[0.3em] uppercase animate-pulse">MEMUAT TOKO...</h2>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-emerald-100 relative">
       
-      {/* MODAL SCANNER KAMERA */}
+      {/* MODALS AREA */}
       {isScanningModalOpen && (
         <div className="fixed inset-0 bg-black z-[999] flex flex-col animate-fade-in">
           <div className="flex justify-between items-center p-4 bg-gradient-to-b from-black/80 to-transparent text-white absolute top-0 w-full z-10">
@@ -867,7 +904,6 @@ function MainApp() {
         </div>
       )}
 
-      {/* MODAL SHARE TOKO */}
       {showShareApp && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[999] flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white w-full max-w-sm rounded-[32px] p-8 shadow-2xl flex flex-col items-center relative text-center animate-slide-up">
@@ -886,7 +922,6 @@ function MainApp() {
         </div>
       )}
 
-      {/* MODAL EDIT TRANSAKSI */}
       {editingTrx && (
         <div className="fixed inset-0 bg-slate-900/60 z-[999] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
            <div className="bg-white rounded-3xl p-6 w-full max-w-md animate-slide-up shadow-2xl border-4 border-white">
@@ -925,7 +960,6 @@ function MainApp() {
         </div>
       )}
 
-      {/* TOAST GLOBAL */}
       {toast.show && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-slate-900 text-white rounded-full shadow-2xl font-bold flex items-center gap-2 animate-slide-up border border-slate-700 w-max max-w-[90%] text-center text-sm md:text-base">
           {toast.type === 'success' ? <CheckCircle size={20} className="text-emerald-400 shrink-0"/> : <AlertTriangle size={20} className="text-rose-400 shrink-0"/>}
@@ -933,30 +967,32 @@ function MainApp() {
         </div>
       )}
 
-      {/* HEADER UTAMA */}
+      {/* HEADER UMUM (Tampil jika bukan di halaman admin/struk) */}
       {view !== 'admin' && view !== 'struk' && (
         <header className="bg-white p-4 shadow-sm sticky top-0 z-40 mb-4 border-b">
           <div className="flex justify-between items-center mb-4 max-w-5xl mx-auto">
             <div className="flex items-center gap-2 text-emerald-600 font-black text-lg md:text-xl truncate max-w-[50%]">
-              <Store className="shrink-0"/> <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v2.0</span></span>
+              <Store className="shrink-0"/> <span className="truncate">{settings.nama_toko}</span>
             </div>
             <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
-              <button onClick={() => setView('riwayat')} className="p-2 md:p-2.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition shadow-sm relative" title="Riwayat Pembelian Saya">
+              <button onClick={() => setView('riwayat')} className="p-2 md:p-2.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition shadow-sm relative" title="Riwayat Pembelian">
                 <History size={18}/>
               </button>
-              <button onClick={() => setView('checkout')} className="p-2 md:p-2.5 bg-orange-50 text-orange-600 rounded-full hover:bg-orange-100 transition shadow-sm relative">
+              <button onClick={() => setView('checkout')} className="p-2 md:p-2.5 bg-orange-50 text-orange-600 rounded-full hover:bg-orange-100 transition shadow-sm relative" title="Keranjang">
                 <ShoppingCart size={18}/>
                 {jumlahItem > 0 && <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[9px] font-black w-4 h-4 rounded-full flex items-center justify-center animate-bounce">{jumlahItem}</span>}
               </button>
-              <button onClick={() => setShowShareApp(true)} className="p-2 md:p-2.5 bg-emerald-50 text-emerald-600 rounded-full hover:bg-emerald-100 transition shadow-sm" title="Bagikan Link Toko (QR Code)"><Share2 size={18}/></button>
-              <button onClick={() => setView('admin')} className="p-2 md:p-2.5 bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200 transition shadow-sm" title="Masuk Mode Admin"><Lock size={18}/></button>
+              <button onClick={handleDownloadQRIS} className="p-2 md:p-2.5 bg-teal-50 text-teal-600 rounded-full hover:bg-teal-100 transition shadow-sm" title="Download QRIS"><QrCode size={18}/></button>
+              <button onClick={() => setShowShareApp(true)} className="p-2 md:p-2.5 bg-emerald-50 text-emerald-600 rounded-full hover:bg-emerald-100 transition shadow-sm" title="Share Toko"><Share2 size={18}/></button>
+              <button onClick={() => setView('admin')} className="p-2 md:p-2.5 bg-slate-100 text-slate-500 rounded-full hover:bg-slate-200 transition shadow-sm" title="Admin"><Lock size={18}/></button>
             </div>
           </div>
+          
           {view === 'toko' && (
             <div className="flex gap-2 max-w-5xl mx-auto">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-3 text-slate-400" size={20}/>
-                <input type="text" placeholder="Cari barang..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} className="w-full bg-slate-100 rounded-xl pl-10 pr-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500 font-medium transition-all border-none text-sm md:text-base"/>
+                <input type="text" placeholder="Cari barang atau barcode..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} className="w-full bg-slate-100 rounded-xl pl-10 pr-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500 font-medium transition-all border-none text-sm md:text-base"/>
               </div>
               <button onClick={() => startScanner('toko')} className="bg-slate-800 text-white p-3 rounded-xl cursor-pointer hover:bg-slate-700 active:scale-95 flex items-center shadow-lg shrink-0"><Camera size={24}/></button>
             </div>
@@ -986,16 +1022,7 @@ function MainApp() {
                 
                 <div className="mb-3 md:mb-4 w-32 h-32 md:w-48 md:h-48 rounded-2xl border border-slate-100 shadow-inner relative overflow-hidden bg-slate-50 flex items-center justify-center shrink-0">
                   {p.gambar ? (
-                    <img 
-                      loading="lazy" 
-                      src={formatImageUrl(p.gambar)} 
-                      className="absolute inset-0 w-full h-full object-cover z-10 bg-white will-change-transform" 
-                      alt={p.nama} 
-                      onError={(e) => { 
-                        e.target.onerror = null; 
-                        e.target.src = FALLBACK_IMAGE; 
-                      }} 
-                    />
+                    <img loading="lazy" referrerPolicy="no-referrer" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" alt={p.nama} onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }} />
                   ) : (
                     <img src={FALLBACK_IMAGE} className="w-16 h-16 opacity-50" alt="kosong"/>
                   )}
@@ -1009,6 +1036,7 @@ function MainApp() {
             {searchFilteredProducts.length === 0 && <div className="col-span-full text-center text-slate-400 mt-10 font-bold text-sm">Barang tidak ditemukan.</div>}
           </main>
 
+          {/* MODAL PILIH JUMLAH BELI */}
           {selectedProduct && (
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-4 animate-fade-in">
               <div className="bg-white w-full max-w-md rounded-3xl p-6 md:p-8 shadow-2xl animate-slide-up border-4 border-white flex flex-col">
@@ -1016,7 +1044,7 @@ function MainApp() {
                    <div className="flex items-center gap-4 w-[85%]">
                      <div className="w-24 h-24 md:w-32 md:h-32 bg-slate-50 rounded-2xl shadow-inner overflow-hidden border shrink-0 relative flex items-center justify-center">
                        {selectedProduct.gambar ? (
-                         <img loading="lazy" src={formatImageUrl(selectedProduct.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/>
+                         <img loading="lazy" referrerPolicy="no-referrer" src={formatImageUrl(selectedProduct.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/>
                        ) : (
                          <img src={FALLBACK_IMAGE} className="w-12 h-12 opacity-50" alt="kosong"/>
                        )}
@@ -1044,6 +1072,7 @@ function MainApp() {
             </div>
           )}
 
+          {/* FLOATING CHECKOUT BUTTON */}
           {jumlahItem > 0 && !selectedProduct && (
             <div className="fixed bottom-6 left-4 right-4 z-50 max-w-md mx-auto">
               <button onClick={() => setView('checkout')} className="w-full bg-emerald-600 text-white p-4 md:p-5 rounded-3xl shadow-2xl flex justify-between items-center active:scale-95 transition-all border border-emerald-400">
@@ -1057,10 +1086,8 @@ function MainApp() {
 
       {/* VIEW: CHECKOUT */}
       {view === 'checkout' && (
-        <div className="max-w-md mx-auto p-4 md:p-6 min-h-screen flex flex-col pb-32">
-          <button onClick={() => setView('toko')} className="flex items-center gap-2 font-black mb-6 text-slate-400 hover:text-slate-600 transition w-max"><ArrowLeft size={18}/> Kembali Belanja</button>
-          
-          <div className="bg-white rounded-3xl p-5 md:p-6 shadow-sm border border-slate-100 mb-6">
+        <div className="max-w-md mx-auto p-4 md:p-6 flex flex-col pb-32">
+          <div className="bg-white rounded-3xl p-5 md:p-6 shadow-sm border border-slate-100 mb-6 mt-4">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
               <h3 className="font-black text-base md:text-lg text-slate-800">Review Keranjang</h3>
               <button onClick={handleClearCart} className="flex items-center gap-1 text-[10px] md:text-xs font-bold text-red-500 bg-red-50 px-2 py-1 rounded hover:bg-red-100 transition"><Trash2 size={14}/> Bersihkan</button>
@@ -1075,7 +1102,7 @@ function MainApp() {
                   <div key={id} className="flex justify-between items-center border-b border-slate-50 pb-4 last:border-0 last:pb-0">
                     <div className="flex items-center gap-3 w-[60%]">
                       <div className="w-16 h-16 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 overflow-hidden shrink-0 relative">
-                        {p.gambar ? <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/> : <img src={FALLBACK_IMAGE} className="w-8 h-8 opacity-50" alt="kosong"/>}
+                        {p.gambar ? <img loading="lazy" referrerPolicy="no-referrer" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/> : <img src={FALLBACK_IMAGE} className="w-8 h-8 opacity-50" alt="kosong"/>}
                       </div>
                       <div className="overflow-hidden">
                         <p className="font-bold text-xs md:text-sm text-slate-800 line-clamp-1">{p.nama}</p>
@@ -1134,7 +1161,7 @@ function MainApp() {
                   <div key={idx} className="flex justify-between items-start gap-2">
                     <div className="flex items-start gap-3 w-[70%]">
                       <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-slate-50 flex items-center justify-center border overflow-hidden shrink-0 relative">
-                        {item.gambar ? <img src={formatImageUrl(item.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/> : <img src={FALLBACK_IMAGE} className="w-6 h-6 opacity-50" alt="kosong"/>}
+                        {item.gambar ? <img referrerPolicy="no-referrer" src={formatImageUrl(item.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/> : <img src={FALLBACK_IMAGE} className="w-6 h-6 opacity-50" alt="kosong"/>}
                       </div>
                       <div className="overflow-hidden">
                         <p className="font-semibold text-slate-800 text-[11px] md:text-sm line-clamp-2 leading-tight">{item.nama}</p>
@@ -1160,7 +1187,7 @@ function MainApp() {
                    <div className="bg-white p-4 rounded-2xl border shadow-sm flex flex-col items-center w-full relative overflow-hidden">
                      <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-blue-500 via-yellow-400 to-red-500"></div>
                      <p className="text-[10px] md:text-xs uppercase font-black text-slate-800 mb-3 mt-1 tracking-widest">QRIS Nasional</p>
-                     <img src={formatImageUrl(settings.qris_url)} className="w-40 h-40 md:w-48 md:h-48 object-contain mb-4 border border-slate-100 p-1 rounded-xl" alt="QRIS Pembayaran"/>
+                     <img referrerPolicy="no-referrer" src={formatImageUrl(settings.qris_url)} className="w-40 h-40 md:w-48 md:h-48 object-contain mb-4 border border-slate-100 p-1 rounded-xl" alt="QRIS Pembayaran"/>
                      <button onClick={handleDownloadQRIS} className="w-full py-2.5 md:py-3 bg-emerald-100 text-emerald-800 rounded-xl font-bold text-[9px] md:text-[10px] flex justify-center items-center gap-2 hover:bg-emerald-200 transition uppercase tracking-widest active:scale-95"><Download size={14}/> Simpan QRIS ke HP</button>
                    </div>
                  ) : (
@@ -1180,19 +1207,10 @@ function MainApp() {
         </div>
       )}
 
-      {/* VIEWS: RIWAYAT LOKAL HP */}
+      {/* VIEW: RIWAYAT LOKAL HP */}
       {view === 'riwayat' && (
          <div className="min-h-screen bg-slate-50 pb-20">
-            <header className="bg-white p-4 shadow-sm flex items-center justify-between sticky top-0 z-40 border-b border-slate-200">
-               <div className="flex items-center gap-3">
-                 <button onClick={() => setView('toko')} className="p-2 bg-slate-100 text-slate-600 rounded-full hover:bg-slate-200"><ArrowLeft size={20}/></button>
-                 <h1 className="font-black text-lg md:text-xl text-slate-800">Riwayat Belanja</h1>
-               </div>
-               {localHistory.length > 0 && (
-                 <button onClick={handleClearLocalHistory} className="text-[10px] md:text-xs font-bold text-rose-500 flex items-center gap-1 bg-rose-50 px-3 py-2 rounded-xl hover:bg-rose-100 transition"><Trash2 size={14}/> Bersihkan</button>
-               )}
-            </header>
-            <div className="p-4 max-w-3xl mx-auto space-y-4">
+            <div className="p-4 max-w-3xl mx-auto space-y-4 mt-6">
                {localHistory.length === 0 ? (
                   <div className="text-center py-20 text-slate-400 font-bold flex flex-col items-center gap-3">
                      <List size={48} className="opacity-20"/>
@@ -1210,7 +1228,7 @@ function MainApp() {
                               <div key={idx} className="flex justify-between items-center text-xs md:text-sm font-semibold text-slate-700">
                                  <div className="flex items-center gap-3">
                                    <div className="w-8 h-8 rounded-lg border bg-slate-50 flex items-center justify-center shrink-0 overflow-hidden relative">
-                                      {item.gambar ? <img loading="lazy" src={formatImageUrl(item.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/> : <img src={FALLBACK_IMAGE} className="w-5 h-5 opacity-50" alt="kosong"/>}
+                                      {item.gambar ? <img loading="lazy" referrerPolicy="no-referrer" src={formatImageUrl(item.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/> : <img src={FALLBACK_IMAGE} className="w-5 h-5 opacity-50" alt="kosong"/>}
                                    </div>
                                    <span className="truncate max-w-[150px]">{item.qty}x {item.nama}</span>
                                  </div>
@@ -1274,7 +1292,7 @@ function MainApp() {
                      <div className="space-y-3">
                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><QrCode size={14}/> Foto QRIS Pembayaran Utama</label>
                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 bg-slate-50 border border-slate-200 p-6 rounded-[32px]">
-                         <div className="flex flex-col items-center gap-3 w-full sm:w-auto shrink-0"><div className="w-40 h-40 bg-white rounded-3xl border-2 border-dashed border-emerald-300 flex items-center justify-center p-2 overflow-hidden shadow-sm relative">{settings.qris_url ? (<img src={formatImageUrl(settings.qris_url)} className="w-full h-full object-contain" alt="QRIS Preview"/>) : (<span className="text-xs text-slate-400 font-bold text-center">Belum ada QRIS</span>)}</div></div>
+                         <div className="flex flex-col items-center gap-3 w-full sm:w-auto shrink-0"><div className="w-40 h-40 bg-white rounded-3xl border-2 border-dashed border-emerald-300 flex items-center justify-center p-2 overflow-hidden shadow-sm relative">{settings.qris_url ? (<img referrerPolicy="no-referrer" src={formatImageUrl(settings.qris_url)} className="w-full h-full object-contain" alt="QRIS Preview"/>) : (<span className="text-xs text-slate-400 font-bold text-center">Belum ada QRIS</span>)}</div></div>
                          <div className="flex-1 w-full space-y-4">
                            <label className="w-full flex items-center justify-center gap-2 bg-emerald-100 text-emerald-800 hover:bg-emerald-200 p-4 rounded-2xl font-black cursor-pointer transition-all active:scale-95 border border-emerald-200 text-xs md:text-sm"><UploadCloud size={18}/> Upload QRIS dari Galeri<input type="file" accept="image/*" className="hidden" onChange={handleUploadQRIS} /></label>
                            <div className="flex items-center gap-3"><div className="h-[1px] bg-slate-300 flex-1"></div><span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">ATAU PASTE LINK</span><div className="h-[1px] bg-slate-300 flex-1"></div></div>
@@ -1340,7 +1358,7 @@ function MainApp() {
                              <tr key={p.id} className="text-xs md:text-sm font-bold hover:bg-slate-50 transition-colors">
                                <td className="p-3 md:p-4 flex items-center gap-3">
                                  <div className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center bg-white shrink-0 overflow-hidden relative">
-                                    {p.gambar ? <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" alt="img" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/> : <img src={FALLBACK_IMAGE} className="w-4 h-4 opacity-50" alt="kosong"/>}
+                                    {p.gambar ? <img loading="lazy" referrerPolicy="no-referrer" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" alt="img" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/> : <img src={FALLBACK_IMAGE} className="w-4 h-4 opacity-50" alt="kosong"/>}
                                  </div>
                                  <span className="truncate max-w-[120px] md:max-w-xs text-slate-700">{p.nama}</span>
                                </td>
@@ -1431,7 +1449,7 @@ function MainApp() {
                        <div className="md:col-span-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-3 border-b border-slate-200 pb-3 mb-1"><h3 className="font-black text-slate-800 text-lg flex items-center gap-2">{editingId ? <><Edit className="text-blue-600" size={20}/> Edit Data Barang</> : <><PlusCircle className="text-emerald-600" size={20}/> Input Barang Baru</>}</h3></div>
                        <div className="md:col-span-4 flex flex-col md:flex-row gap-4 md:gap-6 bg-slate-50 p-4 md:p-6 rounded-2xl border border-slate-200">
                          <div className="w-full md:w-32 h-32 bg-white rounded-2xl border-2 border-dashed border-emerald-300 flex items-center justify-center shrink-0 overflow-hidden shadow-sm relative">
-                           {newProduct.gambar ? <img src={formatImageUrl(newProduct.gambar)} className="w-full h-full object-cover" alt="Preview" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/> : <span className="text-[10px] text-slate-400 font-bold text-center flex flex-col items-center gap-1"><ImageIcon size={18}/> Belum Ada<br/>Foto</span>}
+                           {newProduct.gambar ? <img src={formatImageUrl(newProduct.gambar)} className="w-full h-full object-cover" alt="Preview" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/> : <img src={FALLBACK_IMAGE} className="w-16 h-16 opacity-50" alt="kosong"/>}
                          </div>
                          <div className="flex-1 space-y-3">
                            <p className="text-[9px] md:text-[10px] font-black uppercase text-slate-500 tracking-widest">Gambar Produk (Pilih Kamera HP)</p>
@@ -1501,7 +1519,7 @@ function MainApp() {
                              <tr key={p.id} className={`transition-colors ${editingId === p.id ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
                                <td className="p-4 md:p-6 flex items-center gap-3 md:gap-4">
                                  <div className="w-10 h-10 md:w-14 md:h-14 bg-slate-50 rounded-xl md:rounded-2xl border shadow-sm flex items-center justify-center shrink-0 overflow-hidden relative">
-                                   {p.gambar ? <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/> : <img src={FALLBACK_IMAGE} className="w-5 h-5 opacity-50" alt="kosong"/>}
+                                   {p.gambar ? <img loading="lazy" referrerPolicy="no-referrer" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/> : <img src={FALLBACK_IMAGE} className="w-5 h-5 opacity-50" alt="kosong"/>}
                                  </div>
                                  <div className="min-w-0">
                                    <span className="font-extrabold text-xs md:text-sm text-slate-900 truncate block max-w-[150px] md:max-w-xs">{p.nama}</span>
