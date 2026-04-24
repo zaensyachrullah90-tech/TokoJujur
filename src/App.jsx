@@ -38,7 +38,7 @@ const formatRupiah = (angka) => {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka || 0);
 };
 
-// FORMATTER GAMBAR GOOGLE DRIVE (METODE TERBAIK & PENEMBUS BLOKIR)
+// FORMATTER GAMBAR GOOGLE DRIVE (METODE VIP lh3.googleusercontent - PENEMBUS BLOKIR)
 const formatImageUrl = (url) => {
   if (!url) return '';
   if (url.startsWith('data:image') || url.startsWith('blob:')) return url; 
@@ -288,10 +288,6 @@ function MainApp() {
           supabaseClient.from('transaksi').select('*').order('id', { ascending: false }),
           supabaseClient.from('pengaturan').select('*').eq('id', 1).single()
         ]);
-        
-        if (prodRes.error) {
-           console.error(prodRes.error);
-        }
         
         if (prodRes.data) setProducts(prodRes.data);
         if (trxRes.data) setTransactions(trxRes.data);
@@ -960,6 +956,7 @@ function MainApp() {
         </div>
       )}
 
+      {/* TOAST GLOBAL */}
       {toast.show && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-slate-900 text-white rounded-full shadow-2xl font-bold flex items-center gap-2 animate-slide-up border border-slate-700 w-max max-w-[90%] text-center text-sm md:text-base">
           {toast.type === 'success' ? <CheckCircle size={20} className="text-emerald-400 shrink-0"/> : <AlertTriangle size={20} className="text-rose-400 shrink-0"/>}
@@ -972,7 +969,7 @@ function MainApp() {
         <header className="bg-white p-4 shadow-sm sticky top-0 z-40 mb-4 border-b">
           <div className="flex justify-between items-center mb-4 max-w-5xl mx-auto">
             <div className="flex items-center gap-2 text-emerald-600 font-black text-lg md:text-xl truncate max-w-[50%]">
-              <Store className="shrink-0"/> <span className="truncate">{settings.nama_toko}</span>
+              <Store className="shrink-0"/> <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v2.1 (Live)</span></span>
             </div>
             <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
               <button onClick={() => setView('riwayat')} className="p-2 md:p-2.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition shadow-sm relative" title="Riwayat Pembelian">
@@ -1020,9 +1017,20 @@ function MainApp() {
               <div key={p.id} onClick={() => openProductModal(p)} className="bg-white p-3 md:p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center text-center relative active:scale-95 transition-transform cursor-pointer border-b-4 border-b-slate-100 overflow-hidden w-full h-full">
                 {cart[p.id] > 0 && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] md:text-xs font-black px-2 md:px-3 py-1 rounded-bl-xl shadow-lg z-20">{cart[p.id]}</div>}
                 
+                {/* GAMBAR PRODUK RAKSASA DENGAN PENGHILANG ERROR VISUAL */}
                 <div className="mb-3 md:mb-4 w-32 h-32 md:w-48 md:h-48 rounded-2xl border border-slate-100 shadow-inner relative overflow-hidden bg-slate-50 flex items-center justify-center shrink-0">
                   {p.gambar ? (
-                    <img loading="lazy" referrerPolicy="no-referrer" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" alt={p.nama} onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }} />
+                    <img 
+                      loading="lazy" 
+                      referrerPolicy="no-referrer" 
+                      src={formatImageUrl(p.gambar)} 
+                      className="absolute inset-0 w-full h-full object-cover z-10 bg-white will-change-transform" 
+                      alt={p.nama} 
+                      onError={(e) => { 
+                        e.target.onerror = null; 
+                        e.target.src = FALLBACK_IMAGE; 
+                      }} 
+                    />
                   ) : (
                     <img src={FALLBACK_IMAGE} className="w-16 h-16 opacity-50" alt="kosong"/>
                   )}
@@ -1207,9 +1215,18 @@ function MainApp() {
         </div>
       )}
 
-      {/* VIEW: RIWAYAT LOKAL HP */}
+      {/* VIEWS: RIWAYAT LOKAL HP */}
       {view === 'riwayat' && (
          <div className="min-h-screen bg-slate-50 pb-20">
+            <header className="bg-white p-4 shadow-sm flex items-center justify-between sticky top-0 z-40 border-b border-slate-200">
+               <div className="flex items-center gap-3">
+                 <button onClick={() => setView('toko')} className="p-2 bg-slate-100 text-slate-600 rounded-full hover:bg-slate-200"><ArrowLeft size={20}/></button>
+                 <h1 className="font-black text-lg md:text-xl text-slate-800">Riwayat Belanja</h1>
+               </div>
+               {localHistory.length > 0 && (
+                 <button onClick={handleClearLocalHistory} className="text-[10px] md:text-xs font-bold text-rose-500 flex items-center gap-1 bg-rose-50 px-3 py-2 rounded-xl hover:bg-rose-100 transition"><Trash2 size={14}/> Bersihkan</button>
+               )}
+            </header>
             <div className="p-4 max-w-3xl mx-auto space-y-4 mt-6">
                {localHistory.length === 0 ? (
                   <div className="text-center py-20 text-slate-400 font-bold flex flex-col items-center gap-3">
