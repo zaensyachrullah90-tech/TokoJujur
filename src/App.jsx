@@ -287,6 +287,10 @@ function MainApp() {
           supabaseClient.from('pengaturan').select('*').eq('id', 1).single()
         ]);
         
+        if (prodRes.error) {
+           console.error(prodRes.error);
+        }
+        
         if (prodRes.data) setProducts(prodRes.data);
         if (trxRes.data) setTransactions(trxRes.data);
         if (setRes.data) setSettings(setRes.data);
@@ -843,43 +847,7 @@ function MainApp() {
     link.click();
   };
 
-  // --- RENDER UI ---
-
-  if (!isConnected || !supabaseClient) {
-    return (
-      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center font-sans">
-        <AlertTriangle size={64} className="text-rose-500 mb-4 animate-pulse" />
-        <h1 className="text-2xl font-black mb-2 uppercase tracking-tighter">Database Terputus!</h1>
-        <p className="text-slate-400 text-xs md:text-sm max-w-md mb-8 leading-relaxed">Hubungkan URL dan Anon Key dari Supabase Anda untuk mengaktifkan fitur Realtime Online.</p>
-        <div className="bg-slate-800 p-6 rounded-3xl w-full max-w-sm text-left shadow-2xl border border-slate-700">
-           <div className="mb-4">
-             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Supabase URL</label>
-             <input type="text" id="sbUrl" defaultValue={localStorage.getItem('tokojujur_sb_url') || ''} className="w-full mt-1 p-3 rounded-xl bg-slate-900 border border-slate-700 text-white outline-none focus:border-emerald-500 text-sm font-mono" placeholder="https://xxxx.supabase.co" />
-           </div>
-           <div className="mb-6">
-             <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Supabase Anon Key</label>
-             <input type="password" id="sbKey" defaultValue={localStorage.getItem('tokojujur_sb_key') || ''} className="w-full mt-1 p-3 rounded-xl bg-slate-900 border border-slate-700 text-white outline-none focus:border-emerald-500 text-sm font-mono" placeholder="eyJhbG..." />
-           </div>
-           <button onClick={() => {
-              const url = document.getElementById('sbUrl').value.trim();
-              const key = document.getElementById('sbKey').value.trim();
-              if(url && key) { localStorage.setItem('tokojujur_sb_url', url); localStorage.setItem('tokojujur_sb_key', key); window.location.reload(true); }
-              else alert('Wajib diisi!');
-           }} className="w-full bg-emerald-600 hover:bg-emerald-500 p-4 rounded-xl font-black transition-all active:scale-95 shadow-lg shadow-emerald-900/50">Hubungkan Sekarang</button>
-        </div>
-      </div>
-    );
-  }
-
-  if (isLoadingDB) {
-    return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center font-sans">
-        <Store className="text-emerald-500 animate-bounce relative z-10" size={80} />
-        <h2 className="text-emerald-500 font-black text-2xl mt-4 tracking-[0.3em] uppercase animate-pulse">MEMUAT TOKO...</h2>
-      </div>
-    );
-  }
-
+  // --- RENDERING ---
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-emerald-100 relative">
       
@@ -965,7 +933,7 @@ function MainApp() {
         </div>
       )}
 
-      {/* HEADER UTAMA (MUNCUL DI SEMUA VIEW KECUALI ADMIN FULL ATAU STRUK) */}
+      {/* HEADER UTAMA */}
       {view !== 'admin' && view !== 'struk' && (
         <header className="bg-white p-4 shadow-sm sticky top-0 z-40 mb-4 border-b">
           <div className="flex justify-between items-center mb-4 max-w-5xl mx-auto">
@@ -1016,7 +984,6 @@ function MainApp() {
               <div key={p.id} onClick={() => openProductModal(p)} className="bg-white p-3 md:p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center text-center relative active:scale-95 transition-transform cursor-pointer border-b-4 border-b-slate-100 overflow-hidden w-full h-full">
                 {cart[p.id] > 0 && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] md:text-xs font-black px-2 md:px-3 py-1 rounded-bl-xl shadow-lg z-20">{cart[p.id]}</div>}
                 
-                {/* GAMBAR PRODUK RAKSASA DENGAN FALLBACK AMAN */}
                 <div className="mb-3 md:mb-4 w-32 h-32 md:w-48 md:h-48 rounded-2xl border border-slate-100 shadow-inner relative overflow-hidden bg-slate-50 flex items-center justify-center shrink-0">
                   {p.gambar ? (
                     <img 
@@ -1297,7 +1264,7 @@ function MainApp() {
           
           <main className="flex-1 p-4 md:p-10 overflow-y-auto w-full">
              
-             {/* ADMIN TAB: PENGATURAN */}
+             {/* TAB PENGATURAN */}
              {adminTab === 'pengaturan' && (
                <div className="max-w-3xl animate-fade-in mx-auto md:mx-0">
                   <h1 className="text-3xl font-black tracking-tighter text-slate-800 mb-8">Konfigurasi Toko</h1>
@@ -1323,7 +1290,7 @@ function MainApp() {
                      <div className="space-y-3"><label className="text-[10px] font-black text-rose-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Lock size={14}/> Sandi Rahasia Admin</label><input type="text" value={settings.admin_password || ''} onChange={e => setSettings({...settings, admin_password: e.target.value})} className="w-full p-4 bg-rose-50/50 text-rose-900 rounded-3xl font-black border border-rose-200 focus:border-rose-400 focus:ring-4 focus:ring-rose-500/20 outline-none transition-all tracking-[0.5em] text-lg md:text-xl text-center"/></div>
                      <div className="space-y-3 pt-4 border-t border-slate-100 mt-6">
                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Settings size={14}/> Sistem & Perbaikan</label>
-                       <button type="button" onClick={() => { if(window.confirm('Aplikasi akan memuat ulang dan menghapus memori sementara. Lanjutkan?')) { localStorage.clear(); window.location.reload(true); } }} className="w-full py-4 bg-orange-100 text-orange-700 rounded-[24px] font-bold text-sm hover:bg-orange-200 transition-all flex items-center justify-center gap-2 active:scale-95 shadow-sm"><RefreshCw size={18}/> Hapus Cache & Refresh Aplikasi</button>
+                       <button onClick={() => { if(window.confirm('Aplikasi akan memuat ulang dan menghapus memori sementara. Lanjutkan?')) { localStorage.clear(); window.location.reload(true); } }} className="w-full py-4 bg-orange-100 text-orange-700 rounded-[24px] font-bold text-sm hover:bg-orange-200 transition-all flex items-center justify-center gap-2 active:scale-95 shadow-sm"><RefreshCw size={18}/> Hapus Cache & Refresh Aplikasi</button>
                        <p className="text-[10px] text-slate-400 font-bold ml-2 text-center">Gunakan tombol ini jika tampilan toko tidak berubah setelah pembaruan.</p>
                      </div>
                      <button disabled={isProcessing} onClick={handleSaveSettings} className="w-full py-5 bg-slate-900 text-white rounded-[32px] font-black text-sm md:text-lg shadow-xl shadow-slate-300 hover:bg-slate-800 transition-all active:scale-95 mt-8 disabled:opacity-50">{isProcessing ? 'MENYIMPAN...' : 'SIMPAN SEMUA PENGATURAN'}</button>
