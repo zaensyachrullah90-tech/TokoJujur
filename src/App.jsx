@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  CheckCircle, Settings, BarChart3, PlusCircle, 
-  Store, QrCode, CreditCard, ChevronRight, ArrowLeft,
-  Search, X, Lock, LogOut, TrendingUp, Edit, Trash2, List, TrendingDown,
-  Camera, Download, Power, UploadCloud, AlertTriangle, Copy, Barcode, Share2, Sparkles, Wand2, ExternalLink, ShoppingCart, RefreshCw, History
+  AlertTriangle, ArrowLeft, BarChart3, Barcode, Camera, CheckCircle, 
+  ChevronRight, Copy, CreditCard, Download, Edit, ExternalLink, History, 
+  Image as ImageIcon, List, Lock, LogOut, Package, PlusCircle, Power, 
+  QrCode, RefreshCw, Search, Settings, Share2, ShoppingCart, Sparkles, 
+  Store, Trash2, TrendingDown, TrendingUp, UploadCloud, Wand2, X 
 } from 'lucide-react';
 
 // =========================================================================
@@ -44,8 +45,8 @@ const formatImageUrl = (url) => {
   
   const driveMatch = url.match(/(?:file\/d\/|id=)([a-zA-Z0-9_-]+)/);
   if (driveMatch && driveMatch[1]) {
-    // Menggunakan Thumbnail API Google Drive agar anti-block dan langsung muat tanpa refresh
-    return `https://drive.google.com/thumbnail?id=${driveMatch[1]}&sz=w800`;
+    // Menggunakan API uc?export=view yang paling stabil untuk web
+    return `https://drive.google.com/uc?export=view&id=${driveMatch[1]}`;
   }
   
   if (url.includes('github.com') && url.includes('/blob/')) return url.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/');
@@ -53,7 +54,7 @@ const formatImageUrl = (url) => {
 };
 
 // GAMBAR PENGGANTI JIKA LINK G-DRIVE SALAH / DIPRIVASI
-const FALLBACK_IMAGE = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Crect width='18' height='18' x='3' y='3' rx='2' ry='2'/%3E%3Ccircle cx='9' cy='9' r='2'/%3E%3Cpath d='m21 15-3.086-3.086a2 2 0 0 0-2.828 0L6 21'/%3E%3C/svg%3E";
+const FALLBACK_IMAGE = "https://placehold.co/400x400/f8fafc/94a3b8?text=Foto+Kosong";
 
 const hitungTotalHargaItem = (item, qty) => {
   if (item.diskon && qty >= (item.diskon.min_qty || 1)) {
@@ -286,10 +287,6 @@ function MainApp() {
           supabaseClient.from('pengaturan').select('*').eq('id', 1).single()
         ]);
         
-        if (prodRes.error) {
-           console.error(prodRes.error);
-        }
-        
         if (prodRes.data) setProducts(prodRes.data);
         if (trxRes.data) setTransactions(trxRes.data);
         if (setRes.data) setSettings(setRes.data);
@@ -301,7 +298,6 @@ function MainApp() {
 
     loadData(true);
 
-    // SISTEM AUTO-SYNC SILUMAN
     const pollInterval = setInterval(() => loadData(false), 5000);
 
     const channel = supabaseClient.channel('toko-realtime')
@@ -847,7 +843,8 @@ function MainApp() {
     link.click();
   };
 
-  // --- RENDER AMAN (TANPA ERROR COMPILER) ---
+  // --- RENDER UI ---
+
   if (!isConnected || !supabaseClient) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center font-sans">
@@ -886,6 +883,80 @@ function MainApp() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-emerald-100 relative">
       
+      {/* MODAL SCANNER KAMERA */}
+      {isScanningModalOpen && (
+        <div className="fixed inset-0 bg-black z-[999] flex flex-col animate-fade-in">
+          <div className="flex justify-between items-center p-4 bg-gradient-to-b from-black/80 to-transparent text-white absolute top-0 w-full z-10">
+            <span className="font-bold text-lg tracking-widest uppercase">Arahkan ke Barcode</span>
+            <button onClick={stopScanner} className="p-3 bg-red-500/80 hover:bg-red-500 rounded-full transition-colors backdrop-blur-sm shadow-xl"><X size={24}/></button>
+          </div>
+          <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
+          <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
+            <div className="w-64 h-40 border-4 border-emerald-500 rounded-3xl shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] relative flex items-center justify-center">
+              <div className="absolute w-full h-0.5 bg-emerald-400 animate-[scan_2s_ease-in-out_infinite] shadow-[0_0_10px_#34d399]"></div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL SHARE TOKO */}
+      {showShareApp && (
+        <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[999] flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white w-full max-w-sm rounded-[32px] p-8 shadow-2xl flex flex-col items-center relative text-center animate-slide-up">
+            <button onClick={() => setShowShareApp(false)} className="absolute top-4 right-4 p-2 bg-slate-100 rounded-full hover:bg-slate-200 transition"><X size={20}/></button>
+            <Store className="text-emerald-500 mb-3" size={48}/>
+            <h3 className="font-black text-2xl text-slate-800 mb-1">{settings.nama_toko}</h3>
+            <p className="text-xs text-slate-500 font-bold mb-6">Scan QR Code ini untuk membuka toko di HP Pembeli</p>
+            <div className="bg-white p-4 rounded-3xl shadow-sm border-2 border-dashed border-emerald-300 mb-6">
+              <img src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(typeof window !== 'undefined' ? window.location.href : '')}`} alt="QR Code Toko" className="w-48 h-48 object-contain" />
+            </div>
+            <div className="w-full bg-slate-50 p-3 rounded-2xl border border-slate-200 flex items-center justify-between gap-3 mb-2">
+              <span className="text-xs font-mono text-slate-600 truncate font-bold">{typeof window !== 'undefined' ? window.location.href : ''}</span>
+              <button onClick={() => { if(navigator.clipboard) navigator.clipboard.writeText(window.location.href); showToast('Link Toko Berhasil Disalin!', 'success'); }} className="p-2 bg-emerald-100 text-emerald-700 rounded-xl hover:bg-emerald-200 transition shadow-sm"><Copy size={16}/></button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL EDIT TRANSAKSI */}
+      {editingTrx && (
+        <div className="fixed inset-0 bg-slate-900/60 z-[999] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
+           <div className="bg-white rounded-3xl p-6 w-full max-w-md animate-slide-up shadow-2xl border-4 border-white">
+              <h3 className="font-black text-xl mb-1 text-slate-800">Edit Data Transaksi</h3>
+              <p className="text-xs font-bold text-slate-400 mb-6 pb-4 border-b border-slate-100">Koreksi total harga atau metode pembayaran jika ada kesalahan.</p>
+              <form onSubmit={handleSaveEditTrx}>
+                 <div className="space-y-4">
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest font-black text-gray-500 ml-1">Metode Pembayaran</label>
+                      <select value={editingTrx.metode} onChange={e => setEditingTrx({...editingTrx, metode: e.target.value})} className="w-full p-4 mt-1 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm text-slate-700 outline-none focus:ring-4 focus:ring-emerald-500/20">
+                         <option value="QRIS / Kasir Etalase">QRIS / Kasir Etalase</option>
+                         <option value="QRIS Cepat">QRIS Cepat</option>
+                         <option value="Transfer Bank">Transfer Bank</option>
+                         <option value="Tunai">Tunai / Cash</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest font-black text-gray-500 ml-1">Total Belanja (Rp)</label>
+                      <input type="number" value={editingTrx.total} onChange={e => setEditingTrx({...editingTrx, total: parseInt(e.target.value)||0, profit: (parseInt(e.target.value)||0) - editingTrx.modal})} className="w-full p-4 mt-1 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm text-slate-700 outline-none focus:ring-4 focus:ring-emerald-500/20" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest font-black text-gray-500 ml-1">Total Modal (Rp)</label>
+                      <input type="number" value={editingTrx.modal} onChange={e => setEditingTrx({...editingTrx, modal: parseInt(e.target.value)||0, profit: editingTrx.total - (parseInt(e.target.value)||0)})} className="w-full p-4 mt-1 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm text-slate-700 outline-none focus:ring-4 focus:ring-emerald-500/20" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest font-black text-gray-500 ml-1">Keuntungan / Profit (Rp)</label>
+                      <input type="number" value={editingTrx.profit} onChange={e => setEditingTrx({...editingTrx, profit: parseInt(e.target.value)||0})} className="w-full p-4 mt-1 bg-emerald-50 border border-emerald-200 rounded-2xl font-extrabold text-sm text-emerald-700 outline-none focus:ring-4 focus:ring-emerald-500/20" />
+                    </div>
+                 </div>
+                 <div className="flex gap-3 mt-8">
+                    <button type="button" onClick={() => setEditingTrx(null)} className="flex-1 py-4 bg-slate-100 font-bold rounded-2xl text-slate-600 hover:bg-slate-200 transition-colors">Batal</button>
+                    <button type="submit" disabled={isProcessing} className="flex-1 py-4 bg-emerald-600 font-bold rounded-2xl text-white hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">{isProcessing ? 'Menyimpan...' : 'Simpan Edit'}</button>
+                 </div>
+              </form>
+           </div>
+        </div>
+      )}
+
       {/* TOAST GLOBAL */}
       {toast.show && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-slate-900 text-white rounded-full shadow-2xl font-bold flex items-center gap-2 animate-slide-up border border-slate-700 w-max max-w-[90%] text-center text-sm md:text-base">
@@ -894,7 +965,7 @@ function MainApp() {
         </div>
       )}
 
-      {/* HEADER UTAMA (MUNCUL DI SEMUA VIEW KECUALI ADMIN FULL) */}
+      {/* HEADER UTAMA (MUNCUL DI SEMUA VIEW KECUALI ADMIN FULL ATAU STRUK) */}
       {view !== 'admin' && view !== 'struk' && (
         <header className="bg-white p-4 shadow-sm sticky top-0 z-40 mb-4 border-b">
           <div className="flex justify-between items-center mb-4 max-w-5xl mx-auto">
@@ -945,9 +1016,19 @@ function MainApp() {
               <div key={p.id} onClick={() => openProductModal(p)} className="bg-white p-3 md:p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center text-center relative active:scale-95 transition-transform cursor-pointer border-b-4 border-b-slate-100 overflow-hidden w-full h-full">
                 {cart[p.id] > 0 && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] md:text-xs font-black px-2 md:px-3 py-1 rounded-bl-xl shadow-lg z-20">{cart[p.id]}</div>}
                 
+                {/* GAMBAR PRODUK RAKSASA DENGAN FALLBACK AMAN */}
                 <div className="mb-3 md:mb-4 w-32 h-32 md:w-48 md:h-48 rounded-2xl border border-slate-100 shadow-inner relative overflow-hidden bg-slate-50 flex items-center justify-center shrink-0">
                   {p.gambar ? (
-                    <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white will-change-transform" alt={p.nama} onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }} />
+                    <img 
+                      loading="lazy" 
+                      src={formatImageUrl(p.gambar)} 
+                      className="absolute inset-0 w-full h-full object-cover z-10 bg-white will-change-transform" 
+                      alt={p.nama} 
+                      onError={(e) => { 
+                        e.target.onerror = null; 
+                        e.target.src = FALLBACK_IMAGE; 
+                      }} 
+                    />
                   ) : (
                     <img src={FALLBACK_IMAGE} className="w-16 h-16 opacity-50" alt="kosong"/>
                   )}
@@ -961,7 +1042,6 @@ function MainApp() {
             {searchFilteredProducts.length === 0 && <div className="col-span-full text-center text-slate-400 mt-10 font-bold text-sm">Barang tidak ditemukan.</div>}
           </main>
 
-          {/* MODAL PILIH JUMLAH PRODUK */}
           {selectedProduct && (
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-4 animate-fade-in">
               <div className="bg-white w-full max-w-md rounded-3xl p-6 md:p-8 shadow-2xl animate-slide-up border-4 border-white flex flex-col">
@@ -997,7 +1077,6 @@ function MainApp() {
             </div>
           )}
 
-          {/* TOMBOL BAYAR MENGAMBANG */}
           {jumlahItem > 0 && !selectedProduct && (
             <div className="fixed bottom-6 left-4 right-4 z-50 max-w-md mx-auto">
               <button onClick={() => setView('checkout')} className="w-full bg-emerald-600 text-white p-4 md:p-5 rounded-3xl shadow-2xl flex justify-between items-center active:scale-95 transition-all border border-emerald-400">
@@ -1011,7 +1090,7 @@ function MainApp() {
 
       {/* VIEW: CHECKOUT */}
       {view === 'checkout' && (
-        <div className="max-w-md mx-auto p-4 md:p-6 flex flex-col pb-32">
+        <div className="max-w-md mx-auto p-4 md:p-6 min-h-screen flex flex-col pb-32">
           <button onClick={() => setView('toko')} className="flex items-center gap-2 font-black mb-6 text-slate-400 hover:text-slate-600 transition w-max"><ArrowLeft size={18}/> Kembali Belanja</button>
           
           <div className="bg-white rounded-3xl p-5 md:p-6 shadow-sm border border-slate-100 mb-6">
@@ -1063,7 +1142,7 @@ function MainApp() {
 
       {/* VIEW: STRUK */}
       {view === 'struk' && (
-        <div className="flex flex-col items-center justify-start pt-10 px-4 pb-10">
+        <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-start pt-10 px-4 pb-10">
           <div className="mb-6 flex flex-col items-center animate-slide-up text-center">
             <div className="w-14 h-14 md:w-16 md:h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center mb-3 shadow-lg shadow-emerald-200"><CheckCircle size={32} /></div>
             <h2 className="text-xl md:text-2xl font-extrabold text-slate-800">Struk Tersimpan!</h2>
@@ -1136,7 +1215,7 @@ function MainApp() {
 
       {/* VIEWS: RIWAYAT LOKAL HP */}
       {view === 'riwayat' && (
-         <div className="pb-20">
+         <div className="min-h-screen bg-slate-50 pb-20">
             <header className="bg-white p-4 shadow-sm flex items-center justify-between sticky top-0 z-40 border-b border-slate-200">
                <div className="flex items-center gap-3">
                  <button onClick={() => setView('toko')} className="p-2 bg-slate-100 text-slate-600 rounded-full hover:bg-slate-200"><ArrowLeft size={20}/></button>
@@ -1188,7 +1267,7 @@ function MainApp() {
 
       {/* VIEW: ADMIN LOGIN */}
       {view === 'admin' && !isAdminLogged && (
-        <div className="flex items-center justify-center p-4 min-h-[80vh]">
+        <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
           <form onSubmit={handleLogin} className="bg-white p-8 rounded-[40px] shadow-xl w-full max-w-sm border border-slate-100">
             <div className="w-20 h-20 bg-slate-50 text-slate-600 rounded-3xl flex items-center justify-center mb-6 mx-auto shadow-inner"><Lock size={32} /></div>
             <h2 className="text-2xl font-black text-center mb-2 text-slate-800 uppercase tracking-tight">Panel Admin</h2>
@@ -1201,9 +1280,9 @@ function MainApp() {
       )}
 
       {/* VIEW: ADMIN DASHBOARD */}
-      {view === 'admin' && isAdminLogged && (
-        <div className="flex flex-col md:flex-row relative w-full overflow-hidden">
-          <aside className="bg-slate-950 text-white w-full md:w-64 flex-shrink-0 flex flex-col shadow-2xl sticky top-0 z-40 md:min-h-screen">
+      {view === 'admin' && isAdminLogged && adminData && (
+        <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row relative w-full overflow-hidden">
+          <aside className="bg-slate-950 text-white w-full md:w-64 flex-shrink-0 flex flex-col shadow-2xl sticky top-0 z-40 md:h-screen">
             <div className="hidden md:flex p-6 items-center gap-3 border-b border-slate-800 flex-shrink-0">
                <Store className="text-emerald-400 shrink-0" size={28} />
                <div><h2 className="font-extrabold text-xl text-white leading-tight tracking-wide">Admin Area</h2><p className="text-[10px] text-emerald-400 font-black uppercase tracking-widest mt-1">Toko Kejujuran</p></div>
@@ -1271,32 +1350,26 @@ function MainApp() {
                       </div>
                     </div>
                   </div>
-
                   <h2 className="text-base md:text-xl font-bold text-slate-800 mb-4 flex items-center gap-2"><CheckCircle className="text-emerald-500" size={20}/> Rekap Penjualan (Terjual)</h2>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-8">
-                     <div className="bg-white p-4 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-5"><BarChart3 size={48}/></div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Omset</p><p className="text-lg md:text-3xl font-extrabold text-slate-800 truncate">{formatRupiah(transactions.filter(t => (!filterStart || new Date(t.tanggal) >= new Date(filterStart)) && (!filterEnd || new Date(t.tanggal) <= new Date(filterEnd))).reduce((sum, t) => sum + (t.total || 0), 0))}</p></div>
-                     <div className="bg-white p-4 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-5"><Store size={48}/></div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Modal Terjual</p><p className="text-lg md:text-3xl font-extrabold text-blue-600 truncate">{formatRupiah(transactions.filter(t => (!filterStart || new Date(t.tanggal) >= new Date(filterStart)) && (!filterEnd || new Date(t.tanggal) <= new Date(filterEnd))).reduce((sum, t) => sum + (t.modal || 0), 0))}</p></div>
-                     <div className="col-span-2 md:col-span-1 bg-gradient-to-br from-emerald-500 to-teal-600 p-4 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm text-white relative overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-10"><CheckCircle size={48}/></div><p className="text-[10px] font-black text-emerald-100 uppercase tracking-widest mb-1">Untung Bersih</p><p className="text-xl md:text-3xl font-extrabold drop-shadow-sm truncate">{formatRupiah(transactions.filter(t => (!filterStart || new Date(t.tanggal) >= new Date(filterStart)) && (!filterEnd || new Date(t.tanggal) <= new Date(filterEnd))).reduce((sum, t) => sum + (t.profit || 0), 0))}</p></div>
+                     <div className="bg-white p-4 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-5"><BarChart3 size={48}/></div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Omset</p><p className="text-lg md:text-3xl font-extrabold text-slate-800 truncate">{formatRupiah(adminData.totalPendapatanKotor)}</p></div>
+                     <div className="bg-white p-4 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-5"><Store size={48}/></div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Modal Terjual</p><p className="text-lg md:text-3xl font-extrabold text-blue-600 truncate">{formatRupiah(adminData.totalModalTerjual)}</p></div>
+                     <div className="col-span-2 md:col-span-1 bg-gradient-to-br from-emerald-500 to-teal-600 p-4 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm text-white relative overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-10"><CheckCircle size={48}/></div><p className="text-[10px] font-black text-emerald-100 uppercase tracking-widest mb-1">Untung Bersih</p><p className="text-xl md:text-3xl font-extrabold drop-shadow-sm truncate">{formatRupiah(adminData.totalKeuntunganBersih)}</p></div>
                   </div>
-
                   <h2 className="text-base md:text-xl font-bold text-slate-800 mb-4 flex items-center gap-2"><Package className="text-blue-500" size={20}/> Rekap Input Barang (Filter Tanggal)</h2>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-12">
-                     <div className="bg-white p-4 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-5"><Package size={48}/></div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Barang (Pcs)</p><p className="text-lg md:text-3xl font-extrabold text-slate-800 truncate">{products.reduce((sum, p) => sum + (p.stok || 0), 0)}</p></div>
-                     <div className="bg-white p-4 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-5"><Store size={48}/></div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Modal (Stok)</p><p className="text-lg md:text-3xl font-extrabold text-blue-600 truncate">{formatRupiah(products.reduce((sum, p) => sum + ((p.modal || 0) * (p.stok || 0)), 0))}</p></div>
-                     <div className="col-span-2 md:col-span-1 bg-gradient-to-br from-blue-500 to-indigo-600 p-4 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm text-white relative overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-10"><TrendingUp size={48}/></div><p className="text-[10px] font-black text-blue-100 uppercase tracking-widest mb-1">Potensi Keuntungan</p><p className="text-xl md:text-3xl font-extrabold drop-shadow-sm truncate">{formatRupiah(products.reduce((sum, p) => sum + (((p.jual || 0) - (p.modal || 0)) * (p.stok || 0)), 0))}</p></div>
+                     <div className="bg-white p-4 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-5"><Package size={48}/></div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Barang (Pcs)</p><p className="text-lg md:text-3xl font-extrabold text-slate-800 truncate">{adminData.totalBarangInput}</p></div>
+                     <div className="bg-white p-4 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-5"><Store size={48}/></div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Modal (Stok)</p><p className="text-lg md:text-3xl font-extrabold text-blue-600 truncate">{formatRupiah(adminData.totalModalInput)}</p></div>
+                     <div className="col-span-2 md:col-span-1 bg-gradient-to-br from-blue-500 to-indigo-600 p-4 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm text-white relative overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-10"><TrendingUp size={48}/></div><p className="text-[10px] font-black text-blue-100 uppercase tracking-widest mb-1">Potensi Keuntungan</p><p className="text-xl md:text-3xl font-extrabold drop-shadow-sm truncate">{formatRupiah(adminData.potensiKeuntungan)}</p></div>
                   </div>
-
                   <div className="bg-white rounded-3xl md:rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col mb-8 w-full">
                     <div className="p-4 md:p-6 border-b border-slate-100"><h2 className="font-black text-base md:text-xl text-slate-800 flex items-center gap-2"><Package className="text-emerald-500" size={20}/> Rekap Keseluruhan per Barang</h2></div>
                     <div className="overflow-x-auto max-h-[400px] overflow-y-auto w-full block">
                       <table className="w-full text-left min-w-[600px] border-collapse">
                          <thead className="bg-slate-50 sticky top-0 shadow-sm z-10"><tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest"><th className="p-3 md:p-4">Nama Barang</th><th className="p-3 md:p-4 text-center">Terjual</th><th className="p-3 md:p-4 text-center">Sisa Stok</th><th className="p-3 md:p-4 text-center">Total Awal</th><th className="p-3 md:p-4 text-right">Pendapatan</th></tr></thead>
                          <tbody className="divide-y divide-slate-50">
-                           {products.length === 0 && <tr><td colSpan="5" className="p-6 text-center text-slate-400 font-bold text-xs">Data kosong.</td></tr>}
-                           {products.map((p) => {
-                             let pQty = 0; let pRev = 0;
-                             transactions.forEach(t => t.items.forEach(i => { if(i.id === p.id) { pQty += i.qty; pRev += i.totalHarga; }}));
-                             return (
+                           {adminData.productRankings.length === 0 && <tr><td colSpan="5" className="p-6 text-center text-slate-400 font-bold text-xs">Data kosong.</td></tr>}
+                           {adminData.productRankings.map((p) => (
                              <tr key={p.id} className="text-xs md:text-sm font-bold hover:bg-slate-50 transition-colors">
                                <td className="p-3 md:p-4 flex items-center gap-3">
                                  <div className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center bg-white shrink-0 overflow-hidden relative">
@@ -1304,18 +1377,44 @@ function MainApp() {
                                  </div>
                                  <span className="truncate max-w-[120px] md:max-w-xs text-slate-700">{p.nama}</span>
                                </td>
-                               <td className="p-3 md:p-4 text-center text-emerald-600 font-black">{pQty}</td>
+                               <td className="p-3 md:p-4 text-center text-emerald-600 font-black">{p.qty}</td>
                                <td className="p-3 md:p-4 text-center text-blue-600 font-black">{p.stok}</td>
-                               <td className="p-3 md:p-4 text-center text-slate-600 font-black">{p.stok + pQty}</td>
-                               <td className="p-3 md:p-4 text-right text-slate-800 font-black">{formatRupiah(pRev)}</td>
+                               <td className="p-3 md:p-4 text-center text-slate-600 font-black">{p.stok + p.qty}</td>
+                               <td className="p-3 md:p-4 text-right text-slate-800 font-black">{formatRupiah(p.revenue)}</td>
                              </tr>
-                             );
-                           })}
+                           ))}
                          </tbody>
                       </table>
                     </div>
                   </div>
-
+                  <div className="grid lg:grid-cols-2 gap-6 mb-8 w-full">
+                      <div className="bg-white rounded-3xl md:rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col w-full">
+                        <div className="p-4 md:p-6 border-b border-slate-100"><h2 className="font-black text-base md:text-xl text-slate-800 flex items-center gap-2"><TrendingUp className="text-orange-500" size={20}/> 10 Barang Paling Laku</h2></div>
+                        <div className="overflow-x-auto max-h-[300px] w-full block">
+                          <table className="w-full text-left min-w-[300px] border-collapse">
+                             <tbody className="divide-y divide-slate-50">
+                               {adminData.topSelling.length === 0 && <tr><td className="p-6 text-center text-slate-400 font-bold text-xs">Kosong.</td></tr>}
+                               {adminData.topSelling.map((p, idx) => (
+                                 <tr key={p.id} className="text-xs md:text-sm font-bold"><td className="p-3 flex items-center gap-2"><span className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] ${idx < 3 ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-500'}`}>{idx + 1}</span><span className="truncate max-w-[100px] md:max-w-[200px] text-slate-700">{p.nama}</span></td><td className="p-3 text-center"><span className="px-2 py-1 rounded bg-emerald-100 text-emerald-700 text-[10px]">{p.qty} terjual</span></td></tr>
+                               ))}
+                             </tbody>
+                          </table>
+                        </div>
+                      </div>
+                      <div className="bg-white rounded-3xl md:rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col w-full">
+                        <div className="p-4 md:p-6 border-b border-slate-100"><h2 className="font-black text-base md:text-xl text-slate-800 flex items-center gap-2"><TrendingDown className="text-red-500" size={20}/> Perhatian: Kurang Laku</h2></div>
+                        <div className="overflow-x-auto max-h-[300px] w-full block">
+                          <table className="w-full text-left min-w-[300px] border-collapse">
+                             <tbody className="divide-y divide-slate-50">
+                               {adminData.bottomSelling.length === 0 && <tr><td className="p-6 text-center text-slate-400 font-bold text-xs">Semua laku!</td></tr>}
+                               {adminData.bottomSelling.map((item, idx) => (
+                                 <tr key={idx} className="text-xs md:text-sm font-bold"><td className="p-3 text-slate-700 truncate max-w-[150px]">{item.nama}</td><td className="p-3 text-center text-red-500">{item.qty} terjual</td><td className="p-3 text-right text-[10px] text-slate-400">Nganggur {item.daysActive}h</td></tr>
+                               ))}
+                             </tbody>
+                          </table>
+                        </div>
+                      </div>
+                  </div>
                   <div className="bg-white rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 p-4 md:p-8 w-full">
                     <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-3">
                       <h2 className="font-black text-base md:text-lg flex items-center gap-2 text-slate-900"><List className="text-blue-500" size={20}/> Riwayat Transaksi Lengkap</h2>
@@ -1324,7 +1423,7 @@ function MainApp() {
                       </select>
                     </div>
                     <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1 w-full block">
-                      {transactions.length === 0 ? <p className="text-gray-400 text-xs font-bold text-center py-10">Belum ada transaksi.</p> : transactions.map(t => (
+                      {adminData.sortedTransactions.length === 0 ? <p className="text-gray-400 text-xs font-bold text-center py-10">Belum ada transaksi.</p> : adminData.sortedTransactions.map(t => (
                         <div key={t.id} className="border border-gray-200 rounded-2xl p-4 bg-gray-50/50">
                           <div className="flex justify-between items-center text-[10px] md:text-xs mb-2 pb-2 border-b border-gray-200"><span className="font-mono font-bold text-slate-500">{t.id} • {t.tanggal}</span><span className="font-black px-2 py-0.5 rounded uppercase bg-slate-200 text-slate-600">{t.metode}</span></div>
                           <div className="space-y-1 mb-2">{t.items.map((i, idx) => (<div key={idx} className="text-[10px] md:text-xs flex justify-between text-slate-700 font-bold"><span className="truncate pr-2">{i.qty}x {i.nama}</span><span className="text-slate-900 shrink-0">{formatRupiah(i.totalHarga)}</span></div>))}</div>
@@ -1422,7 +1521,7 @@ function MainApp() {
                            </div>
                          </div>
                        )}
-                       <button disabled={isProcessing} className={`text-white py-4 rounded-2xl font-black text-sm md:text-base md:col-span-4 mt-2 transition-all active:scale-[0.98] shadow-xl disabled:opacity-50 bg-slate-900 hover:bg-slate-800`}>{isProcessing ? 'MENYIMPAN...' : (editingId ? 'UPDATE BARANG SEKARANG' : 'SIMPAN BARANG BARU')}</button>
+                       <button disabled={isProcessing} className={`text-white py-4 rounded-2xl font-black text-sm md:text-base md:col-span-4 mt-2 transition-all active:scale-[0.98] shadow-xl disabled:opacity-50 ${editingId ? 'bg-blue-600 hover:bg-blue-700 shadow-blue-200' : 'bg-slate-900 hover:bg-slate-800'}`}>{isProcessing ? 'MENYIMPAN...' : (editingId ? 'UPDATE BARANG SEKARANG' : 'SIMPAN BARANG BARU')}</button>
                     </form>
                  )}
                  <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden w-full">
