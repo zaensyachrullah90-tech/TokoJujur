@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { 
-  Coffee, Utensils, Package, IceCream, Droplet, Candy, 
   CheckCircle, Settings, BarChart3, PlusCircle, 
   Store, QrCode, CreditCard, ChevronRight, ArrowLeft,
   Search, X, Lock, LogOut, TrendingUp, Edit, Trash2, List, TrendingDown,
@@ -8,8 +7,11 @@ import {
 } from 'lucide-react';
 
 // =========================================================================
-// PENGATURAN KONEKSI SUPABASE (BLUEPRINT TERKUNCI & ANTI-CRASH)
+// KONEKSI SUPABASE LANGSUNG (ANTI-GAGAL)
 // =========================================================================
+const SUPABASE_URL = 'https://azsocvlmuaddleqtlvko.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF6c29jdmxtdWFkZGxlcXRsdmtvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5OTAxMjEsImV4cCI6MjA5MTU2NjEyMX0.xGq-IpxhlFQ_8KTPIZXUm-NLKHIrQI4uNMfG9SVLAgA';
+
 let supabaseClient = null;
 
 // --- LOGIKA BANTUAN & EFEK SUARA ---
@@ -48,42 +50,7 @@ const formatImageUrl = (url) => {
   return url;
 };
 
-// =========================================================================
-// IKON REALISTIS (3D EMOJI SHADOW)
-// =========================================================================
-const getDynamicIcon = (namaBarang) => {
-  const name = (namaBarang || '').toLowerCase();
-  const iconWrapper = (emoji) => (
-    <span className="text-5xl md:text-6xl drop-shadow-md transition-transform transform hover:scale-110 will-change-transform">{emoji}</span>
-  );
-
-  if (name.match(/kacang|peanut|sukro|garuda|dua kelinci|pilus|koro|atom/)) return iconWrapper('🥜');
-  if (name.match(/wafer|tango|nabati|beng|biskuat|nissin|biskuit|oreo|malkist|roma|gery/)) return iconWrapper('🧇');
-  if (name.match(/coklat|chocolate|silverqueen|choki|delfi|milo|cadbury|beng-beng|chocolatos/)) return iconWrapper('🍫');
-  if (name.match(/permen|candy|yupi|kopiko|kiss|mint|sugus|relaxa|mintz|gummy|fox/)) return iconWrapper('🍬');
-  if (name.match(/snack|ciki|chiki|keripik|taro|lays|citato|chitato|qtela|piattos|potabee|cheetos|kusuka|jetz/)) return iconWrapper('🍿');
-  if (name.match(/es|ice|krim|campina|walls|aice|cornetto|magnum|joyday/)) return iconWrapper('🍦');
-
-  if (name.match(/bakso|pentol|cilok|tahu|soto|kuah|seblak|baso|cuanki/)) return iconWrapper('🍲');
-  if (name.match(/mie|indomie|sedap|noodle|samyang|pop mie|sarimi|supermi|lemonilo|gelas/)) return iconWrapper('🍜');
-  if (name.match(/nasi|makan|lontong|geprek|pecel|ayam|gorengan|penyet|lele/)) return iconWrapper('🍛');
-  if (name.match(/roti|bolu|bakpao|pizza|burger|sari roti|kue|donat|cake/)) return iconWrapper('🍞');
-  if (name.match(/daging|sapi|kambing|sosis|nugget|kornet|bakar/)) return iconWrapper('🥩');
-  if (name.match(/ikan|lele|nila|udang|seafood|sarden|tuna|teri/)) return iconWrapper('🐟');
-
-  if (name.match(/kopi|teh|panas|good day|kapal api|nescafe|luwak|pucuk|javana|kotak/)) return iconWrapper('☕');
-  if (name.match(/air|mineral|aqua|le minerale|cleo|vit|nestle|ades|pristine|club/)) return iconWrapper('💧');
-  if (name.match(/minum|coca|susu|jus|sirup|sprite|fanta|soda|nutrisari|floridina|bear brand|yakult|mizone|pocari/)) return iconWrapper('🥤');
-
-  if (name.match(/obat|panadol|paramex|bodrex|tolak|vitamin|promag|mixagrip|diapet|antangin/)) return iconWrapper('💊');
-  if (name.match(/sabun|shampo|rinso|sunlight|cuci|odol|pasta gigi|deterjen|pepsodent|biore|lifebuoy|soklin|daia/)) return iconWrapper('🧼');
-  if (name.match(/rokok|korek|mancis|sampoerna|djarum|gudang|surya|magnum|esse|marlboro|camel/)) return iconWrapper('🚬');
-  if (name.match(/sayur|bayam|kangkung|wortel|tomat|cabe|bawang/)) return iconWrapper('🥬');
-  if (name.match(/buah|apel|jeruk|pisang|mangga|melon|semangka/)) return iconWrapper('🍎');
-  
-  return iconWrapper('🛍️');
-};
-
+// MENGHITUNG TOTAL HARGA (TERMASUK GROSIR)
 const hitungTotalHargaItem = (item, qty) => {
   if (item.diskon && qty >= (item.diskon.min_qty || 1)) {
     const paketDiskon = Math.floor(qty / item.diskon.min_qty);
@@ -162,336 +129,12 @@ function MainApp() {
   const [useDiskon, setUseDiskon] = useState(false);
   const [editingTrx, setEditingTrx] = useState(null);
 
-  const showToast = (msg, type = 'success') => {
-    setToast({ show: true, msg: String(msg), type });
-    setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 4000); 
-  };
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') Notification.requestPermission();
-      let link = document.querySelector("link[rel~='icon']");
-      if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
-      link.href = "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏪</text></svg>";
-    }
-  }, []);
-
-  useEffect(() => { try { localStorage.setItem('tokojujur_view', view); } catch(e){} }, [view]);
-  useEffect(() => { try { localStorage.setItem('tokojujur_admintab', adminTab); } catch(e){} }, [adminTab]);
-  useEffect(() => { try { localStorage.setItem('tokojujur_cart', JSON.stringify(cart)); } catch(e){} }, [cart]);
-  useEffect(() => { try { localStorage.setItem('tokojujur_local_history', JSON.stringify(localHistory)); } catch(e){} }, [localHistory]);
-  useEffect(() => { try { localStorage.setItem('tokojujur_gemini_key', geminiKey); } catch(e){} }, [geminiKey]);
-
-  // INISIALISASI SUPABASE LANGSUNG MENGGUNAKAN KEY
-  useEffect(() => {
-    const initSupabase = () => {
-      try {
-        const env = typeof import.meta !== 'undefined' ? import.meta.env : {};
-        let url = env.VITE_SUPABASE_URL || localStorage.getItem('tokojujur_sb_url') || 'https://azsocvlmuaddleqtlvko.supabase.co';
-        let key = env.VITE_SUPABASE_ANON_KEY || localStorage.getItem('tokojujur_sb_key') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF6c29jdmxtdWFkZGxlcXRsdmtvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5OTAxMjEsImV4cCI6MjA5MTU2NjEyMX0.xGq-IpxhlFQ_8KTPIZXUm-NLKHIrQI4uNMfG9SVLAgA';
-        
-        if (url.endsWith('/rest/v1/')) {
-            url = url.replace('/rest/v1/', '');
-        }
-
-        if (url && key && window.supabase) {
-          supabaseClient = window.supabase.createClient(url, key);
-          setIsConnected(true);
-        } else {
-          setIsConnected(false);
-        }
-      } catch(e) {
-        setIsConnected(false);
-      }
-      setDbReady(true);
-    };
-
-    if (!window.supabase) {
-      const script = document.createElement('script');
-      script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
-      script.onload = initSupabase;
-      document.head.appendChild(script);
-    } else {
-      initSupabase();
-    }
-  }, []);
-
-  // REALTIME INSTAN & SINKRONISASI (DENGAN POLLING SILUMAN BACKUP)
-  useEffect(() => {
-    if (!dbReady || !isConnected || !supabaseClient) return;
-    
-    const loadData = async (isInitial = false) => {
-      if (isInitial) setIsLoadingDB(true);
-      try {
-        const [prodRes, trxRes, setRes] = await Promise.all([
-          supabaseClient.from('produk').select('*').order('id', { ascending: true }),
-          supabaseClient.from('transaksi').select('*').order('id', { ascending: false }),
-          supabaseClient.from('pengaturan').select('*').eq('id', 1).single()
-        ]);
-        
-        if (prodRes.error) {
-           console.error(prodRes.error);
-        }
-        
-        if (prodRes.data) setProducts(prodRes.data);
-        if (trxRes.data) setTransactions(trxRes.data);
-        if (setRes.data) setSettings(setRes.data);
-      } catch (e) {
-        if (isInitial) showToast("Gagal terhubung ke Database.", "error");
-      }
-      if (isInitial) setIsLoadingDB(false);
-    };
-
-    // Muat data pertama kali
-    loadData(true);
-
-    // SISTEM AUTO-SYNC SILUMAN (BACKUP JIKA REPLICATION SUPABASE BELUM DIAKTIFKAN OLEH USER)
-    const pollInterval = setInterval(() => loadData(false), 5000);
-
-    // Sistem Realtime Bawaan Supabase
-    const channel = supabaseClient.channel('toko-realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'produk' }, () => loadData(false))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'transaksi' }, () => loadData(false))
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'pengaturan' }, () => loadData(false))
-      .subscribe();
-      
-    return () => { 
-      clearInterval(pollInterval);
-      supabaseClient.removeChannel(channel); 
-    };
-  }, [dbReady, isConnected]);
-
-  const handleCopyRekening = () => {
-    const amanRekening = settings.rekening || '';
-    const matchAngka = amanRekening.match(/\d+/);
-    const textToCopy = matchAngka ? matchAngka[0] : amanRekening;
-    
-    if (navigator.clipboard && navigator.clipboard.writeText && textToCopy) {
-      navigator.clipboard.writeText(textToCopy);
-      showToast('Berhasil Menyalin Nomor Rekening!', 'success');
-    } else if (textToCopy) {
-      const textArea = document.createElement("textarea");
-      textArea.value = textToCopy;
-      document.body.appendChild(textArea);
-      textArea.select();
-      try { document.execCommand('copy'); showToast('Berhasil Menyalin Nomor Rekening!', 'success'); } catch(e) {}
-      document.body.removeChild(textArea);
-    }
-  };
-
-  const startScanner = async (target) => {
-    if (!('BarcodeDetector' in window)) {
-      showToast('Browser HP Anda belum mendukung pemindaian kamera otomatis.', 'error');
-      return;
-    }
-    setScanTarget(target);
-    setIsScanningModalOpen(true);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 }, advanced: [{ focusMode: "continuous" }] } 
-      });
-      if (videoRef.current) videoRef.current.srcObject = stream;
-      streamRef.current = stream;
-    } catch (err) {
-      showToast('Akses kamera ditolak atau perangkat tidak mendukung.', 'error');
-      setIsScanningModalOpen(false);
-    }
-  };
-
-  const stopScanner = () => {
-    if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
-    setIsScanningModalOpen(false);
-  };
-
-  const handleBarcodeResultToko = (code) => {
-    const foundProduct = products.find(p => p.barcode === code);
-    if (foundProduct) {
-      setSearchQuery('');
-      openProductModal(foundProduct);
-      showToast(`Otomatis Membuka: ${foundProduct.nama}`, 'success');
-    } else {
-      setSearchQuery(code);
-      showToast('Barang belum terdaftar di toko', 'error');
-    }
-  };
-
-  const handleBarcodeResultAdmin = async (code) => {
-    setNewProduct(prev => ({ ...prev, barcode: code }));
-    const localProduct = products.find(p => p.barcode === code);
-    if (localProduct) {
-      showToast(`Membaca data lokal: ${localProduct.nama}`, 'success');
-      return; 
-    }
-    showToast('Barcode Terbaca! Mencari nama & foto asli di internet...', 'success');
-    try {
-      const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
-      const data = await res.json();
-      if (data.status === 1 && data.product && data.product.product_name) {
-        setNewProduct(prev => ({ 
-          ...prev, 
-          nama: data.product.product_name,
-          gambar: data.product.image_url || prev.gambar 
-        }));
-        showToast('Nama dan Foto otomatis berhasil terisi!', 'success');
-      }
-    } catch (err) {}
-  };
-
-  useEffect(() => {
-    let interval;
-    if (isScanningModalOpen && videoRef.current) {
-      const detector = new window.BarcodeDetector({ formats: ['qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39'] });
-      interval = setInterval(async () => {
-        if (videoRef.current && videoRef.current.readyState >= 2) {
-          try {
-            const barcodes = await detector.detect(videoRef.current);
-            if (barcodes.length > 0) {
-              const code = barcodes[0].rawValue;
-              playBeep(); 
-              stopScanner();
-              if (scanTarget === 'toko') handleBarcodeResultToko(code);
-              else handleBarcodeResultAdmin(code);
-            }
-          } catch (e) {}
-        }
-      }, 300); 
-    }
-    return () => clearInterval(interval);
-  }, [isScanningModalOpen, scanTarget, products]);
-
-  // AI & IMAGE PROCESSING
-  const handleGenerateGeminiImage = async () => {
-    if (!geminiKey) return showToast('Harap masukkan API Key Gemini di tab Pengaturan!', 'error');
-    if (!newProduct.nama) return showToast('Isi nama barang terlebih dahulu!', 'error');
-    
-    setIsProcessing(true);
-    showToast('Gemini sedang melukis gambar barang...', 'success');
-    try {
-      const promptText = `A highly detailed, hyper-realistic commercial studio photography of a real product package named "${newProduct.nama}", exact real-world packaging, pure solid white background, vibrant colors, perfect studio lighting, highly realistic texture.`;
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${geminiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ instances: { prompt: promptText }, parameters: { sampleCount: 1 } })
-      });
-      const data = await res.json();
-      if (data.predictions && data.predictions[0] && data.predictions[0].bytesBase64Encoded) {
-        setNewProduct(prev => ({ ...prev, gambar: `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}` }));
-        showToast('Gambar AI berhasil dibuat!', 'success');
-      } else showToast('Gagal generate gambar. Periksa kuota/API Key.', 'error');
-    } catch (err) { showToast('Koneksi ke Gemini gagal.', 'error'); }
-    setIsProcessing(false);
-  };
-
-  const handleEnhanceWithAI = async () => {
-    if (!geminiKey) return showToast('Harap masukkan API Key Gemini di tab Pengaturan!', 'error');
-    if (!newProduct.gambar || !newProduct.gambar.startsWith('data:image')) return showToast('Silakan ambil foto dari kamera terlebih dahulu!', 'error');
-    
-    setIsProcessing(true);
-    showToast('Gemini Flash 2.5 sedang membersihkan foto...', 'success');
-    try {
-      const base64Data = newProduct.gambar.split(',')[1];
-      const mimeType = newProduct.gambar.split(';')[0].split(':')[1];
-      const payload = {
-        contents: [{
-          parts: [
-            { text: "Clean up this product photo perfectly. Remove the background and replace it with a pure solid white background. Improve lighting, clarity, and colors to make it look like a high-quality professional commercial studio product shot." },
-            { inlineData: { mimeType: mimeType, data: base64Data } }
-          ]
-        }],
-        generationConfig: { responseModalities: ['IMAGE'] }
-      };
-
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${geminiKey}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await res.json();
-      const outputBase64 = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
-      
-      if (outputBase64) {
-        setNewProduct(prev => ({ ...prev, gambar: `data:image/jpeg;base64,${outputBase64}` }));
-        showToast('Foto berhasil dibersihkan AI Gemini!', 'success');
-      } else showToast('Gagal merapikan gambar. Cek API/Kuota.', 'error');
-    } catch (err) { showToast('Koneksi ke Gemini gagal.', 'error'); }
-    setIsProcessing(false);
-  };
-
-  const handleDownloadPreviewImage = () => {
-    if (!newProduct.gambar || !newProduct.gambar.startsWith('data:image')) return;
-    const link = document.createElement('a');
-    link.href = newProduct.gambar;
-    link.download = `${newProduct.nama || 'Produk'}_AI_Cleaned.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('Foto didownload! Silakan upload ke folder G-Drive Anda.', 'success');
-  };
-
-  const handleUploadProductImage = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (file.size > 2097152) return showToast('Ukuran maksimal 2MB. Gunakan kamera HP Anda.', 'error');
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setNewProduct(prev => ({ ...prev, gambar: reader.result }));
-        showToast('Foto berhasil diambil! Silakan klik "Rapihkan dgn AI".', 'success');
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  // LOGIKA KERANJANG
-  const openProductModal = (product) => {
-    setSelectedProduct(product);
-    setTempQty(cart[product.id] || 0);
-  };
-
-  const saveToCart = () => {
-    if (tempQty === 0) {
-      const newCart = { ...cart };
-      delete newCart[selectedProduct.id];
-      setCart(newCart);
-      showToast('Barang dihapus dari keranjang.', 'success');
-    } else {
-      setCart({ ...cart, [selectedProduct.id]: tempQty });
-      showToast('Barang tersimpan di keranjang!', 'success');
-    }
-    setSelectedProduct(null);
-  };
-
-  const handleUpdateCartQty = (id, change) => {
-    const product = products.find(p => p.id === parseInt(id));
-    if (!product) return;
-    const currentQty = cart[id] || 0;
-    const newQty = currentQty + change;
-    
-    if (newQty <= 0) {
-      const newCart = { ...cart };
-      delete newCart[id];
-      setCart(newCart);
-      if (Object.keys(newCart).length === 0) setView('toko');
-    } else if (newQty > product.stok) {
-      showToast('Sisa stok tidak mencukupi!', 'error');
-    } else {
-      setCart({ ...cart, [id]: newQty });
-    }
-  };
-
-  const handleClearCart = () => {
-    if(window.confirm('Yakin ingin mengosongkan seluruh isi keranjang Anda?')) {
-      setCart({});
-      setView('toko');
-      showToast('Keranjang berhasil dikosongkan.', 'success');
-    }
-  };
-
-  const handleClearLocalHistory = () => {
-    if(window.confirm('Yakin ingin menghapus riwayat pembelian di HP ini? Data tidak bisa dikembalikan.')) {
-      setLocalHistory([]);
-      showToast('Riwayat berhasil dihapus.', 'success');
-    }
-  };
+  // ==========================================
+  // DERIVED STATES (MOVED TO TOP TO FIX REF ERRORS)
+  // ==========================================
+  const searchFilteredProducts = useMemo(() => {
+    return products.filter(p => p.nama?.toLowerCase().includes(searchQuery.toLowerCase()) || p.barcode?.includes(searchQuery));
+  }, [products, searchQuery]);
 
   const totalBelanja = useMemo(() => {
     return Object.entries(cart).reduce((total, [id, qty]) => {
@@ -502,348 +145,6 @@ function MainApp() {
 
   const jumlahItem = Object.values(cart).reduce((a, b) => a + b, 0);
 
-  // TRANSAKSI SEKEJAP MATA - LANGSUNG STRUK & SIMPAN LOKAL
-  const handleSelesaiBayar = async () => {
-    if (!supabaseClient) return showToast('Database Sedang Tidak Terhubung!', 'error');
-    setIsProcessing(true);
-
-    const detailPesanan = Object.entries(cart).map(([id, qty]) => {
-      const p = products.find(prod => prod.id === parseInt(id));
-      const subTotal = hitungTotalHargaItem(p, qty);
-      return { 
-        id: p.id, nama: p.nama, modal: p.modal || 0, jual: p.jual || 0, 
-        qty, totalHarga: subTotal, profitItem: subTotal - ((p.modal || 0) * qty),
-        gambar: p.gambar || null
-      };
-    });
-    
-    const totalModal = detailPesanan.reduce((s, i) => s + (i.modal * i.qty), 0);
-    const newTransaction = { 
-      id: `TRX-${Date.now()}`, 
-      tanggal: new Date().toLocaleString('id-ID'), 
-      items: detailPesanan, 
-      total: totalBelanja, 
-      modal: totalModal, 
-      profit: totalBelanja - totalModal, 
-      metode: 'QRIS / Kasir Etalase'
-    };
-
-    // Update Local States First for speed
-    setTransactions(prev => [newTransaction, ...prev]);
-    setProducts(prev => prev.map(prod => {
-      const boughtItem = detailPesanan.find(i => i.id === prod.id);
-      return boughtItem ? { ...prod, stok: (prod.stok || 0) - boughtItem.qty } : prod;
-    }));
-    
-    setLocalHistory(prev => [newTransaction, ...prev]);
-    
-    setStrukTerakhir(newTransaction);
-    setView('struk');
-    setCart({}); 
-    setIsProcessing(false);
-
-    // Save to Database asynchronously
-    const { error: trxError } = await supabaseClient.from('transaksi').insert([newTransaction]);
-    if (trxError) showToast(`Gagal nyimpan TRX: ${trxError.message}`, 'error');
-    
-    for (const item of detailPesanan) {
-      const prod = products.find(p => p.id === item.id);
-      if (prod) await supabaseClient.from('produk').update({ stok: (prod.stok || 0) - item.qty }).eq('id', item.id);
-    }
-  };
-
-  const handleTutupStruk = () => {
-    setStrukTerakhir(null);
-    setView('toko');
-  };
-
-  const handleShareStruk = async () => {
-    if (!strukTerakhir) return;
-    const shareData = {
-      title: `Struk - ${settings.nama_toko}`,
-      text: `*${settings.nama_toko}*\nID Transaksi: ${strukTerakhir.id}\nTanggal: ${strukTerakhir.tanggal}\n\nBelanjaan:\n${strukTerakhir.items.map(i => `- ${i.qty}x ${i.nama} = ${formatRupiah(i.totalHarga)}`).join('\n')}\n\n*Total Dibayar: ${formatRupiah(strukTerakhir.total)}*\n\nSilahkan bayar dengan scan QRIS Resmi di kaca etalase. Kejujuran Anda, Kebanggaan Kami!`,
-    };
-    if (navigator.share) {
-      try { await navigator.share(shareData); } catch (err) {}
-    } else {
-      window.print(); 
-    }
-  };
-
-  const handleExitApp = () => {
-    if (window.confirm('Keluar dari aplikasi Toko Kejujuran?')) {
-      try { window.close(); } catch (e) {}
-      setTimeout(() => {
-        showToast('Tutup tab/browser Anda secara manual jika jendela tidak menutup.', 'success');
-        setView('toko');
-        setIsAdminLogged(false);
-      }, 500);
-    }
-  };
-
-  const handleLogin = (e) => {
-    e.preventDefault();
-    if (loginInput === settings.admin_password) {
-      setIsAdminLogged(true);
-      try { localStorage.setItem('tokojujur_admin', 'true'); } catch(err){}
-      setLoginInput('');
-      showToast('Login Berhasil', 'success');
-    } else showToast('Password Salah', 'error');
-  };
-
-  const handleLogout = () => {
-    setIsAdminLogged(false);
-    try { localStorage.removeItem('tokojujur_admin'); } catch(err){}
-    setView('toko');
-    showToast('Berhasil Keluar', 'success');
-  };
-
-  const handleUploadQRIS = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      if (file.size > 1048576) return showToast('Ukuran gambar terlalu besar. Maksimal 1MB.', 'error');
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setSettings({ ...settings, qris_url: reader.result });
-        showToast('Gambar QRIS siap disimpan!', 'success');
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const handleDownloadQRIS = () => {
-    if (!settings.qris_url) return showToast('Belum ada gambar QRIS', 'error');
-    const link = document.createElement('a');
-    link.href = formatImageUrl(settings.qris_url);
-    link.download = 'QRIS_Toko_Kejujuran.png';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    showToast('Mendownload QRIS...', 'success');
-  };
-
-  const handleSaveSettings = async () => {
-    if (!supabaseClient) return showToast('Database belum terhubung', 'error');
-    setIsProcessing(true);
-    setSettings(settings);
-    
-    try { localStorage.setItem('tokojujur_gemini_key', geminiKey); } catch(e){}
-
-    const { error } = await supabaseClient.from('pengaturan').update({
-      nama_toko: settings.nama_toko, qris_url: settings.qris_url,
-      rekening: settings.rekening, admin_password: settings.admin_password
-    }).eq('id', 1);
-    
-    if (error) showToast(`Gagal: ${error.message} (Cek RLS Supabase)`, 'error');
-    else showToast('Pengaturan Disimpan ke Database', 'success');
-    setIsProcessing(false);
-  };
-
-  const handleEditClick = (product) => {
-    setNewProduct({
-      nama: product.nama, modal: product.modal || 0, jual: product.jual || 0, stok: product.stok || 0,
-      barcode: product.barcode || '', diskonQty: product.diskon ? product.diskon.min_qty : '', diskonHarga: product.diskon ? product.diskon.harga_total : '',
-      gambar: product.gambar || ''
-    });
-    setUseDiskon(!!product.diskon);
-    setEditingId(product.id);
-    setShowAddForm(true);
-    window.scrollTo({ top: 0, behavior: 'smooth' }); 
-  };
-
-  const handleAddProduct = async (e) => {
-    e.preventDefault();
-    if (!supabaseClient) return showToast('Database belum terhubung', 'error');
-    
-    const isDuplicate = products.some(p => {
-      const isNameSame = p.nama.toLowerCase().trim() === newProduct.nama.toLowerCase().trim();
-      const isBarcodeSame = newProduct.barcode && p.barcode === newProduct.barcode;
-      if (editingId && p.id === editingId) return false;
-      return isNameSame || isBarcodeSame;
-    });
-
-    if (isDuplicate) return showToast('GAGAL: Nama Barang atau Barcode sudah terdaftar!', 'error');
-
-    setIsProcessing(true);
-    let disc = null;
-    if (useDiskon) disc = { min_qty: parseInt(newProduct.diskonQty) || 1, harga_total: parseInt(newProduct.diskonHarga) || 0 };
-    
-    const targetId = editingId ? editingId : Date.now();
-    const tempProd = { 
-      nama: newProduct.nama, barcode: newProduct.barcode, modal: newProduct.modal||0, 
-      jual: newProduct.jual||0, stok: newProduct.stok||0, diskon: disc,
-      gambar: newProduct.gambar || null
-    };
-    
-    if (editingId) setProducts(p => p.map(item => item.id === editingId ? { ...item, ...tempProd } : item));
-    else setProducts(p => [...p, { ...tempProd, id: targetId, tanggal_dibuat: new Date().toISOString() }]);
-
-    setShowAddForm(false);
-    setEditingId(null);
-    setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '', gambar: '' });
-    setUseDiskon(false);
-    
-    if (editingId) {
-      let { error } = await supabaseClient.from('produk').update(tempProd).eq('id', editingId);
-      if (error && error.message.includes('gambar')) {
-        const { gambar, ...prodNoImg } = tempProd;
-        const res = await supabaseClient.from('produk').update(prodNoImg).eq('id', editingId);
-        error = res.error;
-        if (!error) showToast('Data diupdate. (Kolom gambar belum ada di Supabase)', 'error');
-      } else if (error) {
-        showToast(`Gagal Edit Server: ${error.message}`, 'error');
-      } else {
-        showToast('Berhasil update server!', 'success');
-      }
-    } else {
-      let { error } = await supabaseClient.from('produk').insert([{ ...tempProd, id: targetId, tanggal_dibuat: new Date().toISOString() }]);
-      if (error && error.message.includes('gambar')) {
-        const { gambar, ...prodNoImg } = tempProd;
-        const res = await supabaseClient.from('produk').insert([{ ...prodNoImg, id: targetId, tanggal_dibuat: new Date().toISOString() }]);
-        error = res.error;
-        if (!error) showToast('Barang tersimpan. (Kolom gambar belum ada di Supabase)', 'error');
-      } else if (error) {
-        showToast(`Gagal Tambah Server: ${error.message}`, 'error');
-      } else {
-        showToast('Berhasil simpan ke server!', 'success');
-      }
-    }
-    setIsProcessing(false);
-  };
-
-  const handleDeleteProduct = async (id) => {
-    if (!supabaseClient) return;
-    if(window.confirm("Yakin ingin menghapus barang ini secara permanen?")) {
-       setProducts(prev => prev.filter(item => item.id !== id)); 
-       const { error } = await supabaseClient.from('produk').delete().eq('id', id);
-       if (error) showToast(`Gagal Hapus Server: ${error.message}`, 'error');
-       else showToast('Dihapus dari server', 'success');
-    }
-  };
-
-  const handleClearAllProducts = async () => {
-    if (!supabaseClient) return;
-    if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda benar-benar yakin ingin MENGHAPUS SELURUH BARANG TOKO?\n\nData yang dihapus TIDAK BISA DIKEMBALIKAN!")) {
-      setProducts([]); 
-      const { error } = await supabaseClient.from('produk').delete().neq('id', 0); 
-      if (error) showToast(`Gagal Server: ${error.message}`, 'error');
-      else showToast('Seluruh daftar barang dihapus!', 'success');
-    }
-  };
-
-  const handleClearTransactions = async () => {
-    if (!supabaseClient) return;
-    if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda yakin MENGHAPUS SELURUH RIWAYAT TRANSAKSI PENJUALAN?\nSTOK BARANG AKAN DIKEMBALIKAN SEPERTI SEMULA!")) {
-      setIsProcessing(true);
-      
-      const stockToRestore = {};
-      transactions.forEach(t => {
-        t.items.forEach(item => {
-          if (!stockToRestore[item.id]) stockToRestore[item.id] = 0;
-          stockToRestore[item.id] += item.qty;
-        });
-      });
-
-      setProducts(prevProducts => prevProducts.map(p => {
-        if (stockToRestore[p.id]) {
-          return { ...p, stok: p.stok + stockToRestore[p.id] };
-        }
-        return p;
-      }));
-      setTransactions([]); 
-
-      for (const [productId, qtyToReturn] of Object.entries(stockToRestore)) {
-        const product = products.find(p => p.id === parseInt(productId));
-        if (product) {
-          await supabaseClient.from('produk').update({ stok: (product.stok || 0) + qtyToReturn }).eq('id', product.id);
-        }
-      }
-
-      const { error } = await supabaseClient.from('transaksi').delete().neq('id', '0'); 
-      if (error) {
-        showToast(`Gagal Server: ${error.message}`, 'error');
-      } else {
-        showToast('Transaksi dihapus & Stok barang telah dikembalikan!', 'success');
-      }
-      setIsProcessing(false);
-    }
-  };
-
-  const handleDeleteSingleTransaction = async (id) => {
-    if (!supabaseClient) return;
-    if (window.confirm("Hapus transaksi ini? Stok barang akan dikembalikan seperti semula.")) {
-      setIsProcessing(true);
-      const trx = transactions.find(t => t.id === id);
-      if (!trx) return;
-
-      setProducts(prevProducts => prevProducts.map(p => {
-        const boughtItem = trx.items.find(i => i.id === p.id);
-        if (boughtItem) {
-          return { ...p, stok: (p.stok || 0) + boughtItem.qty };
-        }
-        return p;
-      }));
-      
-      setTransactions(prev => prev.filter(t => t.id !== id));
-
-      for (const item of trx.items) {
-        const product = products.find(p => p.id === item.id);
-        if (product) {
-          await supabaseClient.from('produk').update({ stok: (product.stok || 0) + item.qty }).eq('id', product.id);
-        }
-      }
-
-      const { error } = await supabaseClient.from('transaksi').delete().eq('id', id);
-      if (error) showToast(`Gagal hapus transaksi: ${error.message}`, 'error');
-      else showToast('Transaksi berhasil dihapus & stok kembali!', 'success');
-      
-      setIsProcessing(false);
-    }
-  };
-
-  const handleSaveEditTrx = async (e) => {
-     e.preventDefault();
-     if (!supabaseClient) return;
-     setIsProcessing(true);
-     
-     setTransactions(prev => prev.map(t => t.id === editingTrx.id ? editingTrx : t));
-     
-     const { error } = await supabaseClient.from('transaksi').update({
-       metode: editingTrx.metode,
-       total: editingTrx.total,
-       profit: editingTrx.profit,
-       modal: editingTrx.modal
-     }).eq('id', editingTrx.id);
-
-     if (error) showToast(`Gagal edit: ${error.message}`, 'error');
-     else showToast('Transaksi berhasil diperbarui!', 'success');
-     
-     setEditingTrx(null);
-     setIsProcessing(false);
-  };
-
-  const handleExportCSV = () => {
-    const filteredForExport = transactions.filter(t => {
-      if (!filterStart && !filterEnd) return true;
-      let tDate;
-      const match = t.id.match(/\d+/);
-      tDate = match ? new Date(parseInt(match[0])) : new Date();
-      const sDate = filterStart ? new Date(filterStart) : new Date(0);
-      let eDate = filterEnd ? new Date(filterEnd) : new Date('2100-01-01');
-      if (filterEnd) eDate.setHours(23, 59, 59, 999);
-      return tDate >= sDate && tDate <= eDate;
-    });
-
-    if (filteredForExport.length === 0) return showToast('Tidak ada data', 'error');
-    let csv = "ID Transaksi,Tanggal,Metode,Total Belanja,Total Modal,Profit Bersih\n";
-    filteredForExport.forEach(t => csv += `"${t.id}","${t.tanggal}","${t.metode}","${t.total}","${t.modal}","${t.profit}"\n`);
-    const link = document.createElement("a");
-    link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
-    link.download = `Laporan_Toko_Kejujuran_${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
-  };
-
-  // --- LOGIKA ADMIN DASHBOARD UTAMA BEBAS ERROR ---
   const adminData = useMemo(() => {
     if (view !== 'admin' || !isAdminLogged) return null;
 
@@ -919,8 +220,634 @@ function MainApp() {
     };
   }, [transactions, products, filterStart, filterEnd, sortTrx, view, isAdminLogged]);
 
-  // --- RENDER UI AMAN ---
+  const showToast = (msg, type = 'success') => {
+    setToast({ show: true, msg: String(msg), type });
+    setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 4000); 
+  };
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') Notification.requestPermission();
+      let link = document.querySelector("link[rel~='icon']");
+      if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
+      link.href = "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏪</text></svg>";
+    }
+  }, []);
+
+  useEffect(() => { try { localStorage.setItem('tokojujur_view', view); } catch(e){} }, [view]);
+  useEffect(() => { try { localStorage.setItem('tokojujur_admintab', adminTab); } catch(e){} }, [adminTab]);
+  useEffect(() => { try { localStorage.setItem('tokojujur_cart', JSON.stringify(cart)); } catch(e){} }, [cart]);
+  useEffect(() => { try { localStorage.setItem('tokojujur_local_history', JSON.stringify(localHistory)); } catch(e){} }, [localHistory]);
+  useEffect(() => { try { localStorage.setItem('tokojujur_gemini_key', geminiKey); } catch(e){} }, [geminiKey]);
+
+  // INISIALISASI SUPABASE LANGSUNG MENGGUNAKAN KEY
+  useEffect(() => {
+    const initSupabase = () => {
+      try {
+        const env = typeof import.meta !== 'undefined' ? import.meta.env : {};
+        let url = env.VITE_SUPABASE_URL || localStorage.getItem('tokojujur_sb_url') || SUPABASE_URL;
+        let key = env.VITE_SUPABASE_ANON_KEY || localStorage.getItem('tokojujur_sb_key') || SUPABASE_KEY;
+        
+        if (url.endsWith('/rest/v1/')) {
+            url = url.replace('/rest/v1/', '');
+        }
+
+        if (url && key && window.supabase) {
+          supabaseClient = window.supabase.createClient(url, key);
+          setIsConnected(true);
+        } else {
+          setIsConnected(false);
+        }
+      } catch(e) {
+        setIsConnected(false);
+      }
+      setDbReady(true);
+    };
+
+    if (!window.supabase) {
+      const script = document.createElement('script');
+      script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+      script.onload = initSupabase;
+      document.head.appendChild(script);
+    } else {
+      initSupabase();
+    }
+  }, []);
+
+  // REALTIME INSTAN & SINKRONISASI
+  useEffect(() => {
+    if (!dbReady || !isConnected || !supabaseClient) return;
+    
+    const loadData = async (isInitial = false) => {
+      if (isInitial) setIsLoadingDB(true);
+      try {
+        const [prodRes, trxRes, setRes] = await Promise.all([
+          supabaseClient.from('produk').select('*').order('id', { ascending: true }),
+          supabaseClient.from('transaksi').select('*').order('id', { ascending: false }),
+          supabaseClient.from('pengaturan').select('*').eq('id', 1).single()
+        ]);
+        
+        if (prodRes.error) {
+           console.error(prodRes.error);
+        }
+        
+        if (prodRes.data) setProducts(prodRes.data);
+        if (trxRes.data) setTransactions(trxRes.data);
+        if (setRes.data) setSettings(setRes.data);
+      } catch (e) {
+        if (isInitial) showToast("Gagal terhubung ke Database.", "error");
+      }
+      if (isInitial) setIsLoadingDB(false);
+    };
+
+    loadData(true);
+
+    const pollInterval = setInterval(() => loadData(false), 5000);
+
+    const channel = supabaseClient.channel('toko-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'produk' }, () => loadData(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transaksi' }, () => loadData(false))
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'pengaturan' }, () => loadData(false))
+      .subscribe();
+      
+    return () => { 
+      clearInterval(pollInterval);
+      supabaseClient.removeChannel(channel); 
+    };
+  }, [dbReady, isConnected]);
+
+  const handleCopyRekening = () => {
+    const amanRekening = settings.rekening || '';
+    const matchAngka = amanRekening.match(/\d+/);
+    const textToCopy = matchAngka ? matchAngka[0] : amanRekening;
+    
+    if (navigator.clipboard && navigator.clipboard.writeText && textToCopy) {
+      navigator.clipboard.writeText(textToCopy);
+      showToast('Berhasil Menyalin Nomor Rekening!', 'success');
+    } else if (textToCopy) {
+      const textArea = document.createElement("textarea");
+      textArea.value = textToCopy;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try { document.execCommand('copy'); showToast('Berhasil Menyalin Nomor Rekening!', 'success'); } catch(e) {}
+      document.body.removeChild(textArea);
+    }
+  };
+
+  const startScanner = async (target) => {
+    if (!('BarcodeDetector' in window)) {
+      showToast('Browser HP Anda belum mendukung pemindaian kamera otomatis.', 'error');
+      return;
+    }
+    setScanTarget(target);
+    setIsScanningModalOpen(true);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ 
+        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 }, advanced: [{ focusMode: "continuous" }] } 
+      });
+      if (videoRef.current) videoRef.current.srcObject = stream;
+      streamRef.current = stream;
+    } catch (err) {
+      showToast('Akses kamera ditolak.', 'error');
+      setIsScanningModalOpen(false);
+    }
+  };
+
+  const stopScanner = () => {
+    if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
+    setIsScanningModalOpen(false);
+  };
+
+  const handleBarcodeResultToko = (code) => {
+    const foundProduct = products.find(p => p.barcode === code);
+    if (foundProduct) {
+      setSearchQuery('');
+      openProductModal(foundProduct);
+      showToast(`Otomatis Membuka: ${foundProduct.nama}`, 'success');
+    } else {
+      setSearchQuery(code);
+      showToast('Barang belum terdaftar', 'error');
+    }
+  };
+
+  const handleBarcodeResultAdmin = async (code) => {
+    setNewProduct(prev => ({ ...prev, barcode: code }));
+    const localProduct = products.find(p => p.barcode === code);
+    if (localProduct) {
+      showToast(`Membaca data lokal: ${localProduct.nama}`, 'success');
+      return; 
+    }
+    showToast('Mencari nama & foto asli di internet...', 'success');
+    try {
+      const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
+      const data = await res.json();
+      if (data.status === 1 && data.product && data.product.product_name) {
+        setNewProduct(prev => ({ 
+          ...prev, 
+          nama: data.product.product_name,
+          gambar: data.product.image_url || prev.gambar 
+        }));
+        showToast('Nama otomatis terisi!', 'success');
+      }
+    } catch (err) {}
+  };
+
+  useEffect(() => {
+    let interval;
+    if (isScanningModalOpen && videoRef.current) {
+      const detector = new window.BarcodeDetector({ formats: ['qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39'] });
+      interval = setInterval(async () => {
+        if (videoRef.current && videoRef.current.readyState >= 2) {
+          try {
+            const barcodes = await detector.detect(videoRef.current);
+            if (barcodes.length > 0) {
+              const code = barcodes[0].rawValue;
+              playBeep(); 
+              stopScanner();
+              if (scanTarget === 'toko') handleBarcodeResultToko(code);
+              else handleBarcodeResultAdmin(code);
+            }
+          } catch (e) {}
+        }
+      }, 300); 
+    }
+    return () => clearInterval(interval);
+  }, [isScanningModalOpen, scanTarget, products]);
+
+  const handleGenerateGeminiImage = async () => {
+    if (!geminiKey) return showToast('Harap masukkan API Key Gemini di tab Pengaturan!', 'error');
+    if (!newProduct.nama) return showToast('Isi nama barang terlebih dahulu!', 'error');
+    
+    setIsProcessing(true);
+    showToast('Gemini melukis gambar barang...', 'success');
+    try {
+      const promptText = `A highly detailed, hyper-realistic commercial studio photography of a real product package named "${newProduct.nama}", exact real-world packaging, pure solid white background, vibrant colors, perfect studio lighting, highly realistic texture.`;
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${geminiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ instances: { prompt: promptText }, parameters: { sampleCount: 1 } })
+      });
+      const data = await res.json();
+      if (data.predictions && data.predictions[0] && data.predictions[0].bytesBase64Encoded) {
+        setNewProduct(prev => ({ ...prev, gambar: `data:image/png;base64,${data.predictions[0].bytesBase64Encoded}` }));
+        showToast('Gambar AI berhasil dibuat!', 'success');
+      } else showToast('Gagal generate gambar. Periksa kuota/API Key.', 'error');
+    } catch (err) { showToast('Koneksi ke Gemini gagal.', 'error'); }
+    setIsProcessing(false);
+  };
+
+  const handleEnhanceWithAI = async () => {
+    if (!geminiKey) return showToast('Harap masukkan API Key Gemini di tab Pengaturan!', 'error');
+    if (!newProduct.gambar || !newProduct.gambar.startsWith('data:image')) return showToast('Silakan ambil foto dari kamera terlebih dahulu!', 'error');
+    
+    setIsProcessing(true);
+    showToast('Gemini Flash 2.5 sedang membersihkan foto...', 'success');
+    try {
+      const base64Data = newProduct.gambar.split(',')[1];
+      const mimeType = newProduct.gambar.split(';')[0].split(':')[1];
+      const payload = {
+        contents: [{
+          parts: [
+            { text: "Clean up this product photo perfectly. Remove the background and replace it with a pure solid white background. Improve lighting, clarity, and colors to make it look like a high-quality professional commercial studio product shot." },
+            { inlineData: { mimeType: mimeType, data: base64Data } }
+          ]
+        }],
+        generationConfig: { responseModalities: ['IMAGE'] }
+      };
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${geminiKey}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      const outputBase64 = data.candidates?.[0]?.content?.parts?.find(p => p.inlineData)?.inlineData?.data;
+      
+      if (outputBase64) {
+        setNewProduct(prev => ({ ...prev, gambar: `data:image/jpeg;base64,${outputBase64}` }));
+        showToast('Foto berhasil dibersihkan AI Gemini!', 'success');
+      } else showToast('Gagal merapikan gambar. Cek API/Kuota.', 'error');
+    } catch (err) { showToast('Koneksi ke Gemini gagal.', 'error'); }
+    setIsProcessing(false);
+  };
+
+  const handleDownloadPreviewImage = () => {
+    if (!newProduct.gambar || !newProduct.gambar.startsWith('data:image')) return;
+    const link = document.createElement('a');
+    link.href = newProduct.gambar;
+    link.download = `${newProduct.nama || 'Produk'}_AI_Cleaned.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('Foto didownload! Silakan upload ke folder G-Drive.', 'success');
+  };
+
+  const handleUploadProductImage = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 2097152) return showToast('Ukuran maksimal 2MB. Gunakan kamera HP Anda.', 'error');
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setNewProduct(prev => ({ ...prev, gambar: reader.result }));
+        showToast('Foto berhasil diambil! Silakan klik "Rapihkan dgn AI".', 'success');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const openProductModal = (product) => {
+    setSelectedProduct(product);
+    setTempQty(cart[product.id] || 0);
+  };
+
+  const saveToCart = () => {
+    if (tempQty === 0) {
+      const newCart = { ...cart };
+      delete newCart[selectedProduct.id];
+      setCart(newCart);
+      showToast('Barang dihapus dari keranjang.', 'success');
+    } else {
+      setCart({ ...cart, [selectedProduct.id]: tempQty });
+      showToast('Barang tersimpan di keranjang!', 'success');
+    }
+    setSelectedProduct(null);
+  };
+
+  const handleUpdateCartQty = (id, change) => {
+    const product = products.find(p => p.id === parseInt(id));
+    if (!product) return;
+    const currentQty = cart[id] || 0;
+    const newQty = currentQty + change;
+    
+    if (newQty <= 0) {
+      const newCart = { ...cart };
+      delete newCart[id];
+      setCart(newCart);
+      if (Object.keys(newCart).length === 0) setView('toko');
+    } else if (newQty > product.stok) {
+      showToast('Sisa stok tidak mencukupi!', 'error');
+    } else {
+      setCart({ ...cart, [id]: newQty });
+    }
+  };
+
+  const handleClearCart = () => {
+    if(window.confirm('Yakin ingin mengosongkan seluruh isi keranjang Anda?')) {
+      setCart({});
+      setView('toko');
+      showToast('Keranjang berhasil dikosongkan.', 'success');
+    }
+  };
+
+  const handleClearLocalHistory = () => {
+    if(window.confirm('Yakin ingin menghapus riwayat pembelian di HP ini? Data tidak bisa dikembalikan.')) {
+      setLocalHistory([]);
+      showToast('Riwayat berhasil dihapus.', 'success');
+    }
+  };
+
+  const handleSelesaiBayar = async () => {
+    if (!supabaseClient) return showToast('Database Sedang Tidak Terhubung!', 'error');
+    setIsProcessing(true);
+
+    const detailPesanan = Object.entries(cart).map(([id, qty]) => {
+      const p = products.find(prod => prod.id === parseInt(id));
+      const subTotal = hitungTotalHargaItem(p, qty);
+      return { 
+        id: p.id, nama: p.nama, modal: p.modal || 0, jual: p.jual || 0, 
+        qty, totalHarga: subTotal, profitItem: subTotal - ((p.modal || 0) * qty),
+        gambar: p.gambar || null
+      };
+    });
+    
+    const totalModal = detailPesanan.reduce((s, i) => s + (i.modal * i.qty), 0);
+    const newTransaction = { 
+      id: `TRX-${Date.now()}`, 
+      tanggal: new Date().toLocaleString('id-ID'), 
+      items: detailPesanan, 
+      total: totalBelanja, 
+      modal: totalModal, 
+      profit: totalBelanja - totalModal, 
+      metode: 'QRIS / Kasir Etalase'
+    };
+
+    setTransactions(prev => [newTransaction, ...prev]);
+    setProducts(prev => prev.map(prod => {
+      const boughtItem = detailPesanan.find(i => i.id === prod.id);
+      return boughtItem ? { ...prod, stok: (prod.stok || 0) - boughtItem.qty } : prod;
+    }));
+    
+    setLocalHistory(prev => [newTransaction, ...prev]);
+    setStrukTerakhir(newTransaction);
+    setView('struk');
+    setCart({}); 
+    setIsProcessing(false);
+
+    const { error: trxError } = await supabaseClient.from('transaksi').insert([newTransaction]);
+    if (trxError) showToast(`Gagal nyimpan TRX: ${trxError.message}`, 'error');
+    
+    for (const item of detailPesanan) {
+      const prod = products.find(p => p.id === item.id);
+      if (prod) await supabaseClient.from('produk').update({ stok: (prod.stok || 0) - item.qty }).eq('id', item.id);
+    }
+  };
+
+  const handleTutupStruk = () => {
+    setStrukTerakhir(null);
+    setView('toko');
+  };
+
+  const handleShareStruk = async () => {
+    if (!strukTerakhir) return;
+    const shareData = {
+      title: `Struk - ${settings.nama_toko}`,
+      text: `*${settings.nama_toko}*\nID Transaksi: ${strukTerakhir.id}\nTanggal: ${strukTerakhir.tanggal}\n\nBelanjaan:\n${strukTerakhir.items.map(i => `- ${i.qty}x ${i.nama} = ${formatRupiah(i.totalHarga)}`).join('\n')}\n\n*Total Dibayar: ${formatRupiah(strukTerakhir.total)}*\n\nSilahkan bayar dengan scan QRIS Resmi di kaca etalase. Kejujuran Anda, Kebanggaan Kami!`,
+    };
+    if (navigator.share) {
+      try { await navigator.share(shareData); } catch (err) {}
+    } else {
+      window.print(); 
+    }
+  };
+
+  const handleExitApp = () => {
+    if (window.confirm('Keluar dari aplikasi Toko Kejujuran?')) {
+      try { window.close(); } catch (e) {}
+      setTimeout(() => {
+        showToast('Tutup tab/browser Anda secara manual jika jendela tidak menutup.', 'success');
+        setView('toko');
+        setIsAdminLogged(false);
+      }, 500);
+    }
+  };
+
+  const handleLogin = (e) => {
+    e.preventDefault();
+    if (loginInput === settings.admin_password) {
+      setIsAdminLogged(true);
+      try { localStorage.setItem('tokojujur_admin', 'true'); } catch(err){}
+      setLoginInput('');
+      showToast('Login Berhasil', 'success');
+    } else showToast('Password Salah', 'error');
+  };
+
+  const handleLogout = () => {
+    setIsAdminLogged(false);
+    try { localStorage.removeItem('tokojujur_admin'); } catch(err){}
+    setView('toko');
+    showToast('Berhasil Keluar', 'success');
+  };
+
+  const handleUploadQRIS = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 1048576) return showToast('Ukuran gambar maksimal 1MB.', 'error');
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSettings({ ...settings, qris_url: reader.result });
+        showToast('Gambar QRIS siap disimpan!', 'success');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDownloadQRIS = () => {
+    if (!settings.qris_url) return showToast('Belum ada gambar QRIS', 'error');
+    const link = document.createElement('a');
+    link.href = formatImageUrl(settings.qris_url);
+    link.download = 'QRIS_Toko_Kejujuran.png';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('Mendownload QRIS...', 'success');
+  };
+
+  const handleSaveSettings = async () => {
+    if (!supabaseClient) return showToast('Database belum terhubung', 'error');
+    setIsProcessing(true);
+    setSettings(settings);
+    
+    try { localStorage.setItem('tokojujur_gemini_key', geminiKey); } catch(e){}
+
+    const { error } = await supabaseClient.from('pengaturan').update({
+      nama_toko: settings.nama_toko, qris_url: settings.qris_url,
+      rekening: settings.rekening, admin_password: settings.admin_password
+    }).eq('id', 1);
+    
+    if (error) showToast(`Gagal: ${error.message} (Cek RLS Supabase)`, 'error');
+    else showToast('Pengaturan Disimpan', 'success');
+    setIsProcessing(false);
+  };
+
+  const handleEditClick = (product) => {
+    setNewProduct({
+      nama: product.nama, modal: product.modal || 0, jual: product.jual || 0, stok: product.stok || 0,
+      barcode: product.barcode || '', diskonQty: product.diskon ? product.diskon.min_qty : '', diskonHarga: product.diskon ? product.diskon.harga_total : '',
+      gambar: product.gambar || ''
+    });
+    setUseDiskon(!!product.diskon);
+    setEditingId(product.id);
+    setShowAddForm(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' }); 
+  };
+
+  const handleAddProduct = async (e) => {
+    e.preventDefault();
+    if (!supabaseClient) return showToast('Database belum terhubung', 'error');
+    
+    const isDuplicate = products.some(p => {
+      const isNameSame = p.nama.toLowerCase().trim() === newProduct.nama.toLowerCase().trim();
+      const isBarcodeSame = newProduct.barcode && p.barcode === newProduct.barcode;
+      if (editingId && p.id === editingId) return false;
+      return isNameSame || isBarcodeSame;
+    });
+
+    if (isDuplicate) return showToast('Nama / Barcode sudah ada!', 'error');
+
+    setIsProcessing(true);
+    let disc = null;
+    if (useDiskon) disc = { min_qty: parseInt(newProduct.diskonQty) || 1, harga_total: parseInt(newProduct.diskonHarga) || 0 };
+    
+    const targetId = editingId ? editingId : Date.now();
+    const tempProd = { 
+      nama: newProduct.nama, barcode: newProduct.barcode, modal: newProduct.modal||0, 
+      jual: newProduct.jual||0, stok: newProduct.stok||0, diskon: disc,
+      gambar: newProduct.gambar || null
+    };
+    
+    if (editingId) setProducts(p => p.map(item => item.id === editingId ? { ...item, ...tempProd } : item));
+    else setProducts(p => [...p, { ...tempProd, id: targetId, tanggal_dibuat: new Date().toISOString() }]);
+
+    setShowAddForm(false);
+    setEditingId(null);
+    setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '', gambar: '' });
+    setUseDiskon(false);
+    
+    if (editingId) {
+      let { error } = await supabaseClient.from('produk').update(tempProd).eq('id', editingId);
+      if (error && error.message.includes('gambar')) {
+        const { gambar, ...prodNoImg } = tempProd;
+        await supabaseClient.from('produk').update(prodNoImg).eq('id', editingId);
+      }
+    } else {
+      let { error } = await supabaseClient.from('produk').insert([{ ...tempProd, id: targetId, tanggal_dibuat: new Date().toISOString() }]);
+      if (error && error.message.includes('gambar')) {
+        const { gambar, ...prodNoImg } = tempProd;
+        await supabaseClient.from('produk').insert([{ ...prodNoImg, id: targetId, tanggal_dibuat: new Date().toISOString() }]);
+      }
+    }
+    showToast('Data Barang Disimpan', 'success');
+    setIsProcessing(false);
+  };
+
+  const handleDeleteProduct = async (id) => {
+    if (!supabaseClient) return;
+    if(window.confirm("Yakin ingin menghapus barang ini secara permanen?")) {
+       setProducts(prev => prev.filter(item => item.id !== id)); 
+       await supabaseClient.from('produk').delete().eq('id', id);
+       showToast('Dihapus dari server', 'success');
+    }
+  };
+
+  const handleClearAllProducts = async () => {
+    if (!supabaseClient) return;
+    if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda benar-benar yakin ingin MENGHAPUS SELURUH BARANG TOKO?\n\nData yang dihapus TIDAK BISA DIKEMBALIKAN!")) {
+      setProducts([]); 
+      await supabaseClient.from('produk').delete().neq('id', 0); 
+      showToast('Seluruh daftar barang dihapus!', 'success');
+    }
+  };
+
+  const handleClearTransactions = async () => {
+    if (!supabaseClient) return;
+    if (window.confirm("PERINGATAN SANGAT PENTING!\n\nApakah Anda yakin MENGHAPUS SELURUH RIWAYAT TRANSAKSI PENJUALAN?\nSTOK BARANG AKAN DIKEMBALIKAN SEPERTI SEMULA!")) {
+      setIsProcessing(true);
+      const stockToRestore = {};
+      transactions.forEach(t => {
+        t.items.forEach(item => {
+          if (!stockToRestore[item.id]) stockToRestore[item.id] = 0;
+          stockToRestore[item.id] += item.qty;
+        });
+      });
+
+      setProducts(prevProducts => prevProducts.map(p => {
+        if (stockToRestore[p.id]) return { ...p, stok: p.stok + stockToRestore[p.id] };
+        return p;
+      }));
+      setTransactions([]); 
+
+      for (const [productId, qtyToReturn] of Object.entries(stockToRestore)) {
+        const product = products.find(p => p.id === parseInt(productId));
+        if (product) await supabaseClient.from('produk').update({ stok: (product.stok || 0) + qtyToReturn }).eq('id', product.id);
+      }
+
+      await supabaseClient.from('transaksi').delete().neq('id', '0'); 
+      showToast('Transaksi dihapus & Stok kembali!', 'success');
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDeleteSingleTransaction = async (id) => {
+    if (!supabaseClient) return;
+    if (window.confirm("Hapus transaksi ini? Stok barang akan dikembalikan seperti semula.")) {
+      setIsProcessing(true);
+      const trx = transactions.find(t => t.id === id);
+      if (!trx) return;
+
+      setProducts(prevProducts => prevProducts.map(p => {
+        const boughtItem = trx.items.find(i => i.id === p.id);
+        if (boughtItem) return { ...p, stok: (p.stok || 0) + boughtItem.qty };
+        return p;
+      }));
+      
+      setTransactions(prev => prev.filter(t => t.id !== id));
+
+      for (const item of trx.items) {
+        const product = products.find(p => p.id === item.id);
+        if (product) await supabaseClient.from('produk').update({ stok: (product.stok || 0) + item.qty }).eq('id', product.id);
+      }
+
+      await supabaseClient.from('transaksi').delete().eq('id', id);
+      showToast('Transaksi dihapus & stok kembali!', 'success');
+      setIsProcessing(false);
+    }
+  };
+
+  const handleSaveEditTrx = async (e) => {
+     e.preventDefault();
+     if (!supabaseClient) return;
+     setIsProcessing(true);
+     setTransactions(prev => prev.map(t => t.id === editingTrx.id ? editingTrx : t));
+     await supabaseClient.from('transaksi').update({
+       metode: editingTrx.metode, total: editingTrx.total, profit: editingTrx.profit, modal: editingTrx.modal
+     }).eq('id', editingTrx.id);
+     showToast('Transaksi diperbarui!', 'success');
+     setEditingTrx(null);
+     setIsProcessing(false);
+  };
+
+  const handleExportCSV = () => {
+    const filteredForExport = transactions.filter(t => {
+      if (!filterStart && !filterEnd) return true;
+      let tDate;
+      const match = t.id.match(/\d+/);
+      tDate = match ? new Date(parseInt(match[0])) : new Date();
+      const sDate = filterStart ? new Date(filterStart) : new Date(0);
+      let eDate = filterEnd ? new Date(filterEnd) : new Date('2100-01-01');
+      if (filterEnd) eDate.setHours(23, 59, 59, 999);
+      return tDate >= sDate && tDate <= eDate;
+    });
+
+    if (filteredForExport.length === 0) return showToast('Tidak ada data', 'error');
+    let csv = "ID Transaksi,Tanggal,Metode,Total Belanja,Total Modal,Profit Bersih\n";
+    filteredForExport.forEach(t => csv += `"${t.id}","${t.tanggal}","${t.metode}","${t.total}","${t.modal}","${t.profit}"\n`);
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
+    link.download = `Laporan_Toko_Kejujuran_${new Date().toISOString().split('T')[0]}.csv`;
+    link.click();
+  };
+
+  // --- MAIN RENDER ---
   if (!isConnected || !supabaseClient) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center font-sans">
@@ -956,12 +883,10 @@ function MainApp() {
     );
   }
 
-  const searchFilteredProducts = products.filter(p => p.nama?.toLowerCase().includes(searchQuery.toLowerCase()) || p.barcode?.includes(searchQuery));
-
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-emerald-100 relative">
       
-      {/* MODAL SCANNER KAMERA */}
+      {/* MODALS */}
       {isScanningModalOpen && (
         <div className="fixed inset-0 bg-black z-[999] flex flex-col animate-fade-in">
           <div className="flex justify-between items-center p-4 bg-gradient-to-b from-black/80 to-transparent text-white absolute top-0 w-full z-10">
@@ -977,7 +902,6 @@ function MainApp() {
         </div>
       )}
 
-      {/* MODAL SHARE TOKO */}
       {showShareApp && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[999] flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white w-full max-w-sm rounded-[32px] p-8 shadow-2xl flex flex-col items-center relative text-center animate-slide-up">
@@ -996,7 +920,6 @@ function MainApp() {
         </div>
       )}
 
-      {/* MODAL EDIT TRANSAKSI */}
       {editingTrx && (
         <div className="fixed inset-0 bg-slate-900/60 z-[999] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
            <div className="bg-white rounded-3xl p-6 w-full max-w-md animate-slide-up shadow-2xl border-4 border-white">
@@ -1035,7 +958,6 @@ function MainApp() {
         </div>
       )}
 
-      {/* TOAST */}
       {toast.show && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-slate-900 text-white rounded-full shadow-2xl font-bold flex items-center gap-2 animate-slide-up border border-slate-700 w-max max-w-[90%] text-center text-sm md:text-base">
           {toast.type === 'success' ? <CheckCircle size={20} className="text-emerald-400 shrink-0"/> : <AlertTriangle size={20} className="text-rose-400 shrink-0"/>}
@@ -1043,59 +965,8 @@ function MainApp() {
         </div>
       )}
 
-      {/* VIEWS: RIWAYAT LOKAL HP */}
-      {view === 'riwayat' && (
-         <div className="min-h-screen bg-slate-50 pb-20">
-            <header className="bg-white p-4 shadow-sm flex items-center justify-between sticky top-0 z-40 border-b border-slate-200">
-               <div className="flex items-center gap-3">
-                 <button onClick={() => setView('toko')} className="p-2 bg-slate-100 text-slate-600 rounded-full hover:bg-slate-200"><ArrowLeft size={20}/></button>
-                 <h1 className="font-black text-lg md:text-xl text-slate-800">Riwayat Belanja Saya</h1>
-               </div>
-               {localHistory.length > 0 && (
-                 <button onClick={handleClearLocalHistory} className="text-[10px] md:text-xs font-bold text-rose-500 flex items-center gap-1 bg-rose-50 px-3 py-2 rounded-xl hover:bg-rose-100 transition"><Trash2 size={14}/> Bersihkan</button>
-               )}
-            </header>
-            <div className="p-4 max-w-3xl mx-auto space-y-4">
-               {localHistory.length === 0 ? (
-                  <div className="text-center py-20 text-slate-400 font-bold flex flex-col items-center gap-3">
-                     <List size={48} className="opacity-20"/>
-                     <span>Belum ada riwayat belanja di HP ini.</span>
-                  </div>
-               ) : (
-                  localHistory.map(trx => (
-                     <div key={trx.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
-                        <div className="flex justify-between border-b border-slate-100 pb-3 mb-3">
-                           <span className="text-[10px] md:text-xs font-mono text-slate-500 font-bold">{trx.id}</span>
-                           <span className="text-[10px] md:text-xs font-bold text-slate-400">{trx.tanggal}</span>
-                        </div>
-                        <div className="space-y-3 mb-4">
-                           {trx.items.map((item, idx) => (
-                              <div key={idx} className="flex justify-between items-center text-xs md:text-sm font-semibold text-slate-700">
-                                 <div className="flex items-center gap-3">
-                                   <div className="w-8 h-8 rounded-lg border bg-slate-50 flex items-center justify-center shrink-0 overflow-hidden relative">
-                                      {item.gambar ? <img loading="lazy" src={formatImageUrl(item.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.visibility = 'hidden'; }}/> : <ImageIcon size={16} className="text-slate-300" />}
-                                   </div>
-                                   <span className="truncate max-w-[150px]">{item.qty}x {item.nama}</span>
-                                 </div>
-                                 <span>{formatRupiah(item.totalHarga)}</span>
-                              </div>
-                           ))}
-                        </div>
-                        <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
-                           <span className="font-bold text-sm text-slate-600">Total</span>
-                           <span className="font-black text-emerald-600 text-lg md:text-xl">{formatRupiah(trx.total)}</span>
-                        </div>
-                        <button onClick={() => { setStrukTerakhir(trx); setView('struk'); }} className="w-full mt-3 py-3 bg-blue-50 text-blue-600 font-bold rounded-xl text-xs md:text-sm hover:bg-blue-100 transition active:scale-95 flex items-center justify-center gap-2">
-                           <List size={16}/> Lihat Struk Detail
-                        </button>
-                     </div>
-                  ))
-               )}
-            </div>
-         </div>
-      )}
-
-      {/* VIEWS: TOKO UTAMA */}
+      {/* VIEWS SELECTION */}
+      
       {view === 'toko' && (
         <div className="pb-28">
           <header className="bg-white p-4 shadow-sm sticky top-0 z-40 mb-4 border-b">
@@ -1140,10 +1011,9 @@ function MainApp() {
               <div key={p.id} onClick={() => openProductModal(p)} className="bg-white p-3 md:p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center text-center relative active:scale-95 transition-transform cursor-pointer border-b-4 border-b-slate-100 overflow-hidden w-full h-full">
                 {cart[p.id] > 0 && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] md:text-xs font-black px-2 md:px-3 py-1 rounded-bl-xl shadow-lg z-20">{cart[p.id]}</div>}
                 
-                {/* GAMBAR PRODUK RAKSASA DENGAN PENGHILANG ERROR VISUAL */}
                 <div className="mb-3 md:mb-4 w-32 h-32 md:w-48 md:h-48 rounded-2xl border border-slate-100 shadow-inner relative overflow-hidden bg-slate-50 flex items-center justify-center shrink-0">
                   {p.gambar ? (
-                    <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white will-change-transform" alt={p.nama} onError={(e) => { e.target.style.visibility = 'hidden'; e.target.style.opacity = '0'; }} />
+                    <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white will-change-transform" alt={p.nama} onError={(e) => { e.target.style.display = 'none'; }} />
                   ) : (
                     <ImageIcon size={48} className="text-slate-300" />
                   )}
@@ -1203,7 +1073,6 @@ function MainApp() {
         </div>
       )}
 
-      {/* VIEW: CHECKOUT */}
       {view === 'checkout' && (
         <div className="max-w-md mx-auto p-4 md:p-6 min-h-screen flex flex-col pb-32">
           <button onClick={() => setView('toko')} className="flex items-center gap-2 font-black mb-6 text-slate-400 hover:text-slate-600 transition w-max"><ArrowLeft size={18}/> Kembali Belanja</button>
@@ -1223,7 +1092,7 @@ function MainApp() {
                   <div key={id} className="flex justify-between items-center border-b border-slate-50 pb-4 last:border-0 last:pb-0">
                     <div className="flex items-center gap-3 w-[60%]">
                       <div className="w-16 h-16 bg-slate-50 rounded-xl flex items-center justify-center border border-slate-100 overflow-hidden shrink-0 relative">
-                        {p.gambar ? <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.visibility = 'hidden'; }}/> : <ImageIcon size={24} className="text-slate-300" />}
+                        {p.gambar ? <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.display = 'none'; }}/> : <ImageIcon size={24} className="text-slate-300" />}
                       </div>
                       <div className="overflow-hidden">
                         <p className="font-bold text-xs md:text-sm text-slate-800 line-clamp-1">{p.nama}</p>
@@ -1248,14 +1117,13 @@ function MainApp() {
           </div>
 
           <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-sm border-t border-slate-100 z-50">
-            <button onClick={handleSelesaiBayar} disabled={isProcessing || jumlahItem === 0} className="w-full max-w-md mx-auto block py-4 md:py-5 bg-slate-900 text-white rounded-[20px] font-black text-lg md:text-xl shadow-2xl disabled:opacity-30 active:scale-95 transition-all hover:bg-slate-800">
+            <button onClick={handleSelesaiBayar} disabled={isProcessing || Object.keys(cart).length === 0} className="w-full max-w-md mx-auto block py-4 md:py-5 bg-slate-900 text-white rounded-[20px] font-black text-lg md:text-xl shadow-2xl disabled:opacity-30 active:scale-95 transition-all hover:bg-slate-800">
               {isProcessing ? 'MENYIMPAN...' : 'Selesai & Cetak Struk'}
             </button>
           </div>
         </div>
       )}
 
-      {/* VIEW: STRUK */}
       {view === 'struk' && (
         <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-start pt-10 px-4 pb-10">
           <div className="mb-6 flex flex-col items-center animate-slide-up text-center">
@@ -1282,7 +1150,7 @@ function MainApp() {
                   <div key={idx} className="flex justify-between items-start gap-2">
                     <div className="flex items-start gap-3 w-[70%]">
                       <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl bg-slate-50 flex items-center justify-center border overflow-hidden shrink-0 relative">
-                        {item.gambar ? <img src={formatImageUrl(item.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.visibility = 'hidden'; }}/> : <ImageIcon size={16} className="text-slate-300"/>}
+                        {item.gambar ? <img src={formatImageUrl(item.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.display = 'none'; }}/> : <ImageIcon size={16} className="text-slate-300"/>}
                       </div>
                       <div className="overflow-hidden">
                         <p className="font-semibold text-slate-800 text-[11px] md:text-sm line-clamp-2 leading-tight">{item.nama}</p>
@@ -1328,7 +1196,57 @@ function MainApp() {
         </div>
       )}
 
-      {/* VIEW: ADMIN LOGIN */}
+      {view === 'riwayat' && (
+         <div className="min-h-screen bg-slate-50 pb-20">
+            <header className="bg-white p-4 shadow-sm flex items-center justify-between sticky top-0 z-40 border-b border-slate-200">
+               <div className="flex items-center gap-3">
+                 <button onClick={() => setView('toko')} className="p-2 bg-slate-100 text-slate-600 rounded-full hover:bg-slate-200"><ArrowLeft size={20}/></button>
+                 <h1 className="font-black text-lg md:text-xl text-slate-800">Riwayat Belanja</h1>
+               </div>
+               {localHistory.length > 0 && (
+                 <button onClick={handleClearLocalHistory} className="text-[10px] md:text-xs font-bold text-rose-500 flex items-center gap-1 bg-rose-50 px-3 py-2 rounded-xl hover:bg-rose-100 transition"><Trash2 size={14}/> Bersihkan</button>
+               )}
+            </header>
+            <div className="p-4 max-w-3xl mx-auto space-y-4">
+               {localHistory.length === 0 ? (
+                  <div className="text-center py-20 text-slate-400 font-bold flex flex-col items-center gap-3">
+                     <List size={48} className="opacity-20"/>
+                     <span>Belum ada riwayat belanja di HP ini.</span>
+                  </div>
+               ) : (
+                  localHistory.map(trx => (
+                     <div key={trx.id} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-100">
+                        <div className="flex justify-between border-b border-slate-100 pb-3 mb-3">
+                           <span className="text-[10px] md:text-xs font-mono text-slate-500 font-bold">{trx.id}</span>
+                           <span className="text-[10px] md:text-xs font-bold text-slate-400">{trx.tanggal}</span>
+                        </div>
+                        <div className="space-y-3 mb-4">
+                           {trx.items.map((item, idx) => (
+                              <div key={idx} className="flex justify-between items-center text-xs md:text-sm font-semibold text-slate-700">
+                                 <div className="flex items-center gap-3">
+                                   <div className="w-8 h-8 rounded-lg border bg-slate-50 flex items-center justify-center shrink-0 overflow-hidden relative">
+                                      {item.gambar ? <img loading="lazy" src={formatImageUrl(item.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.display = 'none'; }}/> : <ImageIcon size={16} className="text-slate-300" />}
+                                   </div>
+                                   <span className="truncate max-w-[150px]">{item.qty}x {item.nama}</span>
+                                 </div>
+                                 <span>{formatRupiah(item.totalHarga)}</span>
+                              </div>
+                           ))}
+                        </div>
+                        <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-100">
+                           <span className="font-bold text-sm text-slate-600">Total</span>
+                           <span className="font-black text-emerald-600 text-lg md:text-xl">{formatRupiah(trx.total)}</span>
+                        </div>
+                        <button onClick={() => { setStrukTerakhir(trx); setView('struk'); }} className="w-full mt-3 py-3 bg-blue-50 text-blue-600 font-bold rounded-xl text-xs md:text-sm hover:bg-blue-100 transition active:scale-95 flex items-center justify-center gap-2">
+                           <List size={16}/> Lihat Struk Detail
+                        </button>
+                     </div>
+                  ))
+               )}
+            </div>
+         </div>
+      )}
+
       {view === 'admin' && !isAdminLogged && (
         <div className="min-h-screen bg-slate-100 flex items-center justify-center p-4">
           <form onSubmit={handleLogin} className="bg-white p-8 rounded-[40px] shadow-xl w-full max-w-sm border border-slate-100">
@@ -1342,9 +1260,8 @@ function MainApp() {
         </div>
       )}
 
-      {/* VIEW: ADMIN DASHBOARD */}
       {view === 'admin' && isAdminLogged && adminData && (
-        <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row relative">
+        <div className="min-h-screen bg-slate-50 flex flex-col md:flex-row relative w-full overflow-hidden">
           <aside className="bg-slate-950 text-white w-full md:w-64 flex-shrink-0 flex flex-col shadow-2xl sticky top-0 z-40 md:h-screen">
             <div className="hidden md:flex p-6 items-center gap-3 border-b border-slate-800 flex-shrink-0">
                <Store className="text-emerald-400 shrink-0" size={28} />
@@ -1358,8 +1275,7 @@ function MainApp() {
             </nav>
           </aside>
           
-          <main className="flex-1 p-4 md:p-10 overflow-y-auto">
-             {/* TAB PENGATURAN */}
+          <main className="flex-1 p-4 md:p-10 overflow-y-auto w-full">
              {adminTab === 'pengaturan' && (
                <div className="max-w-3xl animate-fade-in mx-auto md:mx-0">
                   <h1 className="text-3xl font-black tracking-tighter text-slate-800 mb-8">Konfigurasi Toko</h1>
@@ -1393,10 +1309,9 @@ function MainApp() {
                </div>
              )}
 
-             {/* TAB ANALISA */}
              {adminTab === 'analisa' && (
-               <div className="animate-fade-in max-w-6xl mx-auto">
-                  <div className="flex flex-col xl:flex-row justify-between xl:items-center mb-8 gap-6">
+               <div className="animate-fade-in max-w-6xl mx-auto w-full">
+                  <div className="flex flex-col xl:flex-row justify-between xl:items-center mb-8 gap-6 w-full">
                     <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-slate-800">Ikhtisar Penjualan & Stok</h1>
                     <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto">
                       <div className="flex flex-wrap items-center gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm w-full md:w-auto">
@@ -1424,16 +1339,21 @@ function MainApp() {
                      <div className="bg-white p-4 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-5"><Store size={48}/></div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Modal (Stok)</p><p className="text-lg md:text-3xl font-extrabold text-blue-600 truncate">{formatRupiah(adminData.totalModalInput)}</p></div>
                      <div className="col-span-2 md:col-span-1 bg-gradient-to-br from-blue-500 to-indigo-600 p-4 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm text-white relative overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-10"><TrendingUp size={48}/></div><p className="text-[10px] font-black text-blue-100 uppercase tracking-widest mb-1">Potensi Keuntungan</p><p className="text-xl md:text-3xl font-extrabold drop-shadow-sm truncate">{formatRupiah(adminData.potensiKeuntungan)}</p></div>
                   </div>
-                  <div className="bg-white rounded-3xl md:rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col mb-8">
+                  <div className="bg-white rounded-3xl md:rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col mb-8 w-full">
                     <div className="p-4 md:p-6 border-b border-slate-100"><h2 className="font-black text-base md:text-xl text-slate-800 flex items-center gap-2"><Package className="text-emerald-500" size={20}/> Rekap Keseluruhan per Barang</h2></div>
-                    <div className="overflow-x-auto max-h-[400px] overflow-y-auto">
-                      <table className="w-full text-left min-w-[600px]">
+                    <div className="overflow-x-auto max-h-[400px] overflow-y-auto w-full block">
+                      <table className="w-full text-left min-w-[600px] border-collapse">
                          <thead className="bg-slate-50 sticky top-0 shadow-sm z-10"><tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest"><th className="p-3 md:p-4">Nama Barang</th><th className="p-3 md:p-4 text-center">Terjual</th><th className="p-3 md:p-4 text-center">Sisa Stok</th><th className="p-3 md:p-4 text-center">Total Awal</th><th className="p-3 md:p-4 text-right">Pendapatan</th></tr></thead>
                          <tbody className="divide-y divide-slate-50">
                            {adminData.productRankings.length === 0 && <tr><td colSpan="5" className="p-6 text-center text-slate-400 font-bold text-xs">Data kosong.</td></tr>}
                            {adminData.productRankings.map((p) => (
                              <tr key={p.id} className="text-xs md:text-sm font-bold hover:bg-slate-50 transition-colors">
-                               <td className="p-3 md:p-4 flex items-center gap-3"><div className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center bg-white shrink-0 overflow-hidden relative"><div className="absolute inset-0 flex items-center justify-center z-0 scale-75">{getDynamicIcon(p.nama)}</div>{p.gambar && <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.display = 'none'; }}/>}</div><span className="truncate max-w-[120px] md:max-w-xs text-slate-700">{p.nama}</span></td>
+                               <td className="p-3 md:p-4 flex items-center gap-3">
+                                 <div className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center bg-white shrink-0 overflow-hidden relative">
+                                    {p.gambar ? <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" alt="img" onError={(e) => { e.target.style.display = 'none'; }}/> : <ImageIcon size={16} className="text-slate-300"/>}
+                                 </div>
+                                 <span className="truncate max-w-[120px] md:max-w-xs text-slate-700">{p.nama}</span>
+                               </td>
                                <td className="p-3 md:p-4 text-center text-emerald-600 font-black">{p.qty}</td>
                                <td className="p-3 md:p-4 text-center text-blue-600 font-black">{p.stok}</td>
                                <td className="p-3 md:p-4 text-center text-slate-600 font-black">{p.stok + p.qty}</td>
@@ -1444,11 +1364,11 @@ function MainApp() {
                       </table>
                     </div>
                   </div>
-                  <div className="grid lg:grid-cols-2 gap-6 mb-8">
-                      <div className="bg-white rounded-3xl md:rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+                  <div className="grid lg:grid-cols-2 gap-6 mb-8 w-full">
+                      <div className="bg-white rounded-3xl md:rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col w-full">
                         <div className="p-4 md:p-6 border-b border-slate-100"><h2 className="font-black text-base md:text-xl text-slate-800 flex items-center gap-2"><TrendingUp className="text-orange-500" size={20}/> 10 Barang Paling Laku</h2></div>
-                        <div className="overflow-x-auto max-h-[300px]">
-                          <table className="w-full text-left min-w-[300px]">
+                        <div className="overflow-x-auto max-h-[300px] w-full block">
+                          <table className="w-full text-left min-w-[300px] border-collapse">
                              <tbody className="divide-y divide-slate-50">
                                {adminData.topSelling.length === 0 && <tr><td className="p-6 text-center text-slate-400 font-bold text-xs">Kosong.</td></tr>}
                                {adminData.topSelling.map((p, idx) => (
@@ -1458,10 +1378,10 @@ function MainApp() {
                           </table>
                         </div>
                       </div>
-                      <div className="bg-white rounded-3xl md:rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col">
+                      <div className="bg-white rounded-3xl md:rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col w-full">
                         <div className="p-4 md:p-6 border-b border-slate-100"><h2 className="font-black text-base md:text-xl text-slate-800 flex items-center gap-2"><TrendingDown className="text-red-500" size={20}/> Perhatian: Kurang Laku</h2></div>
-                        <div className="overflow-x-auto max-h-[300px]">
-                          <table className="w-full text-left min-w-[300px]">
+                        <div className="overflow-x-auto max-h-[300px] w-full block">
+                          <table className="w-full text-left min-w-[300px] border-collapse">
                              <tbody className="divide-y divide-slate-50">
                                {adminData.bottomSelling.length === 0 && <tr><td className="p-6 text-center text-slate-400 font-bold text-xs">Semua laku!</td></tr>}
                                {adminData.bottomSelling.map((item, idx) => (
@@ -1472,14 +1392,14 @@ function MainApp() {
                         </div>
                       </div>
                   </div>
-                  <div className="bg-white rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 p-4 md:p-8">
+                  <div className="bg-white rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 p-4 md:p-8 w-full">
                     <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-3">
                       <h2 className="font-black text-base md:text-lg flex items-center gap-2 text-slate-900"><List className="text-blue-500" size={20}/> Riwayat Transaksi Lengkap</h2>
                       <select value={sortTrx} onChange={e => setSortTrx(e.target.value)} className="bg-slate-50 px-3 py-2 rounded-xl text-xs font-bold outline-none text-slate-700 border border-slate-200">
                          <option value="terbaru">Paling Baru</option><option value="terlama">Paling Lama</option><option value="terbesar">Nominal Terbesar</option><option value="terkecil">Nominal Terkecil</option>
                       </select>
                     </div>
-                    <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1">
+                    <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1 w-full block">
                       {adminData.sortedTransactions.length === 0 ? <p className="text-gray-400 text-xs font-bold text-center py-10">Belum ada transaksi.</p> : adminData.sortedTransactions.map(t => (
                         <div key={t.id} className="border border-gray-200 rounded-2xl p-4 bg-gray-50/50">
                           <div className="flex justify-between items-center text-[10px] md:text-xs mb-2 pb-2 border-b border-gray-200"><span className="font-mono font-bold text-slate-500">{t.id} • {t.tanggal}</span><span className="font-black px-2 py-0.5 rounded uppercase bg-slate-200 text-slate-600">{t.metode}</span></div>
@@ -1498,9 +1418,9 @@ function MainApp() {
                </div>
              )}
 
-             {/* TAB: MANAJEMEN BARANG */}
+             {/* TAB BARANG */}
              {adminTab === 'barang' && (
-               <div className="animate-fade-in max-w-6xl mx-auto">
+               <div className="animate-fade-in max-w-6xl mx-auto w-full">
                   <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
                     <h1 className="text-3xl font-black tracking-tighter text-slate-800">Manajemen Barang</h1>
                     <div className="flex flex-col sm:flex-row gap-2">
@@ -1581,18 +1501,17 @@ function MainApp() {
                        <button disabled={isProcessing} className={`text-white py-4 rounded-2xl font-black text-sm md:text-base md:col-span-4 mt-2 transition-all active:scale-[0.98] shadow-xl disabled:opacity-50 bg-slate-900 hover:bg-slate-800`}>{isProcessing ? 'MENYIMPAN...' : (editingId ? 'UPDATE BARANG SEKARANG' : 'SIMPAN BARANG BARU')}</button>
                     </form>
                  )}
-                 <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto max-h-[600px]">
-                      <table className="w-full text-left min-w-[700px]">
+                 <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden w-full">
+                    <div className="overflow-x-auto max-h-[600px] w-full block">
+                      <table className="w-full text-left min-w-[700px] border-collapse">
                          <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10 shadow-sm"><tr className="text-[10px] font-black uppercase text-slate-500 tracking-widest"><th className="p-4 md:p-6">Produk</th><th className="p-4 md:p-6 text-center">Stok</th><th className="p-4 md:p-6">Harga & Profit</th><th className="p-4 md:p-6 text-center">Aksi (CRUD)</th></tr></thead>
                          <tbody className="divide-y divide-slate-100">
                            {products.length === 0 && <tr><td colSpan="4" className="p-10 text-center text-slate-400 font-bold text-sm">Barang masih kosong.</td></tr>}
                            {products.map(p => (
                              <tr key={p.id} className={`transition-colors ${editingId === p.id ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
                                <td className="p-4 md:p-6 flex items-center gap-3 md:gap-4">
-                                 <div className="w-10 h-10 md:w-14 md:h-14 bg-white rounded-xl md:rounded-2xl border shadow-sm flex items-center justify-center shrink-0 overflow-hidden relative">
-                                   <div className="absolute inset-0 flex items-center justify-center z-0 scale-75">{getDynamicIcon(p.nama)}</div>
-                                   {p.gambar && <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.display = 'none'; }}/>}
+                                 <div className="w-10 h-10 md:w-14 md:h-14 bg-slate-50 rounded-xl md:rounded-2xl border shadow-sm flex items-center justify-center shrink-0 overflow-hidden relative">
+                                   {p.gambar ? <img loading="lazy" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.style.display = 'none'; }}/> : <ImageIcon size={20} className="text-slate-300"/>}
                                  </div>
                                  <div className="min-w-0">
                                    <span className="font-extrabold text-xs md:text-sm text-slate-900 truncate block max-w-[150px] md:max-w-xs">{p.nama}</span>
