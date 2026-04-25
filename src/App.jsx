@@ -10,7 +10,7 @@ import {
 // =========================================================================
 // KONEKSI SUPABASE LANGSUNG (ANTI-GAGAL)
 // =========================================================================
-const SUPABASE_URL = '[https://azsocvlmuaddleqtlvko.supabase.co](https://azsocvlmuaddleqtlvko.supabase.co)';
+const SUPABASE_URL = 'https://azsocvlmuaddleqtlvko.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF6c29jdmxtdWFkZGxlcXRsdmtvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5OTAxMjEsImV4cCI6MjA5MTU2NjEyMX0.xGq-IpxhlFQ_8KTPIZXUm-NLKHIrQI4uNMfG9SVLAgA';
 
 let supabaseClient = null;
@@ -53,7 +53,7 @@ const formatImageUrl = (url) => {
 };
 
 // GAMBAR PENGGANTI JIKA LINK G-DRIVE SALAH / DIPRIVASI
-const FALLBACK_IMAGE = "[https://placehold.co/400x400/f8fafc/94a3b8?text=Foto+Kosong](https://placehold.co/400x400/f8fafc/94a3b8?text=Foto+Kosong)";
+const FALLBACK_IMAGE = "https://placehold.co/400x400/f8fafc/94a3b8?text=Foto+Kosong";
 
 const hitungTotalHargaItem = (item, qty) => {
   if (item.diskon && qty >= (item.diskon.min_qty || 1)) {
@@ -149,18 +149,6 @@ function MainApp() {
   const adminData = useMemo(() => {
     if (view !== 'admin' || !isAdminLogged) return null;
 
-    // =========================================================================
-    // REKAP INVENTORI & POTENSI (REALTIME DARI PRODUK)
-    // =========================================================================
-    const totalInventoryModal = products.reduce((sum, p) => sum + ((p.modal || 0) * (p.stok || 0)), 0);
-    const totalInventoryPotentialRevenue = products.reduce((sum, p) => sum + ((p.jual || 0) * (p.stok || 0)), 0);
-    const totalInventoryPotentialProfit = products.reduce((sum, p) => sum + (((p.jual || 0) - (p.modal || 0)) * (p.stok || 0)), 0);
-    const totalInventoryPcs = products.reduce((sum, p) => sum + (p.stok || 0), 0);
-    const totalJenisBarang = products.length;
-
-    // =========================================================================
-    // REKAP PENJUALAN (HISTORIS DARI TRANSAKSI)
-    // =========================================================================
     const filteredTransactions = transactions.filter(t => {
       if (!filterStart && !filterEnd) return true;
       let tDate;
@@ -181,7 +169,6 @@ function MainApp() {
     });
 
     const totalPendapatanKotor = filteredTransactions.reduce((sum, t) => sum + (t.total || 0), 0);
-    // Logika Profit Bersih: Omset - Modal Terjual. Menggunakan t.profit bersih jika Supabase sudah didaftar kolomnya. t.modal adalah modal historis transaksi.
     const totalKeuntunganBersih = filteredTransactions.reduce((sum, t) => sum + (t.profit !== undefined ? t.profit : ((t.total||0) - (t.modal||0))), 0);
     const totalModalTerjual = filteredTransactions.reduce((sum, t) => sum + (t.modal || 0), 0);
 
@@ -205,7 +192,6 @@ function MainApp() {
         if (!itemSalesMap[item.id]) itemSalesMap[item.id] = { qty: 0, revenue: 0, profit: 0, modalTerjual: 0, gambar: item.gambar };
         itemSalesMap[item.id].qty += (item.qty || 0);
         itemSalesMap[item.id].revenue += (item.totalHarga || 0);
-        // Profit item historis: Omset Item - (Modal Item * Qty Item). ProfitItem disimpan aman dalam transaksi.
         itemSalesMap[item.id].profit += (item.profitItem !== undefined ? item.profitItem : (item.totalHarga - ((item.modal||0) * item.qty)));
         itemSalesMap[item.id].modalTerjual += ((item.modal||0) * item.qty);
       });
@@ -231,10 +217,16 @@ function MainApp() {
         return b.daysActive - a.daysActive; 
       }).slice(0, 5);
 
+    const totalInventoryModal = products.reduce((sum, p) => sum + ((p.modal || 0) * (p.stok || 0)), 0);
+    const totalInventoryPotentialRevenue = products.reduce((sum, p) => sum + ((p.jual || 0) * (p.stok || 0)), 0);
+    const totalInventoryPotentialProfit = products.reduce((sum, p) => sum + (((p.jual || 0) - (p.modal || 0)) * (p.stok || 0)), 0);
+    const totalInventoryPcs = products.reduce((sum, p) => sum + (p.stok || 0), 0);
+    const totalJenisBarang = products.length;
+
     return {
-      totalInventoryModal, totalInventoryPotentialRevenue, totalInventoryPotentialProfit, totalInventoryPcs, totalJenisBarang,
       filteredTransactions, sortedTransactions, totalPendapatanKotor, totalKeuntunganBersih, totalModalTerjual,
-      totalBarangInput, totalModalInput, potensiKeuntunganInput, productRankings, topSelling, bottomSelling
+      totalBarangInput, totalModalInput, potensiKeuntunganInput, productRankings, topSelling, bottomSelling,
+      totalInventoryModal, totalInventoryPotentialRevenue, totalInventoryPotentialProfit, totalInventoryPcs, totalJenisBarang
     };
   }, [transactions, products, filterStart, filterEnd, sortTrx, view, isAdminLogged]);
 
@@ -243,13 +235,11 @@ function MainApp() {
     setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 4000); 
   };
 
-  // SYSTEM PWA & NOTIFIKASI & AUTO-UPDATE FAVICON
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') Notification.requestPermission();
       
-      // Update Favicon dan Apple Touch Icon Secara Dinamis
-      const logoUrl = settings.logo_url ? formatImageUrl(settings.logo_url) : "data:image/svg+xml,<svg xmlns=%22[http://www.w3.org/2000/svg%22](http://www.w3.org/2000/svg%22) viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏪</text></svg>";
+      const logoUrl = settings.logo_url ? formatImageUrl(settings.logo_url) : "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏪</text></svg>";
       
       let link = document.querySelector("link[rel~='icon']");
       if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
@@ -259,7 +249,6 @@ function MainApp() {
       if (!appleIcon) { appleIcon = document.createElement('link'); appleIcon.rel = 'apple-touch-icon'; document.head.appendChild(appleIcon); }
       appleIcon.href = logoUrl;
       
-      // Update Title Web
       document.title = settings.nama_toko || 'Toko Kejujuran';
     }
   }, [settings.logo_url, settings.nama_toko]);
@@ -270,7 +259,6 @@ function MainApp() {
   useEffect(() => { try { localStorage.setItem('tokojujur_local_history', JSON.stringify(localHistory)); } catch(e){} }, [localHistory]);
   useEffect(() => { try { localStorage.setItem('tokojujur_gemini_key', geminiKey); } catch(e){} }, [geminiKey]);
 
-  // INISIALISASI SUPABASE LANGSUNG MENGGUNAKAN KEY
   useEffect(() => {
     const initSupabase = () => {
       try {
@@ -296,7 +284,7 @@ function MainApp() {
 
     if (!window.supabase) {
       const script = document.createElement('script');
-      script.src = "[https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2](https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2)";
+      script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
       script.onload = initSupabase;
       document.head.appendChild(script);
     } else {
@@ -304,7 +292,6 @@ function MainApp() {
     }
   }, []);
 
-  // REALTIME INSTAN & SINKRONISASI
   useEffect(() => {
     if (!dbReady || !isConnected || !supabaseClient) return;
     
@@ -317,10 +304,7 @@ function MainApp() {
           supabaseClient.from('pengaturan').select('*').eq('id', 1).single()
         ]);
         
-        if (prodRes.error) {
-           console.error(prodRes.error);
-        }
-        
+        if (prodRes.error) console.error(prodRes.error);
         if (prodRes.data) setProducts(prodRes.data);
         if (trxRes.data) setTransactions(trxRes.data);
         if (setRes.data) setSettings(setRes.data);
@@ -483,8 +467,9 @@ function MainApp() {
           ]
         }],
         generationConfig: { responseModalities: ['IMAGE'] }
-      });
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
+      };
+
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${geminiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -524,7 +509,6 @@ function MainApp() {
     }
   };
 
-  // UPLOAD LOGO HANDLER
   const handleUploadLogo = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -731,7 +715,7 @@ function MainApp() {
           admin_password: settings.admin_password
        }).eq('id', 1);
        error = fallbackError;
-       if (!error) showToast('Pengaturan disimpan, TAPI logo gagal tersimpan. Harap buat kolom "logo_url" di Supabase.', 'error');
+       if (!error) showToast('Pengaturan disimpan, TAPI logo gagal. Harap buat kolom "logo_url" di Supabase.', 'error');
     } else if (error) {
        showToast(`Gagal: ${error.message}`, 'error');
     } else {
@@ -909,7 +893,6 @@ function MainApp() {
     link.click();
   };
 
-  // Komponen Logo Dinamis
   const renderLogo = (sizeCls = "w-8 h-8") => {
     if (settings.logo_url) {
       return <img src={formatImageUrl(settings.logo_url)} className={`${sizeCls} object-contain rounded-lg shadow-sm`} alt="Logo" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }} />
@@ -927,7 +910,7 @@ function MainApp() {
         <div className="bg-slate-800 p-6 rounded-3xl w-full max-w-sm text-left shadow-2xl border border-slate-700">
            <div className="mb-4">
              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Supabase URL</label>
-             <input type="text" id="sbUrl" defaultValue={localStorage.getItem('tokojujur_sb_url') || ''} className="w-full mt-1 p-3 rounded-xl bg-slate-900 border border-slate-700 text-white outline-none focus:border-emerald-500 text-sm font-mono" placeholder="[https://xxxx.supabase.co](https://xxxx.supabase.co)" />
+             <input type="text" id="sbUrl" defaultValue={localStorage.getItem('tokojujur_sb_url') || ''} className="w-full mt-1 p-3 rounded-xl bg-slate-900 border border-slate-700 text-white outline-none focus:border-emerald-500 text-sm font-mono" placeholder="https://xxxx.supabase.co" />
            </div>
            <div className="mb-6">
              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Supabase Anon Key</label>
@@ -1169,8 +1152,10 @@ function MainApp() {
 
       {/* VIEW: CHECKOUT */}
       {view === 'checkout' && (
-        <div className="max-w-md mx-auto p-4 md:p-6 flex flex-col pb-32">
-          <div className="bg-white rounded-3xl p-5 md:p-6 shadow-sm border border-slate-100 mb-6 mt-4">
+        <div className="max-w-md mx-auto p-4 md:p-6 min-h-screen flex flex-col pb-32">
+          <button onClick={() => setView('toko')} className="flex items-center gap-2 font-black mb-6 text-slate-400 hover:text-slate-600 transition w-max"><ArrowLeft size={18}/> Kembali Belanja</button>
+          
+          <div className="bg-white rounded-3xl p-5 md:p-6 shadow-sm border border-slate-100 mb-6">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
               <h3 className="font-black text-base md:text-lg text-slate-800">Review Keranjang</h3>
               <button onClick={handleClearCart} className="flex items-center gap-1 text-[10px] md:text-xs font-bold text-red-500 bg-red-50 px-2 py-1 rounded hover:bg-red-100 transition"><Trash2 size={14}/> Bersihkan</button>
@@ -1581,7 +1566,7 @@ function MainApp() {
                              </div>
                              <div className="bg-blue-50 border border-blue-100 rounded-lg p-2 flex items-center justify-between gap-2 mt-1">
                                 <span className="text-[9px] font-bold text-blue-700 w-[60%] leading-tight truncate">Paste Link Google Drive di bawah</span>
-                                <a href="[https://drive.google.com/drive/folders/1KbB_QVH_TclNJkQSziFJ7VTGbOo_oA0r?hl=ID](https://drive.google.com/drive/folders/1KbB_QVH_TclNJkQSziFJ7VTGbOo_oA0r?hl=ID)" target="_blank" rel="noreferrer" className="bg-blue-600 text-white px-2 py-1.5 rounded font-black text-[9px] flex items-center gap-1 hover:bg-blue-700 shrink-0"><ExternalLink size={12}/> Buka Folder</a>
+                                <a href="https://drive.google.com/drive/folders/1KbB_QVH_TclNJkQSziFJ7VTGbOo_oA0r?hl=ID" target="_blank" rel="noreferrer" className="bg-blue-600 text-white px-2 py-1.5 rounded font-black text-[9px] flex items-center gap-1 hover:bg-blue-700 shrink-0"><ExternalLink size={12}/> Buka Folder</a>
                              </div>
                              <input type="text" placeholder="Paste Link Gambar / Google Drive disini..." value={newProduct.gambar || ''} onChange={e => setNewProduct({...newProduct, gambar: e.target.value})} className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs focus:ring-2 focus:ring-emerald-500 outline-none font-semibold text-slate-700 shadow-sm"/>
                            </div>
@@ -1649,12 +1634,12 @@ function MainApp() {
                                <td className="p-4 md:p-6 text-center"><span className={`px-2 py-1 md:px-4 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black tracking-widest uppercase ${p.stok > 10 ? 'bg-emerald-100 text-emerald-800' : p.stok > 0 ? 'bg-orange-100 text-orange-800' : 'bg-rose-100 text-rose-800'}`}>{p.stok}</span></td>
                                <td className="p-4 md:p-6">
                                   <div className="font-black text-xs md:text-sm text-emerald-700">{formatRupiah(p.jual)}</div>
-                                  <div className="text-[9px] md:text-[10px] font-bold text-slate-500 mt-0.5 md:mt-1">Profit Satuan: {formatRupiah(p.jual - p.modal)}</div>
+                                  <div className="text-[9px] md:text-[10px] font-bold text-slate-500 mt-0.5 md:mt-1">Profit Satuan: {formatRupiah((p.jual||0) - (p.modal||0))}</div>
                                   {p.diskon && <div className="text-[9px] text-orange-700 font-black bg-orange-100 px-1.5 py-0.5 rounded md:rounded-lg w-max mt-1 border border-orange-200">GROSIR: {p.diskon.min_qty} = {formatRupiah(p.diskon.harga_total)}</div>}
                                </td>
                                <td className="p-4 md:p-6 text-center">
-                                  <div className="text-[11px] md:text-sm font-extrabold text-emerald-600">{p.jual > 0 ? (((p.jual - p.modal)/p.jual)*100).toFixed(1) : '0'}%</div>
-                                  <div className="text-[9px] md:text-[10px] font-bold text-slate-500 mt-1">Potensi Item: {formatRupiah((p.jual - p.modal) * p.stok)}</div>
+                                  <div className="text-[11px] md:text-sm font-extrabold text-emerald-600">{p.jual > 0 ? ((((p.jual||0) - (p.modal||0))/(p.jual||1))*100).toFixed(1) : '0'}%</div>
+                                  <div className="text-[9px] md:text-[10px] font-bold text-slate-500 mt-1">Potensi Item: {formatRupiah(((p.jual||0) - (p.modal||0)) * (p.stok||0))}</div>
                                </td>
                                <td className="p-4 md:p-6 text-center">
                                  <div className="flex items-center justify-center gap-2">
