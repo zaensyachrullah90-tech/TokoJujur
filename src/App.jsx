@@ -1021,13 +1021,13 @@ function MainApp() {
         </div>
       )}
 
-      {/* HEADER UMUM (Tampil jika bukan di halaman admin/struk) */}
+      {/* HEADER UMUM */}
       {view !== 'admin' && view !== 'struk' && (
         <header className="bg-white p-4 shadow-sm sticky top-0 z-40 mb-4 border-b">
           <div className="flex justify-between items-center mb-4 max-w-5xl mx-auto">
             <div className="flex items-center gap-2 text-emerald-600 font-black text-lg md:text-xl truncate max-w-[50%]">
               {renderLogo("w-8 h-8")}
-              <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v3.1</span></span>
+              <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v3.2</span></span>
             </div>
             <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
               <button onClick={() => setView('riwayat')} className="p-2 md:p-2.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition shadow-sm relative" title="Riwayat Pembelian">
@@ -1075,7 +1075,6 @@ function MainApp() {
               <div key={p.id} onClick={() => openProductModal(p)} className="bg-white p-3 md:p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center text-center relative active:scale-95 transition-transform cursor-pointer border-b-4 border-b-slate-100 overflow-hidden w-full h-full">
                 {cart[p.id] > 0 && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] md:text-xs font-black px-2 md:px-3 py-1 rounded-bl-xl shadow-lg z-20">{cart[p.id]}</div>}
                 
-                {/* GAMBAR PRODUK RAKSASA DENGAN PENGHILANG ERROR VISUAL */}
                 <div className="mb-3 md:mb-4 w-32 h-32 md:w-48 md:h-48 rounded-2xl border border-slate-100 shadow-inner relative overflow-hidden bg-slate-50 flex items-center justify-center shrink-0">
                   {p.gambar ? (
                     <img 
@@ -1436,18 +1435,67 @@ function MainApp() {
                   {/* SECTION BARU: REKAP INVENTORI & POTENSI (REALTIME) */}
                   <h2 className="text-lg md:text-2xl font-black text-slate-800 mb-5 flex items-center gap-3"><Package className="text-blue-500" size={26}/> Rekap Inventori & Potensi (Realtime)</h2>
                   <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-10">
-                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between"><div className="absolute top-0 right-0 p-4 opacity-5"><Store size={60}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Total Modal Inventori</p><p className="text-xl md:text-3xl font-extrabold text-slate-900 truncate">{formatRupiah(adminData.totalInventoryModal)}</p></div><p className="text-xs font-bold text-slate-500 mt-2">Dari {adminData.totalInventoryPcs} pcs barang aktif</p></div>
-                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between"><div className="absolute top-0 right-0 p-4 opacity-5"><BarChart3 size={60}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Potensi Total Omset</p><p className="text-xl md:text-3xl font-extrabold text-blue-600 truncate">{formatRupiah(adminData.totalInventoryPotentialRevenue)}</p></div><p className="text-xs font-bold text-slate-500 mt-2">Jika semua stok terjual habis</p></div>
-                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between"><div className="absolute top-0 right-0 p-4 opacity-5"><Sparkles size={60}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Total Potensi Untung</p><p className="text-xl md:text-3xl font-extrabold text-emerald-600 truncate">{formatRupiah(adminData.totalInventoryPotentialProfit)}</p></div><p className="text-xs font-bold text-emerald-700 mt-2 flex items-center gap-1.5"><TrendingUp size={14}/> Margin Potensial: {adminData.totalInventoryPotentialRevenue > 0 ? ((adminData.totalInventoryPotentialProfit / adminData.totalInventoryPotentialRevenue) * 100).toFixed(1) : '0'}%</p></div>
-                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between"><div className="absolute top-0 right-0 p-4 opacity-5"><List size={60}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Total Jenis Barang</p><p className="text-xl md:text-3xl font-extrabold text-slate-900 truncate">{adminData.totalJenisBarang}</p></div><p className="text-xs font-bold text-slate-500 mt-2">Item terdaftar aktif</p></div>
+                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between">
+                        <div className="absolute top-0 right-0 p-4 opacity-5"><Store size={60}/></div>
+                        <div className="relative z-10">
+                           <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-words">Total Modal Inventori</p>
+                           <p className="text-xl md:text-2xl lg:text-3xl font-extrabold text-slate-900">{formatRupiah(adminData.totalInventoryModal)}</p>
+                        </div>
+                        <p className="text-xs font-bold text-slate-500 mt-2 relative z-10">Dari {adminData.totalInventoryPcs} pcs aktif</p>
+                     </div>
+                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between">
+                        <div className="absolute top-0 right-0 p-4 opacity-5"><BarChart3 size={60}/></div>
+                        <div className="relative z-10">
+                           <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-words">Potensi Total Omset</p>
+                           <p className="text-xl md:text-2xl lg:text-3xl font-extrabold text-blue-600">{formatRupiah(adminData.totalInventoryPotentialRevenue)}</p>
+                        </div>
+                        <p className="text-xs font-bold text-slate-500 mt-2 relative z-10">Jika terjual habis</p>
+                     </div>
+                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between">
+                        <div className="absolute top-0 right-0 p-4 opacity-5"><Sparkles size={60}/></div>
+                        <div className="relative z-10">
+                           <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-words">Total Potensi Untung</p>
+                           <p className="text-xl md:text-2xl lg:text-3xl font-extrabold text-emerald-600">{formatRupiah(adminData.totalInventoryPotentialProfit)}</p>
+                        </div>
+                        <p className="text-xs font-bold text-emerald-700 mt-2 flex items-center gap-1.5 relative z-10"><TrendingUp size={14}/> Margin: {adminData.totalInventoryPotentialRevenue > 0 ? ((adminData.totalInventoryPotentialProfit / adminData.totalInventoryPotentialRevenue) * 100).toFixed(1) : '0'}%</p>
+                     </div>
+                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between">
+                        <div className="absolute top-0 right-0 p-4 opacity-5"><List size={60}/></div>
+                        <div className="relative z-10">
+                           <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-words">Total Jenis Barang</p>
+                           <p className="text-xl md:text-2xl lg:text-3xl font-extrabold text-slate-900">{adminData.totalJenisBarang}</p>
+                        </div>
+                        <p className="text-xs font-bold text-slate-500 mt-2 relative z-10">Item terdaftar aktif</p>
+                     </div>
                   </div>
 
                   {/* SECTION: REKAP PENJUALAN (HISTORIS) */}
                   <h2 className="text-lg md:text-2xl font-black text-slate-800 mb-5 flex items-center gap-3"><CheckCircle className="text-emerald-500" size={26}/> Rekap Penjualan Historis (Terjual)</h2>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-8">
-                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between"><div className="absolute top-0 right-0 p-4 opacity-5"><TrendingUp size={60}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Total Omset (Terjual)</p><p className="text-lg md:text-3xl font-extrabold text-slate-900 truncate">{formatRupiah(adminData.totalPendapatanKotor)}</p></div><p className="text-xs font-bold text-slate-500 mt-2">Dari {adminData.filteredTransactions.length} transaksi</p></div>
-                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between"><div className="absolute top-0 right-0 p-4 opacity-5"><Store size={60}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Modal Barang Terjual</p><p className="text-lg md:text-3xl font-extrabold text-blue-600 truncate">{formatRupiah(adminData.totalModalTerjual)}</p></div><p className="text-xs font-bold text-slate-500 mt-2">Sesuai modal historis transaksi</p></div>
-                     <div className="col-span-2 md:col-span-1 bg-gradient-to-br from-emerald-500 to-teal-600 p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm text-white relative overflow-hidden flex flex-col justify-between"><div className="absolute top-0 right-0 p-4 opacity-10"><Sparkles size={60}/></div><div><p className="text-[10px] font-black text-emerald-100 uppercase tracking-widest mb-1.5">Untung Bersih (Historis)</p><p className="text-xl md:text-3xl font-extrabold drop-shadow-sm truncate">{formatRupiah(adminData.totalKeuntunganBersih)}</p></div><p className="text-xs font-bold text-emerald-50 mt-2 flex items-center gap-1.5"><TrendingUp size={14}/> Margin Bersih: {adminData.totalPendapatanKotor > 0 ? ((adminData.totalKeuntunganBersih / adminData.totalPendapatanKotor) * 100).toFixed(1) : '0'}%</p></div>
+                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between">
+                        <div className="absolute top-0 right-0 p-4 opacity-5"><TrendingUp size={60}/></div>
+                        <div className="relative z-10">
+                           <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-words">Total Omset (Terjual)</p>
+                           <p className="text-xl md:text-2xl lg:text-3xl font-extrabold text-slate-900">{formatRupiah(adminData.totalPendapatanKotor)}</p>
+                        </div>
+                        <p className="text-xs font-bold text-slate-500 mt-2 relative z-10">Dari {adminData.filteredTransactions.length} transaksi</p>
+                     </div>
+                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between">
+                        <div className="absolute top-0 right-0 p-4 opacity-5"><Store size={60}/></div>
+                        <div className="relative z-10">
+                           <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-words">Modal Barang Terjual</p>
+                           <p className="text-xl md:text-2xl lg:text-3xl font-extrabold text-blue-600">{formatRupiah(adminData.totalModalTerjual)}</p>
+                        </div>
+                        <p className="text-xs font-bold text-slate-500 mt-2 relative z-10">Modal historis transaksi</p>
+                     </div>
+                     <div className="col-span-2 md:col-span-1 bg-gradient-to-br from-emerald-500 to-teal-600 p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm text-white relative overflow-hidden flex flex-col justify-between">
+                        <div className="absolute top-0 right-0 p-4 opacity-10"><Sparkles size={60}/></div>
+                        <div className="relative z-10">
+                           <p className="text-[10px] md:text-xs font-black text-emerald-100 uppercase tracking-wider mb-1.5 break-words">Untung Bersih Historis</p>
+                           <p className="text-xl md:text-2xl lg:text-3xl font-extrabold drop-shadow-sm">{formatRupiah(adminData.totalKeuntunganBersih)}</p>
+                        </div>
+                        <p className="text-xs font-bold text-emerald-50 mt-2 flex items-center gap-1.5 relative z-10"><TrendingUp size={14}/> Margin Bersih: {adminData.totalPendapatanKotor > 0 ? ((adminData.totalKeuntunganBersih / adminData.totalPendapatanKotor) * 100).toFixed(1) : '0'}%</p>
+                     </div>
                   </div>
 
                   <div className="bg-white rounded-3xl md:rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col mb-8 w-full">
@@ -1476,7 +1524,7 @@ function MainApp() {
                       </table>
                     </div>
                   </div>
-                  {/* ... (Sisanya dikunci/sama seperti blueprint) ... */}
+                  
                   <div className="grid lg:grid-cols-2 gap-6 mb-8 w-full">
                       <div className="bg-white rounded-3xl md:rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col w-full">
                         <div className="p-4 md:p-6 border-b border-slate-100"><h2 className="font-black text-base md:text-xl text-slate-800 flex items-center gap-2"><TrendingUp className="text-orange-500" size={20}/> 10 Barang Paling Laku</h2></div>
@@ -1543,10 +1591,30 @@ function MainApp() {
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
-                      <div className="bg-white p-4 rounded-2xl md:rounded-[32px] shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center"><span className="text-slate-400 text-[9px] md:text-[10px] font-black uppercase tracking-widest mb-0.5">Total Produk</span><span className="text-lg md:text-2xl font-extrabold text-slate-800">{adminData.totalJenisBarang} Item</span></div>
-                      <div className="bg-white p-4 rounded-2xl md:rounded-[32px] shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center"><span className="text-slate-400 text-[9px] md:text-[10px] font-black uppercase tracking-widest mb-0.5">Total Stok</span><span className="text-lg md:text-2xl font-extrabold text-blue-600">{adminData.totalInventoryPcs} Pcs</span></div>
-                      <div className="bg-white p-4 rounded-2xl md:rounded-[32px] shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center"><span className="text-slate-400 text-[9px] md:text-[10px] font-black uppercase tracking-widest mb-0.5">Total Modal Inventori</span><span className="text-sm md:text-xl font-extrabold text-rose-600 truncate w-full">{formatRupiah(adminData.totalInventoryModal)}</span></div>
-                      <div className="bg-white p-4 rounded-2xl md:rounded-[32px] shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center"><span className="text-slate-400 text-[9px] md:text-[10px] font-black uppercase tracking-widest mb-0.5">Potensi Profit Bersih</span><span className="text-sm md:text-xl font-extrabold text-emerald-600 truncate w-full">{formatRupiah(adminData.totalInventoryPotentialProfit)}</span></div>
+                      <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-slate-100 flex flex-col justify-center text-center relative overflow-hidden">
+                        <div className="relative z-10">
+                          <span className="text-slate-400 text-[10px] md:text-xs font-black uppercase tracking-wider mb-1.5 break-words block">Total Produk</span>
+                          <span className="text-xl md:text-2xl lg:text-3xl font-extrabold text-slate-800 block">{adminData.totalJenisBarang} Item</span>
+                        </div>
+                      </div>
+                      <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-slate-100 flex flex-col justify-center text-center relative overflow-hidden">
+                        <div className="relative z-10">
+                          <span className="text-slate-400 text-[10px] md:text-xs font-black uppercase tracking-wider mb-1.5 break-words block">Total Stok</span>
+                          <span className="text-xl md:text-2xl lg:text-3xl font-extrabold text-blue-600 block">{adminData.totalInventoryPcs} Pcs</span>
+                        </div>
+                      </div>
+                      <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-slate-100 flex flex-col justify-center text-center relative overflow-hidden">
+                        <div className="relative z-10">
+                          <span className="text-slate-400 text-[10px] md:text-xs font-black uppercase tracking-wider mb-1.5 break-words block">Total Modal Inventori</span>
+                          <span className="text-xl md:text-2xl lg:text-3xl font-extrabold text-rose-600 block">{formatRupiah(adminData.totalInventoryModal)}</span>
+                        </div>
+                      </div>
+                      <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-slate-100 flex flex-col justify-center text-center relative overflow-hidden">
+                        <div className="relative z-10">
+                          <span className="text-slate-400 text-[10px] md:text-xs font-black uppercase tracking-wider mb-1.5 break-words block">Potensi Profit Bersih</span>
+                          <span className="text-xl md:text-2xl lg:text-3xl font-extrabold text-emerald-600 block">{formatRupiah(adminData.totalInventoryPotentialProfit)}</span>
+                        </div>
+                      </div>
                   </div>
 
                   {showAddForm && (
@@ -1616,8 +1684,16 @@ function MainApp() {
                  )}
                  <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden w-full">
                     <div className="overflow-x-auto max-h-[600px] w-full block">
-                      <table className="w-full text-left min-w-[700px] border-collapse">
-                         <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10 shadow-sm"><tr className="text-[10px] font-black uppercase text-slate-500 tracking-widest"><th className="p-4 md:p-6">Produk</th><th className="p-4 md:p-6 text-center">Stok</th><th className="p-4 md:p-6">Harga & Profit</th><th className="p-4 md:p-6 text-center">Margin & Potensi Item</th><th className="p-4 md:p-6 text-center">Aksi (CRUD)</th></tr></thead>
+                      <table className="w-full text-left min-w-[800px] border-collapse">
+                         <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10 shadow-sm">
+                           <tr className="text-[10px] font-black uppercase text-slate-500 tracking-widest">
+                             <th className="p-4 md:p-6">Produk</th>
+                             <th className="p-4 md:p-6 text-center">Stok</th>
+                             <th className="p-4 md:p-6">Info Harga</th>
+                             <th className="p-4 md:p-6">Total Modal & Potensi</th>
+                             <th className="p-4 md:p-6 text-center">Aksi (CRUD)</th>
+                           </tr>
+                         </thead>
                          <tbody className="divide-y divide-slate-100">
                            {products.length === 0 && <tr><td colSpan="5" className="p-10 text-center text-slate-400 font-bold text-sm">Barang masih kosong.</td></tr>}
                            {products.map(p => (
@@ -1633,13 +1709,14 @@ function MainApp() {
                                </td>
                                <td className="p-4 md:p-6 text-center"><span className={`px-2 py-1 md:px-4 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black tracking-widest uppercase ${p.stok > 10 ? 'bg-emerald-100 text-emerald-800' : p.stok > 0 ? 'bg-orange-100 text-orange-800' : 'bg-rose-100 text-rose-800'}`}>{p.stok}</span></td>
                                <td className="p-4 md:p-6">
-                                  <div className="font-black text-xs md:text-sm text-emerald-700">{formatRupiah(p.jual)}</div>
-                                  <div className="text-[9px] md:text-[10px] font-bold text-slate-500 mt-0.5 md:mt-1">Profit Satuan: {formatRupiah((p.jual||0) - (p.modal||0))}</div>
+                                  <div className="font-black text-xs md:text-sm text-emerald-700">Jual: {formatRupiah(p.jual)}</div>
+                                  <div className="text-[9px] md:text-[10px] font-bold text-slate-500 mt-0.5 md:mt-1">Modal: {formatRupiah(p.modal)}</div>
                                   {p.diskon && <div className="text-[9px] text-orange-700 font-black bg-orange-100 px-1.5 py-0.5 rounded md:rounded-lg w-max mt-1 border border-orange-200">GROSIR: {p.diskon.min_qty} = {formatRupiah(p.diskon.harga_total)}</div>}
                                </td>
-                               <td className="p-4 md:p-6 text-center">
-                                  <div className="text-[11px] md:text-sm font-extrabold text-emerald-600">{p.jual > 0 ? ((((p.jual||0) - (p.modal||0))/(p.jual||1))*100).toFixed(1) : '0'}%</div>
-                                  <div className="text-[9px] md:text-[10px] font-bold text-slate-500 mt-1">Potensi Item: {formatRupiah(((p.jual||0) - (p.modal||0)) * (p.stok||0))}</div>
+                               <td className="p-4 md:p-6">
+                                  <div className="text-xs md:text-sm font-extrabold text-rose-600 mb-1" title="Total Modal (Stok x Modal)">Modal: {formatRupiah((p.modal||0) * (p.stok||0))}</div>
+                                  <div className="text-[10px] md:text-xs font-bold text-emerald-600 mb-1" title="Potensi Profit (Stok x Untung)">Potensi: {formatRupiah(((p.jual||0) - (p.modal||0)) * (p.stok||0))}</div>
+                                  <div className="text-[9px] font-bold text-slate-500 inline-block bg-slate-100 px-2 py-0.5 rounded">Margin: {p.jual > 0 ? ((((p.jual||0) - (p.modal||0))/(p.jual||1))*100).toFixed(1) : '0'}%</div>
                                </td>
                                <td className="p-4 md:p-6 text-center">
                                  <div className="flex items-center justify-center gap-2">
@@ -1650,6 +1727,18 @@ function MainApp() {
                              </tr>
                            ))}
                          </tbody>
+                         <tfoot className="bg-slate-100 border-t-2 border-slate-200">
+                           <tr>
+                             <td className="p-4 md:p-6 text-right font-black text-slate-600 uppercase tracking-widest text-[10px] md:text-xs">TOTAL KESELURUHAN</td>
+                             <td className="p-4 md:p-6 text-center font-black text-blue-600 text-xs md:text-sm">{adminData.totalInventoryPcs} Pcs</td>
+                             <td className="p-4 md:p-6 text-center font-black text-slate-500">-</td>
+                             <td className="p-4 md:p-6">
+                                <div className="text-xs md:text-sm font-extrabold text-rose-700 mb-1">Total Modal: {formatRupiah(adminData.totalInventoryModal)}</div>
+                                <div className="text-[10px] md:text-xs font-extrabold text-emerald-700">Total Potensi: {formatRupiah(adminData.totalInventoryPotentialProfit)}</div>
+                             </td>
+                             <td className="p-4 md:p-6"></td>
+                           </tr>
+                         </tfoot>
                        </table>
                     </div>
                  </div>
@@ -1670,7 +1759,7 @@ export default class App extends React.Component {
     if (this.state.hasError) {
       return (
         <div style={{ padding: '40px', background: '#f87171', color: 'white', minHeight: '100vh', fontFamily: 'sans-serif' }}>
-          <h1 style={{ fontSize: '2rem', fontWeight: '900' }}>⚠️ Aplikasi Mengalami Crash Server (V3.1 Locked Blueprint)</h1>
+          <h1 style={{ fontSize: '2rem', fontWeight: '900' }}>⚠️ Aplikasi Mengalami Crash Server (V3.2 Locked Blueprint)</h1>
           <p style={{ marginTop: '10px', fontSize: '1.2rem' }}>Layar putih berhasil dihindari! Masalahnya ada pada kode di bawah ini:</p>
           <pre style={{ background: 'rgba(0,0,0,0.3)', padding: '20px', borderRadius: '10px', marginTop: '20px', whiteSpace: 'pre-wrap', fontWeight: 'bold' }}>{String(this.state.errorInfo)}</pre>
           <button onClick={() => { localStorage.clear(); window.location.reload(true); }} style={{ marginTop: '20px', padding: '10px 20px', borderRadius: '10px', border: 'none', background: 'white', color: '#f87171', fontWeight: 'bold', cursor: 'pointer' }}>Hapus Cache & Muat Ulang</button>
