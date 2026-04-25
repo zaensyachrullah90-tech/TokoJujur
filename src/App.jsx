@@ -1023,13 +1023,13 @@ function MainApp() {
         </div>
       )}
 
-      {/* HEADER UMUM (Tampil jika bukan di halaman admin/struk) */}
+      {/* HEADER UMUM */}
       {view !== 'admin' && view !== 'struk' && (
         <header className="bg-white p-4 shadow-sm sticky top-0 z-40 mb-4 border-b">
           <div className="flex justify-between items-center mb-4 max-w-5xl mx-auto">
             <div className="flex items-center gap-2 text-emerald-600 font-black text-lg md:text-xl truncate max-w-[50%]">
               {renderLogo("w-8 h-8")}
-              <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v3.3</span></span>
+              <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v3.4</span></span>
             </div>
             <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
               <button onClick={() => setView('riwayat')} className="p-2 md:p-2.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition shadow-sm relative" title="Riwayat Pembelian">
@@ -1157,7 +1157,7 @@ function MainApp() {
         <div className="max-w-md mx-auto p-4 md:p-6 min-h-screen flex flex-col pb-32">
           <button onClick={() => setView('toko')} className="flex items-center gap-2 font-black mb-6 text-slate-400 hover:text-slate-600 transition w-max"><ArrowLeft size={18}/> Kembali Belanja</button>
           
-          <div className="bg-white rounded-3xl p-5 md:p-6 shadow-sm border border-slate-100 mb-6">
+          <div className="bg-white rounded-3xl p-5 md:p-6 shadow-sm border border-slate-100 mb-6 mt-4">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
               <h3 className="font-black text-base md:text-lg text-slate-800">Review Keranjang</h3>
               <button onClick={handleClearCart} className="flex items-center gap-1 text-[10px] md:text-xs font-bold text-red-500 bg-red-50 px-2 py-1 rounded hover:bg-red-100 transition"><Trash2 size={14}/> Bersihkan</button>
@@ -1359,11 +1359,11 @@ function MainApp() {
             </nav>
           </aside>
           
-          <main className="flex-1 p-4 md:p-10 overflow-y-auto w-full">
+          <main className="flex-1 p-4 md:p-10 overflow-y-auto w-full max-w-7xl mx-auto">
              
              {/* TAB PENGATURAN */}
              {adminTab === 'pengaturan' && (
-               <div className="max-w-3xl animate-fade-in mx-auto md:mx-0">
+               <div className="max-w-4xl animate-fade-in mx-auto md:mx-0">
                   <h1 className="text-3xl font-black tracking-tighter text-slate-800 mb-8">Konfigurasi Toko</h1>
                   <div className="bg-white p-6 md:p-10 rounded-[40px] border border-slate-200 shadow-sm space-y-8">
                      <div className="space-y-3"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Store size={14}/> Nama Toko Digital</label><input value={settings.nama_toko || ''} onChange={e => setSettings({...settings, nama_toko: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-3xl font-black focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all text-sm md:text-lg"/></div>
@@ -1407,7 +1407,7 @@ function MainApp() {
                      <div className="space-y-3"><label className="text-[10px] font-black text-rose-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Lock size={14}/> Sandi Rahasia Admin</label><input type="text" value={settings.admin_password || ''} onChange={e => setSettings({...settings, admin_password: e.target.value})} className="w-full p-4 bg-rose-50/50 text-rose-900 rounded-3xl font-black border border-rose-200 focus:border-rose-400 focus:ring-4 focus:ring-rose-500/20 outline-none transition-all tracking-[0.5em] text-lg md:text-xl text-center"/></div>
                      <div className="space-y-3 pt-4 border-t border-slate-100 mt-6">
                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Settings size={14}/> Sistem & Perbaikan</label>
-                       <button type="button" onClick={() => { if(window.confirm('Aplikasi akan memuat ulang dan menghapus memori sementara. Lanjutkan?')) { localStorage.clear(); window.location.reload(true); } }} className="w-full py-4 bg-orange-100 text-orange-700 rounded-[24px] font-bold text-sm hover:bg-orange-200 transition-all flex items-center justify-center gap-2 active:scale-95 shadow-sm"><RefreshCw size={18}/> Hapus Cache & Refresh Aplikasi</button>
+                       <button onClick={() => { if(window.confirm('Aplikasi akan memuat ulang dan menghapus memori sementara. Lanjutkan?')) { localStorage.clear(); window.location.reload(true); } }} className="w-full py-4 bg-orange-100 text-orange-700 rounded-[24px] font-bold text-sm hover:bg-orange-200 transition-all flex items-center justify-center gap-2 active:scale-95 shadow-sm"><RefreshCw size={18}/> Hapus Cache & Refresh Aplikasi</button>
                        <p className="text-[10px] text-slate-400 font-bold ml-2 text-center">Gunakan tombol ini jika tampilan toko tidak berubah setelah pembaruan.</p>
                      </div>
                      <button disabled={isProcessing} onClick={handleSaveSettings} className="w-full py-5 bg-slate-900 text-white rounded-[32px] font-black text-sm md:text-lg shadow-xl shadow-slate-300 hover:bg-slate-800 transition-all active:scale-95 mt-8 disabled:opacity-50">{isProcessing ? 'MENYIMPAN...' : 'SIMPAN SEMUA PENGATURAN'}</button>
@@ -1417,7 +1417,7 @@ function MainApp() {
 
              {/* TAB ANALISA */}
              {adminTab === 'analisa' && (
-               <div className="animate-fade-in max-w-6xl mx-auto w-full pb-10">
+               <div className="animate-fade-in max-w-7xl mx-auto w-full pb-10">
                   <div className="flex flex-col xl:flex-row justify-between xl:items-center mb-8 gap-6 w-full">
                     <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-slate-800">Ikhtisar Penjualan & Inventori</h1>
                     <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto">
@@ -1442,7 +1442,7 @@ function MainApp() {
                         <div className="absolute top-0 right-0 p-4 opacity-5"><Store size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-words block">Total Modal Keseluruhan</p>
-                           <p className="text-xl md:text-2xl lg:text-3xl font-extrabold text-slate-900 break-words whitespace-normal block">{formatRupiah(adminData.grandTotalModalAwal)}</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-slate-900 break-words whitespace-normal block">{formatRupiah(adminData.grandTotalModalAwal)}</p>
                         </div>
                         <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Modal dari stok awal ({adminData.grandTotalStokAwal} Pcs)</p>
                      </div>
@@ -1450,7 +1450,7 @@ function MainApp() {
                         <div className="absolute top-0 right-0 p-4 opacity-5"><BarChart3 size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-words block">Potensi Sisa Profit</p>
-                           <p className="text-xl md:text-2xl lg:text-3xl font-extrabold text-emerald-600 break-words whitespace-normal block">{formatRupiah(adminData.grandTotalPotensiSisaProfit)}</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-emerald-600 break-words whitespace-normal block">{formatRupiah(adminData.grandTotalPotensiSisaProfit)}</p>
                         </div>
                         <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Jika sisa stok ({adminData.grandTotalSisaStok} Pcs) habis</p>
                      </div>
@@ -1458,7 +1458,7 @@ function MainApp() {
                         <div className="absolute top-0 right-0 p-4 opacity-5"><Sparkles size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-words block">Total Barang Aktif</p>
-                           <p className="text-xl md:text-2xl lg:text-3xl font-extrabold text-blue-600 break-words whitespace-normal block">{adminData.totalJenisBarang}</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-blue-600 break-words whitespace-normal block">{adminData.totalJenisBarang}</p>
                         </div>
                         <p className="text-[10px] md:text-xs font-bold text-blue-700 mt-2 relative z-10 break-words">Jenis item yang didaftarkan</p>
                      </div>
@@ -1466,7 +1466,7 @@ function MainApp() {
                         <div className="absolute top-0 right-0 p-4 opacity-5"><List size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-words block">Sisa Stok Barang</p>
-                           <p className="text-xl md:text-2xl lg:text-3xl font-extrabold text-slate-900 break-words whitespace-normal block">{adminData.grandTotalSisaStok} Pcs</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-slate-900 break-words whitespace-normal block">{adminData.grandTotalSisaStok} Pcs</p>
                         </div>
                         <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Sisa barang siap jual</p>
                      </div>
@@ -1479,7 +1479,7 @@ function MainApp() {
                         <div className="absolute top-0 right-0 p-4 opacity-5"><TrendingUp size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-words block">Total Omset (Terjual)</p>
-                           <p className="text-xl md:text-2xl lg:text-3xl font-extrabold text-slate-900 break-words whitespace-normal block">{formatRupiah(adminData.totalPendapatanKotor)}</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-slate-900 break-words whitespace-normal block">{formatRupiah(adminData.totalPendapatanKotor)}</p>
                         </div>
                         <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Dari {adminData.filteredTransactions.length} transaksi</p>
                      </div>
@@ -1487,7 +1487,7 @@ function MainApp() {
                         <div className="absolute top-0 right-0 p-4 opacity-5"><Store size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-words block">Modal Barang Terjual</p>
-                           <p className="text-xl md:text-2xl lg:text-3xl font-extrabold text-blue-600 break-words whitespace-normal block">{formatRupiah(adminData.totalModalTerjual)}</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-blue-600 break-words whitespace-normal block">{formatRupiah(adminData.totalModalTerjual)}</p>
                         </div>
                         <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Modal historis transaksi</p>
                      </div>
@@ -1495,7 +1495,7 @@ function MainApp() {
                         <div className="absolute top-0 right-0 p-4 opacity-10"><Sparkles size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-emerald-100 uppercase tracking-wider mb-1.5 break-words block">Untung Bersih Historis</p>
-                           <p className="text-xl md:text-2xl lg:text-3xl font-extrabold drop-shadow-sm break-words whitespace-normal block">{formatRupiah(adminData.totalKeuntunganBersih)}</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold drop-shadow-sm break-words whitespace-normal block">{formatRupiah(adminData.totalKeuntunganBersih)}</p>
                         </div>
                         <p className="text-[10px] md:text-xs font-bold text-emerald-50 mt-2 flex items-center gap-1.5 relative z-10 break-words"><TrendingUp size={14}/> Margin Bersih: {adminData.totalPendapatanKotor > 0 ? ((adminData.totalKeuntunganBersih / adminData.totalPendapatanKotor) * 100).toFixed(1) : '0'}%</p>
                      </div>
@@ -1503,24 +1503,33 @@ function MainApp() {
 
                   <div className="bg-white rounded-3xl md:rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col mb-8 w-full">
                     <div className="p-4 md:p-6 border-b border-slate-100"><h2 className="font-black text-base md:text-xl text-slate-800 flex items-center gap-2"><Package className="text-emerald-500" size={20}/> Rekap Penjualan per Barang (Historis)</h2></div>
-                    <div className="overflow-x-auto max-h-[400px] overflow-y-auto w-full block">
+                    <div className="overflow-x-auto w-full block">
                       <table className="w-full text-left min-w-[800px] border-collapse">
-                         <thead className="bg-slate-50 sticky top-0 shadow-sm z-10"><tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest"><th className="p-3 md:p-4">Nama Barang</th><th className="p-3 md:p-4 text-center">Qty Terjual</th><th className="p-3 md:p-4 text-center">Profit Satuan</th><th className="p-3 md:p-4 text-center">Sisa Stok</th><th className="p-3 md:p-4 text-right">Omset (Terjual)</th><th className="p-3 md:p-4 text-right">Profit Terjual</th></tr></thead>
+                         <thead className="bg-slate-50 border-b border-slate-200">
+                           <tr className="text-[10px] font-black uppercase text-slate-500 tracking-widest whitespace-nowrap">
+                             <th className="p-4 md:p-6">Nama Barang</th>
+                             <th className="p-4 md:p-6 text-center">Qty Terjual</th>
+                             <th className="p-4 md:p-6 text-center">Profit Satuan</th>
+                             <th className="p-4 md:p-6 text-center">Sisa Stok</th>
+                             <th className="p-4 md:p-6 text-right">Omset (Terjual)</th>
+                             <th className="p-4 md:p-6 text-right">Profit Terjual</th>
+                           </tr>
+                         </thead>
                          <tbody className="divide-y divide-slate-50">
                            {adminData.productRankings.length === 0 && <tr><td colSpan="6" className="p-6 text-center text-slate-400 font-bold text-xs">Data kosong.</td></tr>}
                            {adminData.productRankings.map((p) => (
                              <tr key={p.id} className="text-xs md:text-sm font-bold hover:bg-slate-50 transition-colors">
-                               <td className="p-3 md:p-4 flex items-center gap-3">
-                                 <div className="w-8 h-8 rounded-lg border border-slate-200 flex items-center justify-center bg-white shrink-0 overflow-hidden relative">
-                                    {p.gambar ? <img loading="lazy" referrerPolicy="no-referrer" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" alt="img" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/> : <img src={FALLBACK_IMAGE} className="w-4 h-4 opacity-50" alt="kosong"/>}
+                               <td className="p-3 md:p-4 flex items-center gap-3 break-words min-w-[200px]">
+                                 <div className="w-10 h-10 rounded-lg border border-slate-200 flex items-center justify-center bg-white shrink-0 overflow-hidden relative">
+                                    {p.gambar ? <img loading="lazy" referrerPolicy="no-referrer" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" alt="img" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/> : <img src={FALLBACK_IMAGE} className="w-5 h-5 opacity-50" alt="kosong"/>}
                                  </div>
-                                 <span className="truncate max-w-[120px] md:max-w-xs text-slate-700">{p.nama}</span>
+                                 <span className="text-slate-700 leading-tight">{p.nama}</span>
                                </td>
-                               <td className="p-3 md:p-4 text-center text-emerald-600 font-black">{p.qtyTerjual}</td>
-                               <td className="p-3 md:p-4 text-center text-emerald-600">{formatRupiah(p.jual - p.modal)}</td>
-                               <td className="p-3 md:p-4 text-center text-blue-600 font-black">{p.stok}</td>
-                               <td className="p-3 md:p-4 text-right text-slate-800">{formatRupiah(p.revenue)}</td>
-                               <td className="p-3 md:p-4 text-right text-emerald-700 font-black">{formatRupiah(p.profitTerjual)}</td>
+                               <td className="p-3 md:p-4 text-center text-emerald-600 font-black whitespace-nowrap">{p.qtyTerjual}</td>
+                               <td className="p-3 md:p-4 text-center text-emerald-600 whitespace-nowrap">{formatRupiah(p.jual - p.modal)}</td>
+                               <td className="p-3 md:p-4 text-center text-blue-600 font-black whitespace-nowrap">{p.stok}</td>
+                               <td className="p-3 md:p-4 text-right text-slate-800 break-words min-w-[120px]">{formatRupiah(p.revenue)}</td>
+                               <td className="p-3 md:p-4 text-right text-emerald-700 font-black break-words min-w-[120px]">{formatRupiah(p.profitTerjual)}</td>
                              </tr>
                            ))}
                          </tbody>
@@ -1531,12 +1540,12 @@ function MainApp() {
                   <div className="grid lg:grid-cols-2 gap-6 mb-8 w-full">
                       <div className="bg-white rounded-3xl md:rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col w-full">
                         <div className="p-4 md:p-6 border-b border-slate-100"><h2 className="font-black text-base md:text-xl text-slate-800 flex items-center gap-2"><TrendingUp className="text-orange-500" size={20}/> 10 Barang Paling Laku</h2></div>
-                        <div className="overflow-x-auto max-h-[300px] w-full block">
+                        <div className="overflow-x-auto w-full block">
                           <table className="w-full text-left min-w-[300px] border-collapse">
                              <tbody className="divide-y divide-slate-50">
                                {adminData.topSelling.length === 0 && <tr><td className="p-6 text-center text-slate-400 font-bold text-xs">Kosong.</td></tr>}
                                {adminData.topSelling.map((p, idx) => (
-                                 <tr key={p.id} className="text-xs md:text-sm font-bold"><td className="p-3 flex items-center gap-2"><span className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 text-[10px] ${idx < 3 ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-500'}`}>{idx + 1}</span><span className="truncate max-w-[100px] md:max-w-[200px] text-slate-700">{p.nama}</span></td><td className="p-3 text-center"><span className="px-2 py-1 rounded bg-emerald-100 text-emerald-700 text-[10px]">{p.qtyTerjual} terjual</span></td></tr>
+                                 <tr key={p.id} className="text-xs md:text-sm font-bold"><td className="p-3 flex items-center gap-2 break-words"><span className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 text-[10px] ${idx < 3 ? 'bg-orange-100 text-orange-600' : 'bg-slate-100 text-slate-500'}`}>{idx + 1}</span><span className="text-slate-700 leading-tight">{p.nama}</span></td><td className="p-3 text-right whitespace-nowrap"><span className="px-2 py-1 rounded bg-emerald-100 text-emerald-700 text-[10px]">{p.qtyTerjual} terjual</span></td></tr>
                                ))}
                              </tbody>
                           </table>
@@ -1544,12 +1553,12 @@ function MainApp() {
                       </div>
                       <div className="bg-white rounded-3xl md:rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col w-full">
                         <div className="p-4 md:p-6 border-b border-slate-100"><h2 className="font-black text-base md:text-xl text-slate-800 flex items-center gap-2"><TrendingDown className="text-red-500" size={20}/> Perhatian: Kurang Laku</h2></div>
-                        <div className="overflow-x-auto max-h-[300px] w-full block">
+                        <div className="overflow-x-auto w-full block">
                           <table className="w-full text-left min-w-[300px] border-collapse">
                              <tbody className="divide-y divide-slate-50">
                                {adminData.bottomSelling.length === 0 && <tr><td className="p-6 text-center text-slate-400 font-bold text-xs">Semua laku!</td></tr>}
                                {adminData.bottomSelling.map((item, idx) => (
-                                 <tr key={idx} className="text-xs md:text-sm font-bold"><td className="p-3 text-slate-700 truncate max-w-[150px]">{item.nama}</td><td className="p-3 text-center text-red-500">{item.qtyTerjual} terjual</td><td className="p-3 text-right text-[10px] text-slate-400">Nganggur {item.daysActive}h</td></tr>
+                                 <tr key={idx} className="text-xs md:text-sm font-bold"><td className="p-3 text-slate-700 break-words leading-tight">{item.nama}</td><td className="p-3 text-center text-red-500 whitespace-nowrap">{item.qtyTerjual} terjual</td><td className="p-3 text-right text-[10px] text-slate-400 whitespace-nowrap">Nganggur {item.daysActive}h</td></tr>
                                ))}
                              </tbody>
                           </table>
@@ -1567,13 +1576,13 @@ function MainApp() {
                       {adminData.sortedTransactions.length === 0 ? <p className="text-gray-400 text-xs font-bold text-center py-10">Belum ada transaksi.</p> : adminData.sortedTransactions.map(t => (
                         <div key={t.id} className="border border-gray-200 rounded-2xl p-4 bg-gray-50/50">
                           <div className="flex justify-between items-center text-[10px] md:text-xs mb-2 pb-2 border-b border-gray-200"><span className="font-mono font-bold text-slate-500">{t.id} • {t.tanggal}</span><span className="font-black px-2 py-0.5 rounded uppercase bg-slate-200 text-slate-600">{t.metode}</span></div>
-                          <div className="space-y-1 mb-2">{t.items.map((i, idx) => (<div key={idx} className="text-[10px] md:text-xs flex justify-between text-slate-700 font-bold"><span className="truncate pr-2">{i.qty}x {i.nama}</span><span className="text-slate-900 shrink-0">{formatRupiah(i.totalHarga)}</span></div>))}</div>
+                          <div className="space-y-1 mb-2">{t.items.map((i, idx) => (<div key={idx} className="text-[10px] md:text-xs flex justify-between text-slate-700 font-bold"><span className="break-words pr-2 leading-tight">{i.qty}x {i.nama}</span><span className="text-slate-900 shrink-0 whitespace-nowrap">{formatRupiah(i.totalHarga)}</span></div>))}</div>
                           <div className="flex flex-col sm:flex-row justify-between sm:items-end mt-2 pt-2 border-t border-gray-200 gap-3">
                             <div className="flex items-center gap-2 w-full sm:w-auto">
-                               <button onClick={() => setEditingTrx(t)} className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-2 py-1.5 bg-blue-50 text-blue-600 rounded hover:bg-blue-100 transition-colors text-[10px] font-bold"><Edit size={12}/> Edit</button>
-                               <button onClick={() => handleDeleteSingleTransaction(t.id)} className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-2 py-1.5 bg-rose-50 text-rose-600 rounded hover:bg-rose-100 transition-colors text-[10px] font-bold"><Trash2 size={12}/> Batal & Kembalikan Stok</button>
+                               <button onClick={() => setEditingTrx(t)} className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors text-[10px] font-bold"><Edit size={14}/> Edit</button>
+                               <button onClick={() => handleDeleteSingleTransaction(t.id)} className="flex-1 sm:flex-none flex items-center justify-center gap-1 px-3 py-2 bg-rose-50 text-rose-600 rounded-lg hover:bg-rose-100 transition-colors text-[10px] font-bold"><Trash2 size={14}/> Batal & Kembalikan Stok</button>
                             </div>
-                            <div className="flex justify-between sm:justify-end items-end gap-3 w-full sm:w-auto"><span className="text-[9px] uppercase font-black text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-100">Untung {formatRupiah(t.profit)}</span><span className="font-black text-sm md:text-lg text-slate-900">{formatRupiah(t.total)}</span></div>
+                            <div className="flex justify-between sm:justify-end items-end gap-3 w-full sm:w-auto"><span className="text-[9px] uppercase font-black text-emerald-600 bg-emerald-50 px-2 py-1 rounded border border-emerald-100 whitespace-nowrap">Untung {formatRupiah(t.profit)}</span><span className="font-black text-base md:text-xl text-slate-900 whitespace-nowrap">{formatRupiah(t.total)}</span></div>
                           </div>
                         </div>
                       ))}
@@ -1584,7 +1593,7 @@ function MainApp() {
 
              {/* TAB BARANG */}
              {adminTab === 'barang' && (
-               <div className="animate-fade-in max-w-6xl mx-auto w-full pb-10">
+               <div className="animate-fade-in max-w-7xl mx-auto w-full pb-10">
                   <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
                     <h1 className="text-3xl font-black tracking-tighter text-slate-800">Manajemen Barang</h1>
                     <div className="flex flex-col sm:flex-row gap-2">
@@ -1615,7 +1624,7 @@ function MainApp() {
                           <span className="text-slate-400 text-[10px] md:text-xs font-black uppercase tracking-wider mb-1.5 break-words block">Total Modal Awal</span>
                           <span className="text-xl md:text-2xl lg:text-3xl font-extrabold text-rose-600 block break-words whitespace-normal">{formatRupiah(adminData.grandTotalModalAwal)}</span>
                         </div>
-                        <div className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Total Stok Awal x Harga Modal Baru</div>
+                        <div className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Stok Awal x Harga Modal</div>
                       </div>
                       <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-slate-100 flex flex-col justify-between h-full relative overflow-hidden">
                         <div className="absolute top-0 right-0 p-4 opacity-5"><Sparkles size={60}/></div>
@@ -1693,10 +1702,10 @@ function MainApp() {
                     </form>
                  )}
                  <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden w-full">
-                    <div className="overflow-x-auto max-h-[600px] w-full block">
+                    <div className="overflow-x-auto w-full block">
                       <table className="w-full text-left min-w-[800px] border-collapse">
-                         <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10 shadow-sm">
-                           <tr className="text-[10px] font-black uppercase text-slate-500 tracking-widest">
+                         <thead className="bg-slate-50 border-b border-slate-200">
+                           <tr className="text-[10px] font-black uppercase text-slate-500 tracking-widest whitespace-nowrap">
                              <th className="p-4 md:p-6">Produk</th>
                              <th className="p-4 md:p-6 text-center">Stok & Histori</th>
                              <th className="p-4 md:p-6">Info Harga</th>
@@ -1708,34 +1717,34 @@ function MainApp() {
                            {adminData.inventoryList.length === 0 && <tr><td colSpan="5" className="p-10 text-center text-slate-400 font-bold text-sm">Barang masih kosong.</td></tr>}
                            {adminData.inventoryList.map(p => (
                              <tr key={p.id} className={`transition-colors ${editingId === p.id ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
-                               <td className="p-4 md:p-6 flex items-center gap-3 md:gap-4">
-                                 <div className="w-10 h-10 md:w-14 md:h-14 bg-slate-50 rounded-xl md:rounded-2xl border shadow-sm flex items-center justify-center shrink-0 overflow-hidden relative">
-                                   {p.gambar ? <img loading="lazy" referrerPolicy="no-referrer" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/> : <img src={FALLBACK_IMAGE} className="w-5 h-5 opacity-50" alt="kosong"/>}
+                               <td className="p-4 md:p-6 flex items-center gap-3 md:gap-4 break-words min-w-[200px]">
+                                 <div className="w-12 h-12 md:w-16 md:h-16 bg-slate-50 rounded-xl md:rounded-2xl border shadow-sm flex items-center justify-center shrink-0 overflow-hidden relative">
+                                   {p.gambar ? <img loading="lazy" referrerPolicy="no-referrer" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/> : <img src={FALLBACK_IMAGE} className="w-6 h-6 opacity-50" alt="kosong"/>}
                                  </div>
-                                 <div className="min-w-0">
-                                   <span className="font-extrabold text-xs md:text-sm text-slate-900 truncate block max-w-[150px] md:max-w-xs">{p.nama}</span>
+                                 <div className="min-w-0 flex-1">
+                                   <span className="font-extrabold text-sm md:text-base text-slate-900 block leading-tight">{p.nama}</span>
                                    {p.barcode ? <span className="font-mono text-[9px] md:text-[10px] text-slate-500 mt-1 uppercase tracking-widest flex items-center gap-1"><Barcode size={10}/> {p.barcode}</span> : <span className="text-[9px] text-slate-400 mt-1 italic">No Barcode</span>}
                                  </div>
                                </td>
-                               <td className="p-4 md:p-6 text-center">
-                                  <span className={`px-2 py-1 md:px-4 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black tracking-widest uppercase ${p.stok > 10 ? 'bg-emerald-100 text-emerald-800' : p.stok > 0 ? 'bg-orange-100 text-orange-800' : 'bg-rose-100 text-rose-800'}`}>Sisa: {p.stok}</span>
-                                  <div className="text-[9px] md:text-[10px] font-bold text-slate-500 mt-2">Terjual: {p.qtyTerjual}</div>
-                                  <div className="text-[9px] md:text-[10px] font-bold text-blue-600">Total Awal: {p.stokAwal}</div>
+                               <td className="p-4 md:p-6 text-center whitespace-nowrap">
+                                  <span className={`px-3 py-1 md:px-4 md:py-2 rounded-lg md:rounded-xl text-[10px] md:text-xs font-black tracking-widest uppercase ${p.stok > 10 ? 'bg-emerald-100 text-emerald-800' : p.stok > 0 ? 'bg-orange-100 text-orange-800' : 'bg-rose-100 text-rose-800'}`}>Sisa: {p.stok}</span>
+                                  <div className="text-[10px] md:text-xs font-bold text-slate-500 mt-2">Terjual: {p.qtyTerjual}</div>
+                                  <div className="text-[10px] md:text-xs font-bold text-blue-600 mt-0.5">Total Awal: {p.stokAwal}</div>
                                </td>
-                               <td className="p-4 md:p-6">
-                                  <div className="font-black text-xs md:text-sm text-emerald-700">Jual: {formatRupiah(p.jual)}</div>
-                                  <div className="text-[9px] md:text-[10px] font-bold text-slate-500 mt-0.5 md:mt-1">Modal: {formatRupiah(p.modal)}</div>
+                               <td className="p-4 md:p-6 min-w-[150px] break-words">
+                                  <div className="font-black text-sm md:text-base text-emerald-700">Jual: {formatRupiah(p.jual)}</div>
+                                  <div className="text-[10px] md:text-xs font-bold text-slate-500 mt-0.5 md:mt-1">Modal: {formatRupiah(p.modal)}</div>
                                   {p.diskon && <div className="text-[9px] text-orange-700 font-black bg-orange-100 px-1.5 py-0.5 rounded md:rounded-lg w-max mt-1 border border-orange-200">GROSIR: {p.diskon.min_qty} = {formatRupiah(p.diskon.harga_total)}</div>}
                                </td>
-                               <td className="p-4 md:p-6">
-                                  <div className="text-xs md:text-sm font-extrabold text-rose-600 mb-1" title="Total Stok Awal x Modal">Modal Awal: {formatRupiah(p.modalTotalAwal)}</div>
-                                  <div className="text-[10px] md:text-xs font-bold text-emerald-600 mb-1" title="Potensi Sisa Profit (Sisa Stok x Untung)">Potensi: {formatRupiah(p.potensiSisaProfit)}</div>
+                               <td className="p-4 md:p-6 min-w-[180px] break-words">
+                                  <div className="text-xs md:text-sm font-extrabold text-rose-600 mb-1 leading-tight" title="Total Stok Awal x Modal">Modal Awal:<br/>{formatRupiah(p.modalTotalAwal)}</div>
+                                  <div className="text-[10px] md:text-xs font-bold text-emerald-600 mb-1 leading-tight" title="Potensi Sisa Profit (Sisa Stok x Untung)">Potensi Profit:<br/>{formatRupiah(p.potensiSisaProfit)}</div>
                                   <div className="text-[9px] font-bold text-slate-500 inline-block bg-slate-100 px-2 py-0.5 rounded">Margin: {p.jual > 0 ? ((((p.jual||0) - (p.modal||0))/(p.jual||1))*100).toFixed(1) : '0'}%</div>
                                </td>
-                               <td className="p-4 md:p-6 text-center">
+                               <td className="p-4 md:p-6 text-center whitespace-nowrap">
                                  <div className="flex items-center justify-center gap-2">
-                                   <button onClick={() => handleEditClick(p)} className="p-2 md:p-3 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl md:rounded-2xl transition-colors shadow-sm"><Edit size={16}/></button>
-                                   <button onClick={() => handleDeleteProduct(p.id)} disabled={isProcessing} className="p-2 md:p-3 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-xl md:rounded-2xl transition-colors shadow-sm disabled:opacity-50"><Trash2 size={16}/></button>
+                                   <button onClick={() => handleEditClick(p)} className="p-2 md:p-3 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl md:rounded-2xl transition-colors shadow-sm"><Edit size={18}/></button>
+                                   <button onClick={() => handleDeleteProduct(p.id)} disabled={isProcessing} className="p-2 md:p-3 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-xl md:rounded-2xl transition-colors shadow-sm disabled:opacity-50"><Trash2 size={18}/></button>
                                  </div>
                                </td>
                              </tr>
@@ -1745,13 +1754,13 @@ function MainApp() {
                            <tr>
                              <td className="p-4 md:p-6 text-right font-black text-slate-600 uppercase tracking-widest text-[10px] md:text-xs">TOTAL KESELURUHAN</td>
                              <td className="p-4 md:p-6 text-center">
-                               <div className="font-black text-slate-800 text-xs md:text-sm">Awal: {adminData.grandTotalStokAwal}</div>
-                               <div className="font-bold text-blue-600 text-[10px] md:text-xs">Sisa: {adminData.grandTotalSisaStok}</div>
+                               <div className="font-black text-slate-800 text-sm md:text-base">Awal: {adminData.grandTotalStokAwal}</div>
+                               <div className="font-bold text-blue-600 text-xs md:text-sm mt-0.5">Sisa: {adminData.grandTotalSisaStok}</div>
                              </td>
                              <td className="p-4 md:p-6 text-center font-black text-slate-500">-</td>
-                             <td className="p-4 md:p-6">
-                                <div className="text-xs md:text-sm font-extrabold text-rose-700 mb-1">Total Modal: {formatRupiah(adminData.grandTotalModalAwal)}</div>
-                                <div className="text-[10px] md:text-xs font-extrabold text-emerald-700">Total Potensi: {formatRupiah(adminData.grandTotalPotensiSisaProfit)}</div>
+                             <td className="p-4 md:p-6 break-words">
+                                <div className="text-sm md:text-base font-extrabold text-rose-700 mb-1 leading-tight">Total Modal:<br/>{formatRupiah(adminData.grandTotalModalAwal)}</div>
+                                <div className="text-xs md:text-sm font-extrabold text-emerald-700 leading-tight">Total Potensi:<br/>{formatRupiah(adminData.grandTotalPotensiSisaProfit)}</div>
                              </td>
                              <td className="p-4 md:p-6"></td>
                            </tr>
@@ -1776,7 +1785,7 @@ export default class App extends React.Component {
     if (this.state.hasError) {
       return (
         <div style={{ padding: '40px', background: '#f87171', color: 'white', minHeight: '100vh', fontFamily: 'sans-serif' }}>
-          <h1 style={{ fontSize: '2rem', fontWeight: '900' }}>⚠️ Aplikasi Mengalami Crash Server (V3.3 Locked Blueprint)</h1>
+          <h1 style={{ fontSize: '2rem', fontWeight: '900' }}>⚠️ Aplikasi Mengalami Crash Server (V3.4 Locked Blueprint)</h1>
           <p style={{ marginTop: '10px', fontSize: '1.2rem' }}>Layar putih berhasil dihindari! Masalahnya ada pada kode di bawah ini:</p>
           <pre style={{ background: 'rgba(0,0,0,0.3)', padding: '20px', borderRadius: '10px', marginTop: '20px', whiteSpace: 'pre-wrap', fontWeight: 'bold' }}>{String(this.state.errorInfo)}</pre>
           <button onClick={() => { localStorage.clear(); window.location.reload(true); }} style={{ marginTop: '20px', padding: '10px 20px', borderRadius: '10px', border: 'none', background: 'white', color: '#f87171', fontWeight: 'bold', cursor: 'pointer' }}>Hapus Cache & Muat Ulang</button>
