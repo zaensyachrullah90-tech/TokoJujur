@@ -10,7 +10,7 @@ import {
 // =========================================================================
 // KONEKSI SUPABASE LANGSUNG (ANTI-GAGAL)
 // =========================================================================
-const SUPABASE_URL = 'https://azsocvlmuaddleqtlvko.supabase.co';
+const SUPABASE_URL = '[https://azsocvlmuaddleqtlvko.supabase.co](https://azsocvlmuaddleqtlvko.supabase.co)';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF6c29jdmxtdWFkZGxlcXRsdmtvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU5OTAxMjEsImV4cCI6MjA5MTU2NjEyMX0.xGq-IpxhlFQ_8KTPIZXUm-NLKHIrQI4uNMfG9SVLAgA';
 
 let supabaseClient = null;
@@ -45,7 +45,6 @@ const formatImageUrl = (url) => {
   
   const driveMatch = url.match(/(?:file\/d\/|id=)([a-zA-Z0-9_-]+)/);
   if (driveMatch && driveMatch[1]) {
-    // Menggunakan API lh3.googleusercontent yang merupakan Jalur VIP gambar Google (Anti-CORS / Anti-Blokir)
     return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
   }
   
@@ -54,7 +53,7 @@ const formatImageUrl = (url) => {
 };
 
 // GAMBAR PENGGANTI JIKA LINK G-DRIVE SALAH / DIPRIVASI
-const FALLBACK_IMAGE = "https://placehold.co/400x400/f8fafc/94a3b8?text=Foto+Kosong";
+const FALLBACK_IMAGE = "[https://placehold.co/400x400/f8fafc/94a3b8?text=Foto+Kosong](https://placehold.co/400x400/f8fafc/94a3b8?text=Foto+Kosong)";
 
 const hitungTotalHargaItem = (item, qty) => {
   if (item.diskon && qty >= (item.diskon.min_qty || 1)) {
@@ -150,6 +149,18 @@ function MainApp() {
   const adminData = useMemo(() => {
     if (view !== 'admin' || !isAdminLogged) return null;
 
+    // =========================================================================
+    // REKAP INVENTORI & POTENSI (REALTIME DARI PRODUK)
+    // =========================================================================
+    const totalInventoryModal = products.reduce((sum, p) => sum + ((p.modal || 0) * (p.stok || 0)), 0);
+    const totalInventoryPotentialRevenue = products.reduce((sum, p) => sum + ((p.jual || 0) * (p.stok || 0)), 0);
+    const totalInventoryPotentialProfit = products.reduce((sum, p) => sum + (((p.jual || 0) - (p.modal || 0)) * (p.stok || 0)), 0);
+    const totalInventoryPcs = products.reduce((sum, p) => sum + (p.stok || 0), 0);
+    const totalJenisBarang = products.length;
+
+    // =========================================================================
+    // REKAP PENJUALAN (HISTORIS DARI TRANSAKSI)
+    // =========================================================================
     const filteredTransactions = transactions.filter(t => {
       if (!filterStart && !filterEnd) return true;
       let tDate;
@@ -170,7 +181,8 @@ function MainApp() {
     });
 
     const totalPendapatanKotor = filteredTransactions.reduce((sum, t) => sum + (t.total || 0), 0);
-    const totalKeuntunganBersih = filteredTransactions.reduce((sum, t) => sum + (t.profit || 0), 0);
+    // Logika Profit Bersih: Omset - Modal Terjual. Menggunakan t.profit bersih jika Supabase sudah didaftar kolomnya. t.modal adalah modal historis transaksi.
+    const totalKeuntunganBersih = filteredTransactions.reduce((sum, t) => sum + (t.profit !== undefined ? t.profit : ((t.total||0) - (t.modal||0))), 0);
     const totalModalTerjual = filteredTransactions.reduce((sum, t) => sum + (t.modal || 0), 0);
 
     const filteredProductsInput = products.filter(p => {
@@ -184,16 +196,18 @@ function MainApp() {
 
     const totalBarangInput = filteredProductsInput.reduce((sum, p) => sum + (p.stok || 0), 0);
     const totalModalInput = filteredProductsInput.reduce((sum, p) => sum + ((p.modal || 0) * (p.stok || 0)), 0);
-    const potensiKeuntungan = filteredProductsInput.reduce((sum, p) => sum + (((p.jual || 0) - (p.modal || 0)) * (p.stok || 0)), 0);
+    const potensiKeuntunganInput = filteredProductsInput.reduce((sum, p) => sum + (((p.jual || 0) - (p.modal || 0)) * (p.stok || 0)), 0);
 
     const itemSalesMap = {};
     filteredTransactions.forEach(t => {
       if (!t.items) return;
       t.items.forEach(item => {
-        if (!itemSalesMap[item.id]) itemSalesMap[item.id] = { qty: 0, revenue: 0, profit: 0, gambar: item.gambar };
+        if (!itemSalesMap[item.id]) itemSalesMap[item.id] = { qty: 0, revenue: 0, profit: 0, modalTerjual: 0, gambar: item.gambar };
         itemSalesMap[item.id].qty += (item.qty || 0);
         itemSalesMap[item.id].revenue += (item.totalHarga || 0);
-        itemSalesMap[item.id].profit += (item.profitItem || 0);
+        // Profit item historis: Omset Item - (Modal Item * Qty Item). ProfitItem disimpan aman dalam transaksi.
+        itemSalesMap[item.id].profit += (item.profitItem !== undefined ? item.profitItem : (item.totalHarga - ((item.modal||0) * item.qty)));
+        itemSalesMap[item.id].modalTerjual += ((item.modal||0) * item.qty);
       });
     });
 
@@ -204,6 +218,7 @@ function MainApp() {
         qty: itemSalesMap[p.id]?.qty || 0,
         revenue: itemSalesMap[p.id]?.revenue || 0,
         profit: itemSalesMap[p.id]?.profit || 0,
+        modalTerjual: itemSalesMap[p.id]?.modalTerjual || 0,
         daysActive
       };
     }).sort((a, b) => b.qty - a.qty); 
@@ -217,8 +232,9 @@ function MainApp() {
       }).slice(0, 5);
 
     return {
+      totalInventoryModal, totalInventoryPotentialRevenue, totalInventoryPotentialProfit, totalInventoryPcs, totalJenisBarang,
       filteredTransactions, sortedTransactions, totalPendapatanKotor, totalKeuntunganBersih, totalModalTerjual,
-      totalBarangInput, totalModalInput, potensiKeuntungan, productRankings, topSelling, bottomSelling
+      totalBarangInput, totalModalInput, potensiKeuntunganInput, productRankings, topSelling, bottomSelling
     };
   }, [transactions, products, filterStart, filterEnd, sortTrx, view, isAdminLogged]);
 
@@ -233,7 +249,7 @@ function MainApp() {
       if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') Notification.requestPermission();
       
       // Update Favicon dan Apple Touch Icon Secara Dinamis
-      const logoUrl = settings.logo_url ? formatImageUrl(settings.logo_url) : "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏪</text></svg>";
+      const logoUrl = settings.logo_url ? formatImageUrl(settings.logo_url) : "data:image/svg+xml,<svg xmlns=%22[http://www.w3.org/2000/svg%22](http://www.w3.org/2000/svg%22) viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏪</text></svg>";
       
       let link = document.querySelector("link[rel~='icon']");
       if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
@@ -280,7 +296,7 @@ function MainApp() {
 
     if (!window.supabase) {
       const script = document.createElement('script');
-      script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
+      script.src = "[https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2](https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2)";
       script.onload = initSupabase;
       document.head.appendChild(script);
     } else {
@@ -467,9 +483,8 @@ function MainApp() {
           ]
         }],
         generationConfig: { responseModalities: ['IMAGE'] }
-      };
-
-      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${geminiKey}`, {
+      });
+      const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -499,7 +514,7 @@ function MainApp() {
   const handleUploadProductImage = (e) => {
     const file = e.target.files[0];
     if (file) {
-      if (file.size > 2097152) return showToast('Ukuran maksimal 2MB. Gunakan kamera HP Anda.', 'error');
+      if (file.size > 2097152) return showToast('Ukuran maksimal 2MB.', 'error');
       const reader = new FileReader();
       reader.onloadend = () => {
         setNewProduct(prev => ({ ...prev, gambar: reader.result }));
@@ -581,21 +596,25 @@ function MainApp() {
     const detailPesanan = Object.entries(cart).map(([id, qty]) => {
       const p = products.find(prod => prod.id === parseInt(id));
       const subTotal = hitungTotalHargaItem(p, qty);
+      const unitModal = p.modal || 0;
       return { 
-        id: p.id, nama: p.nama, modal: p.modal || 0, jual: p.jual || 0, 
-        qty, totalHarga: subTotal, profitItem: subTotal - ((p.modal || 0) * qty),
+        id: p.id, nama: p.nama, modal: unitModal, jual: p.jual || 0, 
+        qty, totalHarga: subTotal, profitItem: subTotal - (unitModal * qty),
         gambar: p.gambar || null
       };
     });
     
-    const totalModal = detailPesanan.reduce((s, i) => s + (i.modal * i.qty), 0);
+    const totalModalTrx = detailPesanan.reduce((s, i) => s + (i.modal * i.qty), 0);
+    const totalOmsetTrx = totalBelanja;
+    const totalProfitTrx = totalOmsetTrx - totalModalTrx;
+
     const newTransaction = { 
       id: `TRX-${Date.now()}`, 
       tanggal: new Date().toLocaleString('id-ID'), 
       items: detailPesanan, 
-      total: totalBelanja, 
-      modal: totalModal, 
-      profit: totalBelanja - totalModal, 
+      total: totalOmsetTrx, 
+      modal: totalModalTrx, 
+      profit: totalProfitTrx, 
       metode: 'QRIS / Kasir Etalase'
     };
 
@@ -694,7 +713,6 @@ function MainApp() {
     if (!supabaseClient) return showToast('Database belum terhubung', 'error');
     setIsProcessing(true);
     setSettings(settings);
-    
     try { localStorage.setItem('tokojujur_gemini_key', geminiKey); } catch(e){}
 
     let { error } = await supabaseClient.from('pengaturan').update({
@@ -713,7 +731,7 @@ function MainApp() {
           admin_password: settings.admin_password
        }).eq('id', 1);
        error = fallbackError;
-       if (!error) showToast('Pengaturan disimpan. (Kolom "logo_url" belum ada di Supabase).', 'error');
+       if (!error) showToast('Pengaturan disimpan, TAPI logo gagal tersimpan. Harap buat kolom "logo_url" di Supabase.', 'error');
     } else if (error) {
        showToast(`Gagal: ${error.message}`, 'error');
     } else {
@@ -899,7 +917,7 @@ function MainApp() {
     return <Store className="text-emerald-500 shrink-0" size={28} />;
   };
 
-  // --- RENDER UTAMA ---
+  // --- RENDER UI ---
   if (!isConnected || !supabaseClient) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center font-sans">
@@ -909,7 +927,7 @@ function MainApp() {
         <div className="bg-slate-800 p-6 rounded-3xl w-full max-w-sm text-left shadow-2xl border border-slate-700">
            <div className="mb-4">
              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Supabase URL</label>
-             <input type="text" id="sbUrl" defaultValue={localStorage.getItem('tokojujur_sb_url') || ''} className="w-full mt-1 p-3 rounded-xl bg-slate-900 border border-slate-700 text-white outline-none focus:border-emerald-500 text-sm font-mono" placeholder="https://xxxx.supabase.co" />
+             <input type="text" id="sbUrl" defaultValue={localStorage.getItem('tokojujur_sb_url') || ''} className="w-full mt-1 p-3 rounded-xl bg-slate-900 border border-slate-700 text-white outline-none focus:border-emerald-500 text-sm font-mono" placeholder="[https://xxxx.supabase.co](https://xxxx.supabase.co)" />
            </div>
            <div className="mb-6">
              <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Supabase Anon Key</label>
@@ -1020,13 +1038,13 @@ function MainApp() {
         </div>
       )}
 
-      {/* HEADER UMUM */}
+      {/* HEADER UMUM (Tampil jika bukan di halaman admin/struk) */}
       {view !== 'admin' && view !== 'struk' && (
         <header className="bg-white p-4 shadow-sm sticky top-0 z-40 mb-4 border-b">
           <div className="flex justify-between items-center mb-4 max-w-5xl mx-auto">
             <div className="flex items-center gap-2 text-emerald-600 font-black text-lg md:text-xl truncate max-w-[50%]">
               {renderLogo("w-8 h-8")}
-              <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v3.0</span></span>
+              <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v3.1</span></span>
             </div>
             <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
               <button onClick={() => setView('riwayat')} className="p-2 md:p-2.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition shadow-sm relative" title="Riwayat Pembelian">
@@ -1151,10 +1169,8 @@ function MainApp() {
 
       {/* VIEW: CHECKOUT */}
       {view === 'checkout' && (
-        <div className="max-w-md mx-auto p-4 md:p-6 min-h-screen flex flex-col pb-32">
-          <button onClick={() => setView('toko')} className="flex items-center gap-2 font-black mb-6 text-slate-400 hover:text-slate-600 transition w-max"><ArrowLeft size={18}/> Kembali Belanja</button>
-          
-          <div className="bg-white rounded-3xl p-5 md:p-6 shadow-sm border border-slate-100 mb-6">
+        <div className="max-w-md mx-auto p-4 md:p-6 flex flex-col pb-32">
+          <div className="bg-white rounded-3xl p-5 md:p-6 shadow-sm border border-slate-100 mb-6 mt-4">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3 mb-4">
               <h3 className="font-black text-base md:text-lg text-slate-800">Review Keranjang</h3>
               <button onClick={handleClearCart} className="flex items-center gap-1 text-[10px] md:text-xs font-bold text-red-500 bg-red-50 px-2 py-1 rounded hover:bg-red-100 transition"><Trash2 size={14}/> Bersihkan</button>
@@ -1414,42 +1430,48 @@ function MainApp() {
 
              {/* TAB ANALISA */}
              {adminTab === 'analisa' && (
-               <div className="animate-fade-in max-w-6xl mx-auto w-full">
+               <div className="animate-fade-in max-w-6xl mx-auto w-full pb-10">
                   <div className="flex flex-col xl:flex-row justify-between xl:items-center mb-8 gap-6 w-full">
-                    <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-slate-800">Ikhtisar Penjualan & Stok</h1>
+                    <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-slate-800">Ikhtisar Penjualan & Inventori</h1>
                     <div className="flex flex-col md:flex-row gap-4 w-full xl:w-auto">
                       <div className="flex flex-wrap items-center gap-2 bg-white p-2 rounded-2xl border border-slate-200 shadow-sm w-full md:w-auto">
-                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Filter Waktu:</span>
+                        <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest pl-2">Filter Waktu Trx:</span>
                         <input type="date" value={filterStart} onChange={e => setFilterStart(e.target.value)} className="bg-slate-50 px-2 py-2 rounded-xl text-xs md:text-sm font-bold outline-none text-slate-700 border border-slate-100 flex-1 md:flex-none"/>
                         <span className="text-slate-300 font-black hidden md:inline">-</span>
                         <input type="date" value={filterEnd} onChange={e => setFilterEnd(e.target.value)} className="bg-slate-50 px-2 py-2 rounded-xl text-xs md:text-sm font-bold outline-none text-slate-700 border border-slate-100 flex-1 md:flex-none"/>
                         {(filterStart || filterEnd) && <button onClick={() => {setFilterStart(''); setFilterEnd('');}} className="p-2 bg-rose-50 hover:bg-rose-100 text-rose-500 rounded-xl transition-colors shrink-0"><X size={16}/></button>}
                       </div>
                       <div className="flex flex-col md:flex-row gap-2 w-full md:w-auto">
-                        <button onClick={handleExportCSV} className="bg-slate-900 text-white px-4 py-3 md:px-6 rounded-2xl font-black flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-all text-xs md:text-sm"><Download size={16}/> EXPORT</button>
-                        <button onClick={handleClearTransactions} disabled={isProcessing} className="bg-rose-600 text-white px-4 py-3 md:px-6 rounded-2xl font-black flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-all text-xs md:text-sm"><Trash2 size={16}/> RESET & RESTORE</button>
+                        <button onClick={handleExportCSV} className="bg-slate-900 text-white px-4 py-3 md:px-6 rounded-2xl font-black flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-all text-xs md:text-sm"><Download size={16}/> EXPORT CSV</button>
+                        <button onClick={handleClearTransactions} disabled={isProcessing} className="bg-rose-600 text-white px-4 py-3 md:px-6 rounded-2xl font-black flex items-center justify-center gap-2 shadow-xl active:scale-95 transition-all text-xs md:text-sm"><Trash2 size={16}/> RESET TRX</button>
                       </div>
                     </div>
                   </div>
-                  <h2 className="text-base md:text-xl font-bold text-slate-800 mb-4 flex items-center gap-2"><CheckCircle className="text-emerald-500" size={20}/> Rekap Penjualan (Terjual)</h2>
+
+                  {/* SECTION BARU: REKAP INVENTORI & POTENSI (REALTIME) */}
+                  <h2 className="text-lg md:text-2xl font-black text-slate-800 mb-5 flex items-center gap-3"><Package className="text-blue-500" size={26}/> Rekap Inventori & Potensi (Realtime)</h2>
+                  <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-10">
+                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between"><div className="absolute top-0 right-0 p-4 opacity-5"><Store size={60}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Total Modal Inventori</p><p className="text-xl md:text-3xl font-extrabold text-slate-900 truncate">{formatRupiah(adminData.totalInventoryModal)}</p></div><p className="text-xs font-bold text-slate-500 mt-2">Dari {adminData.totalInventoryPcs} pcs barang aktif</p></div>
+                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between"><div className="absolute top-0 right-0 p-4 opacity-5"><BarChart3 size={60}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Potensi Total Omset</p><p className="text-xl md:text-3xl font-extrabold text-blue-600 truncate">{formatRupiah(adminData.totalInventoryPotentialRevenue)}</p></div><p className="text-xs font-bold text-slate-500 mt-2">Jika semua stok terjual habis</p></div>
+                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between"><div className="absolute top-0 right-0 p-4 opacity-5"><Sparkles size={60}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Total Potensi Untung</p><p className="text-xl md:text-3xl font-extrabold text-emerald-600 truncate">{formatRupiah(adminData.totalInventoryPotentialProfit)}</p></div><p className="text-xs font-bold text-emerald-700 mt-2 flex items-center gap-1.5"><TrendingUp size={14}/> Margin Potensial: {adminData.totalInventoryPotentialRevenue > 0 ? ((adminData.totalInventoryPotentialProfit / adminData.totalInventoryPotentialRevenue) * 100).toFixed(1) : '0'}%</p></div>
+                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between"><div className="absolute top-0 right-0 p-4 opacity-5"><List size={60}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Total Jenis Barang</p><p className="text-xl md:text-3xl font-extrabold text-slate-900 truncate">{adminData.totalJenisBarang}</p></div><p className="text-xs font-bold text-slate-500 mt-2">Item terdaftar aktif</p></div>
+                  </div>
+
+                  {/* SECTION: REKAP PENJUALAN (HISTORIS) */}
+                  <h2 className="text-lg md:text-2xl font-black text-slate-800 mb-5 flex items-center gap-3"><CheckCircle className="text-emerald-500" size={26}/> Rekap Penjualan Historis (Terjual)</h2>
                   <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-8">
-                     <div className="bg-white p-4 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-5"><BarChart3 size={48}/></div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Omset</p><p className="text-lg md:text-3xl font-extrabold text-slate-800 truncate">{formatRupiah(adminData.totalPendapatanKotor)}</p></div>
-                     <div className="bg-white p-4 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-5"><Store size={48}/></div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Modal Terjual</p><p className="text-lg md:text-3xl font-extrabold text-blue-600 truncate">{formatRupiah(adminData.totalModalTerjual)}</p></div>
-                     <div className="col-span-2 md:col-span-1 bg-gradient-to-br from-emerald-500 to-teal-600 p-4 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm text-white relative overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-10"><CheckCircle size={48}/></div><p className="text-[10px] font-black text-emerald-100 uppercase tracking-widest mb-1">Untung Bersih</p><p className="text-xl md:text-3xl font-extrabold drop-shadow-sm truncate">{formatRupiah(adminData.totalKeuntunganBersih)}</p></div>
+                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between"><div className="absolute top-0 right-0 p-4 opacity-5"><TrendingUp size={60}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Total Omset (Terjual)</p><p className="text-lg md:text-3xl font-extrabold text-slate-900 truncate">{formatRupiah(adminData.totalPendapatanKotor)}</p></div><p className="text-xs font-bold text-slate-500 mt-2">Dari {adminData.filteredTransactions.length} transaksi</p></div>
+                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between"><div className="absolute top-0 right-0 p-4 opacity-5"><Store size={60}/></div><div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1.5">Modal Barang Terjual</p><p className="text-lg md:text-3xl font-extrabold text-blue-600 truncate">{formatRupiah(adminData.totalModalTerjual)}</p></div><p className="text-xs font-bold text-slate-500 mt-2">Sesuai modal historis transaksi</p></div>
+                     <div className="col-span-2 md:col-span-1 bg-gradient-to-br from-emerald-500 to-teal-600 p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm text-white relative overflow-hidden flex flex-col justify-between"><div className="absolute top-0 right-0 p-4 opacity-10"><Sparkles size={60}/></div><div><p className="text-[10px] font-black text-emerald-100 uppercase tracking-widest mb-1.5">Untung Bersih (Historis)</p><p className="text-xl md:text-3xl font-extrabold drop-shadow-sm truncate">{formatRupiah(adminData.totalKeuntunganBersih)}</p></div><p className="text-xs font-bold text-emerald-50 mt-2 flex items-center gap-1.5"><TrendingUp size={14}/> Margin Bersih: {adminData.totalPendapatanKotor > 0 ? ((adminData.totalKeuntunganBersih / adminData.totalPendapatanKotor) * 100).toFixed(1) : '0'}%</p></div>
                   </div>
-                  <h2 className="text-base md:text-xl font-bold text-slate-800 mb-4 flex items-center gap-2"><Package className="text-blue-500" size={20}/> Rekap Input Barang (Filter Tanggal)</h2>
-                  <div className="grid grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-12">
-                     <div className="bg-white p-4 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-5"><Package size={48}/></div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Barang (Pcs)</p><p className="text-lg md:text-3xl font-extrabold text-slate-800 truncate">{adminData.totalBarangInput}</p></div>
-                     <div className="bg-white p-4 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-5"><Store size={48}/></div><p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Modal (Stok)</p><p className="text-lg md:text-3xl font-extrabold text-blue-600 truncate">{formatRupiah(adminData.totalModalInput)}</p></div>
-                     <div className="col-span-2 md:col-span-1 bg-gradient-to-br from-blue-500 to-indigo-600 p-4 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm text-white relative overflow-hidden"><div className="absolute top-0 right-0 p-4 opacity-10"><TrendingUp size={48}/></div><p className="text-[10px] font-black text-blue-100 uppercase tracking-widest mb-1">Potensi Keuntungan</p><p className="text-xl md:text-3xl font-extrabold drop-shadow-sm truncate">{formatRupiah(adminData.potensiKeuntungan)}</p></div>
-                  </div>
+
                   <div className="bg-white rounded-3xl md:rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col mb-8 w-full">
-                    <div className="p-4 md:p-6 border-b border-slate-100"><h2 className="font-black text-base md:text-xl text-slate-800 flex items-center gap-2"><Package className="text-emerald-500" size={20}/> Rekap Keseluruhan per Barang</h2></div>
+                    <div className="p-4 md:p-6 border-b border-slate-100"><h2 className="font-black text-base md:text-xl text-slate-800 flex items-center gap-2"><Package className="text-emerald-500" size={20}/> Rekap Penjualan per Barang (Historis)</h2></div>
                     <div className="overflow-x-auto max-h-[400px] overflow-y-auto w-full block">
-                      <table className="w-full text-left min-w-[600px] border-collapse">
-                         <thead className="bg-slate-50 sticky top-0 shadow-sm z-10"><tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest"><th className="p-3 md:p-4">Nama Barang</th><th className="p-3 md:p-4 text-center">Terjual</th><th className="p-3 md:p-4 text-center">Sisa Stok</th><th className="p-3 md:p-4 text-center">Total Awal</th><th className="p-3 md:p-4 text-right">Pendapatan</th></tr></thead>
+                      <table className="w-full text-left min-w-[800px] border-collapse">
+                         <thead className="bg-slate-50 sticky top-0 shadow-sm z-10"><tr className="text-[10px] font-black uppercase text-slate-400 tracking-widest"><th className="p-3 md:p-4">Nama Barang</th><th className="p-3 md:p-4 text-center">Qty Terjual</th><th className="p-3 md:p-4 text-center">Profit Satuan</th><th className="p-3 md:p-4 text-center">Sisa Stok</th><th className="p-3 md:p-4 text-right">Omset</th><th className="p-3 md:p-4 text-right">Profit Terjual</th></tr></thead>
                          <tbody className="divide-y divide-slate-50">
-                           {adminData.productRankings.length === 0 && <tr><td colSpan="5" className="p-6 text-center text-slate-400 font-bold text-xs">Data kosong.</td></tr>}
+                           {adminData.productRankings.length === 0 && <tr><td colSpan="6" className="p-6 text-center text-slate-400 font-bold text-xs">Data kosong.</td></tr>}
                            {adminData.productRankings.map((p) => (
                              <tr key={p.id} className="text-xs md:text-sm font-bold hover:bg-slate-50 transition-colors">
                                <td className="p-3 md:p-4 flex items-center gap-3">
@@ -1459,15 +1481,17 @@ function MainApp() {
                                  <span className="truncate max-w-[120px] md:max-w-xs text-slate-700">{p.nama}</span>
                                </td>
                                <td className="p-3 md:p-4 text-center text-emerald-600 font-black">{p.qty}</td>
+                               <td className="p-3 md:p-4 text-center text-emerald-600">{formatRupiah(p.jual - p.modal)}</td>
                                <td className="p-3 md:p-4 text-center text-blue-600 font-black">{p.stok}</td>
-                               <td className="p-3 md:p-4 text-center text-slate-600 font-black">{p.stok + p.qty}</td>
-                               <td className="p-3 md:p-4 text-right text-slate-800 font-black">{formatRupiah(p.revenue)}</td>
+                               <td className="p-3 md:p-4 text-right text-slate-800">{formatRupiah(p.revenue)}</td>
+                               <td className="p-3 md:p-4 text-right text-emerald-700 font-black">{formatRupiah(p.profit)}</td>
                              </tr>
                            ))}
                          </tbody>
                       </table>
                     </div>
                   </div>
+                  {/* ... (Sisanya dikunci/sama seperti blueprint) ... */}
                   <div className="grid lg:grid-cols-2 gap-6 mb-8 w-full">
                       <div className="bg-white rounded-3xl md:rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col w-full">
                         <div className="p-4 md:p-6 border-b border-slate-100"><h2 className="font-black text-base md:text-xl text-slate-800 flex items-center gap-2"><TrendingUp className="text-orange-500" size={20}/> 10 Barang Paling Laku</h2></div>
@@ -1524,7 +1548,7 @@ function MainApp() {
 
              {/* TAB BARANG */}
              {adminTab === 'barang' && (
-               <div className="animate-fade-in max-w-6xl mx-auto w-full">
+               <div className="animate-fade-in max-w-6xl mx-auto w-full pb-10">
                   <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 gap-4">
                     <h1 className="text-3xl font-black tracking-tighter text-slate-800">Manajemen Barang</h1>
                     <div className="flex flex-col sm:flex-row gap-2">
@@ -1534,10 +1558,10 @@ function MainApp() {
                   </div>
 
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4 mb-6">
-                      <div className="bg-white p-4 rounded-2xl md:rounded-[32px] shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center"><span className="text-slate-400 text-[9px] md:text-[10px] font-black uppercase tracking-widest mb-0.5">Total Produk</span><span className="text-lg md:text-2xl font-extrabold text-slate-800">{products.length} Item</span></div>
-                      <div className="bg-white p-4 rounded-2xl md:rounded-[32px] shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center"><span className="text-slate-400 text-[9px] md:text-[10px] font-black uppercase tracking-widest mb-0.5">Total Stok</span><span className="text-lg md:text-2xl font-extrabold text-blue-600">{products.reduce((sum, p) => sum + (p.stok || 0), 0)} Pcs</span></div>
-                      <div className="bg-white p-4 rounded-2xl md:rounded-[32px] shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center"><span className="text-slate-400 text-[9px] md:text-[10px] font-black uppercase tracking-widest mb-0.5">Total Modal</span><span className="text-sm md:text-xl font-extrabold text-rose-600 truncate w-full">{formatRupiah(products.reduce((sum, p) => sum + ((p.modal || 0) * (p.stok || 0)), 0))}</span></div>
-                      <div className="bg-white p-4 rounded-2xl md:rounded-[32px] shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center"><span className="text-slate-400 text-[9px] md:text-[10px] font-black uppercase tracking-widest mb-0.5">Potensi Profit</span><span className="text-sm md:text-xl font-extrabold text-emerald-600 truncate w-full">{formatRupiah(products.reduce((sum, p) => sum + (((p.jual || 0) - (p.modal || 0)) * (p.stok || 0)), 0))}</span></div>
+                      <div className="bg-white p-4 rounded-2xl md:rounded-[32px] shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center"><span className="text-slate-400 text-[9px] md:text-[10px] font-black uppercase tracking-widest mb-0.5">Total Produk</span><span className="text-lg md:text-2xl font-extrabold text-slate-800">{adminData.totalJenisBarang} Item</span></div>
+                      <div className="bg-white p-4 rounded-2xl md:rounded-[32px] shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center"><span className="text-slate-400 text-[9px] md:text-[10px] font-black uppercase tracking-widest mb-0.5">Total Stok</span><span className="text-lg md:text-2xl font-extrabold text-blue-600">{adminData.totalInventoryPcs} Pcs</span></div>
+                      <div className="bg-white p-4 rounded-2xl md:rounded-[32px] shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center"><span className="text-slate-400 text-[9px] md:text-[10px] font-black uppercase tracking-widest mb-0.5">Total Modal Inventori</span><span className="text-sm md:text-xl font-extrabold text-rose-600 truncate w-full">{formatRupiah(adminData.totalInventoryModal)}</span></div>
+                      <div className="bg-white p-4 rounded-2xl md:rounded-[32px] shadow-sm border border-slate-100 flex flex-col items-center justify-center text-center"><span className="text-slate-400 text-[9px] md:text-[10px] font-black uppercase tracking-widest mb-0.5">Potensi Profit Bersih</span><span className="text-sm md:text-xl font-extrabold text-emerald-600 truncate w-full">{formatRupiah(adminData.totalInventoryPotentialProfit)}</span></div>
                   </div>
 
                   {showAddForm && (
@@ -1557,7 +1581,7 @@ function MainApp() {
                              </div>
                              <div className="bg-blue-50 border border-blue-100 rounded-lg p-2 flex items-center justify-between gap-2 mt-1">
                                 <span className="text-[9px] font-bold text-blue-700 w-[60%] leading-tight truncate">Paste Link Google Drive di bawah</span>
-                                <a href="https://drive.google.com/drive/folders/1KbB_QVH_TclNJkQSziFJ7VTGbOo_oA0r?hl=ID" target="_blank" rel="noreferrer" className="bg-blue-600 text-white px-2 py-1.5 rounded font-black text-[9px] flex items-center gap-1 hover:bg-blue-700 shrink-0"><ExternalLink size={12}/> Buka Folder</a>
+                                <a href="[https://drive.google.com/drive/folders/1KbB_QVH_TclNJkQSziFJ7VTGbOo_oA0r?hl=ID](https://drive.google.com/drive/folders/1KbB_QVH_TclNJkQSziFJ7VTGbOo_oA0r?hl=ID)" target="_blank" rel="noreferrer" className="bg-blue-600 text-white px-2 py-1.5 rounded font-black text-[9px] flex items-center gap-1 hover:bg-blue-700 shrink-0"><ExternalLink size={12}/> Buka Folder</a>
                              </div>
                              <input type="text" placeholder="Paste Link Gambar / Google Drive disini..." value={newProduct.gambar || ''} onChange={e => setNewProduct({...newProduct, gambar: e.target.value})} className="w-full bg-white border border-slate-300 rounded-xl px-3 py-2.5 text-xs focus:ring-2 focus:ring-emerald-500 outline-none font-semibold text-slate-700 shadow-sm"/>
                            </div>
@@ -1608,9 +1632,9 @@ function MainApp() {
                  <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden w-full">
                     <div className="overflow-x-auto max-h-[600px] w-full block">
                       <table className="w-full text-left min-w-[700px] border-collapse">
-                         <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10 shadow-sm"><tr className="text-[10px] font-black uppercase text-slate-500 tracking-widest"><th className="p-4 md:p-6">Produk</th><th className="p-4 md:p-6 text-center">Stok</th><th className="p-4 md:p-6">Harga & Profit</th><th className="p-4 md:p-6 text-center">Aksi (CRUD)</th></tr></thead>
+                         <thead className="bg-slate-50 border-b border-slate-200 sticky top-0 z-10 shadow-sm"><tr className="text-[10px] font-black uppercase text-slate-500 tracking-widest"><th className="p-4 md:p-6">Produk</th><th className="p-4 md:p-6 text-center">Stok</th><th className="p-4 md:p-6">Harga & Profit</th><th className="p-4 md:p-6 text-center">Margin & Potensi Item</th><th className="p-4 md:p-6 text-center">Aksi (CRUD)</th></tr></thead>
                          <tbody className="divide-y divide-slate-100">
-                           {products.length === 0 && <tr><td colSpan="4" className="p-10 text-center text-slate-400 font-bold text-sm">Barang masih kosong.</td></tr>}
+                           {products.length === 0 && <tr><td colSpan="5" className="p-10 text-center text-slate-400 font-bold text-sm">Barang masih kosong.</td></tr>}
                            {products.map(p => (
                              <tr key={p.id} className={`transition-colors ${editingId === p.id ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
                                <td className="p-4 md:p-6 flex items-center gap-3 md:gap-4">
@@ -1625,12 +1649,16 @@ function MainApp() {
                                <td className="p-4 md:p-6 text-center"><span className={`px-2 py-1 md:px-4 md:py-2 rounded-lg md:rounded-xl text-[9px] md:text-[10px] font-black tracking-widest uppercase ${p.stok > 10 ? 'bg-emerald-100 text-emerald-800' : p.stok > 0 ? 'bg-orange-100 text-orange-800' : 'bg-rose-100 text-rose-800'}`}>{p.stok}</span></td>
                                <td className="p-4 md:p-6">
                                   <div className="font-black text-xs md:text-sm text-emerald-700">{formatRupiah(p.jual)}</div>
-                                  <div className="text-[9px] md:text-[10px] font-bold text-slate-500 mt-0.5 md:mt-1">Untung: {formatRupiah(p.jual - p.modal)}</div>
+                                  <div className="text-[9px] md:text-[10px] font-bold text-slate-500 mt-0.5 md:mt-1">Profit Satuan: {formatRupiah(p.jual - p.modal)}</div>
                                   {p.diskon && <div className="text-[9px] text-orange-700 font-black bg-orange-100 px-1.5 py-0.5 rounded md:rounded-lg w-max mt-1 border border-orange-200">GROSIR: {p.diskon.min_qty} = {formatRupiah(p.diskon.harga_total)}</div>}
                                </td>
                                <td className="p-4 md:p-6 text-center">
+                                  <div className="text-[11px] md:text-sm font-extrabold text-emerald-600">{p.jual > 0 ? (((p.jual - p.modal)/p.jual)*100).toFixed(1) : '0'}%</div>
+                                  <div className="text-[9px] md:text-[10px] font-bold text-slate-500 mt-1">Potensi Item: {formatRupiah((p.jual - p.modal) * p.stok)}</div>
+                               </td>
+                               <td className="p-4 md:p-6 text-center">
                                  <div className="flex items-center justify-center gap-2">
-                                   <button onClick={() => {setEditingId(p.id); setNewProduct({...p}); setShowAddForm(true); window.scrollTo({ top: 0, behavior: 'smooth' });}} className="p-2 md:p-3 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl md:rounded-2xl transition-colors shadow-sm"><Edit size={16}/></button>
+                                   <button onClick={() => handleEditClick(p)} className="p-2 md:p-3 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded-xl md:rounded-2xl transition-colors shadow-sm"><Edit size={16}/></button>
                                    <button onClick={() => handleDeleteProduct(p.id)} disabled={isProcessing} className="p-2 md:p-3 bg-rose-50 text-rose-600 hover:bg-rose-600 hover:text-white rounded-xl md:rounded-2xl transition-colors shadow-sm disabled:opacity-50"><Trash2 size={16}/></button>
                                  </div>
                                </td>
@@ -1657,7 +1685,7 @@ export default class App extends React.Component {
     if (this.state.hasError) {
       return (
         <div style={{ padding: '40px', background: '#f87171', color: 'white', minHeight: '100vh', fontFamily: 'sans-serif' }}>
-          <h1 style={{ fontSize: '2rem', fontWeight: '900' }}>⚠️ Aplikasi Mengalami Crash Server</h1>
+          <h1 style={{ fontSize: '2rem', fontWeight: '900' }}>⚠️ Aplikasi Mengalami Crash Server (V3.1 Locked Blueprint)</h1>
           <p style={{ marginTop: '10px', fontSize: '1.2rem' }}>Layar putih berhasil dihindari! Masalahnya ada pada kode di bawah ini:</p>
           <pre style={{ background: 'rgba(0,0,0,0.3)', padding: '20px', borderRadius: '10px', marginTop: '20px', whiteSpace: 'pre-wrap', fontWeight: 'bold' }}>{String(this.state.errorInfo)}</pre>
           <button onClick={() => { localStorage.clear(); window.location.reload(true); }} style={{ marginTop: '20px', padding: '10px 20px', borderRadius: '10px', border: 'none', background: 'white', color: '#f87171', fontWeight: 'bold', cursor: 'pointer' }}>Hapus Cache & Muat Ulang</button>
