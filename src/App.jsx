@@ -110,10 +110,11 @@ function MainApp() {
   const [tempQty, setTempQty] = useState(0);
 
   const [showShareApp, setShowShareApp] = useState(false);
+  
+  // STATE SCANNER CAMERA
   const [isScanningModalOpen, setIsScanningModalOpen] = useState(false);
   const [scanTarget, setScanTarget] = useState(''); 
-  const videoRef = useRef(null);
-  const streamRef = useRef(null);
+  const html5QrCodeRef = useRef(null);
 
   const [isAdminLogged, setIsAdminLogged] = useState(() => {
     try { return localStorage.getItem('tokojujur_admin') === 'true'; } catch(e) { return false; }
@@ -147,12 +148,13 @@ function MainApp() {
   const jumlahItem = Object.values(cart).reduce((a, b) => a + b, 0);
 
   // =========================================================================
-  // OTAR ATIK LOGIKA ADMIN - LENGKAP & ANTI POTONG TEKS
+  // OTAR ATIK LOGIKA ADMIN & DATA BARANG (STOK AWAL x HARGA MODAL BARU)
+  // Sesuai permintaan mutlak user: "Jika berubah harga modalnya maka menyesuaikan dengan yang baru, namun stoknya dihitung stok awal meskipun sudah laku"
   // =========================================================================
   const adminData = useMemo(() => {
     if (view !== 'admin' || !isAdminLogged) return null;
 
-    // FILTER TRANSAKSI
+    // FILTER TRANSAKSI WAKTU
     const filteredTransactions = transactions.filter(t => {
       if (!filterStart && !filterEnd) return true;
       let tDate;
@@ -175,27 +177,43 @@ function MainApp() {
     // MENGHITUNG PENJUALAN PER ITEM (REALISASI)
     const itemSalesMap = {};
     let totalBarangTerjual = 0;
+    let totalPendapatanKotor = 0;
+    let totalModalTerjualDinamis = 0; // Menggunakan harga modal terbaru untuk kalkulasi historis
+    
     filteredTransactions.forEach(t => {
       if (!t.items) return;
       t.items.forEach(item => {
         if (!itemSalesMap[item.id]) itemSalesMap[item.id] = { qty: 0, revenue: 0, profit: 0, modalTerjual: 0 };
-        itemSalesMap[item.id].qty += (item.qty || 0);
-        itemSalesMap[item.id].revenue += (item.totalHarga || 0);
-        itemSalesMap[item.id].profit += (item.profitItem !== undefined ? item.profitItem : (item.totalHarga - ((item.modal||0) * item.qty)));
-        itemSalesMap[item.id].modalTerjual += ((item.modal||0) * item.qty);
-        totalBarangTerjual += (item.qty || 0);
+        
+        // Cari produk di DB untuk mendapatkan harga modal TERBARU
+        const currentProduct = products.find(p => p.id === item.id);
+        const modalTerbaru = currentProduct ? (currentProduct.modal || 0) : (item.modal || 0);
+        
+        const qtyItem = item.qty || 0;
+        const omsetItem = item.totalHarga || 0;
+        const modalItemDinamis = modalTerbaru * qtyItem;
+        const profitItemDinamis = omsetItem - modalItemDinamis; // Profit berdasarkan harga modal saat ini
+        
+        itemSalesMap[item.id].qty += qtyItem;
+        itemSalesMap[item.id].revenue += omsetItem;
+        itemSalesMap[item.id].profit += profitItemDinamis;
+        itemSalesMap[item.id].modalTerjual += modalItemDinamis;
+        
+        totalBarangTerjual += qtyItem;
+        totalPendapatanKotor += omsetItem;
+        totalModalTerjualDinamis += modalItemDinamis;
       });
     });
 
-    const totalPendapatanKotor = filteredTransactions.reduce((sum, t) => sum + (t.total || 0), 0);
-    const totalKeuntunganBersih = filteredTransactions.reduce((sum, t) => sum + (t.profit !== undefined ? t.profit : ((t.total||0) - (t.modal||0))), 0);
-    const totalModalTerjual = filteredTransactions.reduce((sum, t) => sum + (t.modal || 0), 0);
+    const totalKeuntunganBersihDinamis = totalPendapatanKotor - totalModalTerjualDinamis;
 
-    // MENGGABUNGKAN DATA STOK AWAL & MODAL TOTAL
+    // MENGGABUNGKAN DATA STOK AWAL & MODAL TOTAL KESELURUHAN (SESUAI REQUEST)
     const inventoryList = products.map(p => {
       const qtyTerjual = itemSalesMap[p.id]?.qty || 0;
+      // Stok Awal = Sisa Stok + Total Terjual
       const stokAwal = (p.stok || 0) + qtyTerjual; 
       
+      // Menghitung Modal: Total Stok Awal * Harga Modal Saat Ini
       const modalTotalAwal = stokAwal * (p.modal || 0);
       const potensiSisaProfit = ((p.jual || 0) - (p.modal || 0)) * (p.stok || 0);
 
@@ -230,7 +248,7 @@ function MainApp() {
 
     // KESELURUHAN GLOBAL (Laku + Sisa)
     const totalOmsetKeseluruhan = totalPendapatanKotor + totalInventoryPotentialRevenue;
-    const totalProfitKeseluruhan = totalKeuntunganBersih + grandTotalPotensiSisaProfit;
+    const totalProfitKeseluruhan = totalKeuntunganBersihDinamis + grandTotalPotensiSisaProfit;
 
     return {
       // 1. MASTER
@@ -238,7 +256,7 @@ function MainApp() {
       // 2. SISA / INVENTORI
       grandTotalSisaStok, totalInventoryModal, totalInventoryPotentialRevenue, grandTotalPotensiSisaProfit,
       // 3. TEREALISASI / TERJUAL
-      totalBarangTerjual, totalPendapatanKotor, totalKeuntunganBersih, totalModalTerjual,
+      totalBarangTerjual, totalPendapatanKotor, totalKeuntunganBersih: totalKeuntunganBersihDinamis, totalModalTerjual: totalModalTerjualDinamis,
       
       filteredTransactions, sortedTransactions, productRankings, topSelling, bottomSelling, inventoryList
     };
@@ -249,22 +267,27 @@ function MainApp() {
     setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 4000); 
   };
 
-  // SYSTEM PWA & NOTIFIKASI & AUTO-UPDATE FAVICON
+  // SYSTEM PWA & NOTIFIKASI & PUSTAKA SCANNER CANGGIH
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') Notification.requestPermission();
       
       const logoUrl = settings.logo_url ? formatImageUrl(settings.logo_url) : "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏪</text></svg>";
-      
       let link = document.querySelector("link[rel~='icon']");
       if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
       link.href = logoUrl;
-
       let appleIcon = document.querySelector("link[rel='apple-touch-icon']");
       if (!appleIcon) { appleIcon = document.createElement('link'); appleIcon.rel = 'apple-touch-icon'; document.head.appendChild(appleIcon); }
       appleIcon.href = logoUrl;
-      
       document.title = settings.nama_toko || 'Toko Kejujuran';
+
+      // Load Scanner Library Khusus Untuk PC/Laptop/HP Semua Merek
+      if (!document.getElementById('html5qrcode-script')) {
+        const script = document.createElement('script');
+        script.id = 'html5qrcode-script';
+        script.src = 'https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js';
+        document.head.appendChild(script);
+      }
     }
   }, [settings.logo_url, settings.nama_toko]);
 
@@ -281,11 +304,7 @@ function MainApp() {
         const env = typeof import.meta !== 'undefined' ? import.meta.env : {};
         let url = env.VITE_SUPABASE_URL || localStorage.getItem('tokojujur_sb_url') || SUPABASE_URL;
         let key = env.VITE_SUPABASE_ANON_KEY || localStorage.getItem('tokojujur_sb_key') || SUPABASE_KEY;
-        
-        if (url.endsWith('/rest/v1/')) {
-            url = url.replace('/rest/v1/', '');
-        }
-
+        if (url.endsWith('/rest/v1/')) { url = url.replace('/rest/v1/', ''); }
         if (url && key && window.supabase) {
           supabaseClient = window.supabase.createClient(url, key);
           setIsConnected(true);
@@ -320,7 +339,6 @@ function MainApp() {
           supabaseClient.from('transaksi').select('*').order('id', { ascending: false }),
           supabaseClient.from('pengaturan').select('*').eq('id', 1).single()
         ]);
-        
         if (prodRes.error) console.error(prodRes.error);
         if (prodRes.data) setProducts(prodRes.data);
         if (trxRes.data) setTransactions(trxRes.data);
@@ -365,29 +383,53 @@ function MainApp() {
     }
   };
 
-  const startScanner = async (target) => {
-    if (!('BarcodeDetector' in window)) {
-      showToast('Browser HP Anda belum mendukung pemindaian kamera otomatis.', 'error');
-      return;
+  // LOGIKA SCANNER KAMERA SUPER ROBUST (SEMUA DEVICE)
+  const startScanner = (target) => {
+    if (!window.Html5Qrcode) {
+       showToast("Pustaka Scanner sedang dimuat, coba 2 detik lagi.", "error");
+       return;
     }
     setScanTarget(target);
     setIsScanningModalOpen(true);
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ 
-        video: { facingMode: 'environment', width: { ideal: 1280 }, height: { ideal: 720 }, advanced: [{ focusMode: "continuous" }] } 
-      });
-      if (videoRef.current) videoRef.current.srcObject = stream;
-      streamRef.current = stream;
-    } catch (err) {
-      showToast('Akses kamera ditolak.', 'error');
-      setIsScanningModalOpen(false);
-    }
   };
 
   const stopScanner = () => {
-    if (streamRef.current) streamRef.current.getTracks().forEach(track => track.stop());
-    setIsScanningModalOpen(false);
+    if (html5QrCodeRef.current) {
+       html5QrCodeRef.current.stop().then(() => {
+          html5QrCodeRef.current.clear();
+          setIsScanningModalOpen(false);
+       }).catch(e => {
+          setIsScanningModalOpen(false);
+       });
+    } else {
+       setIsScanningModalOpen(false);
+    }
   };
+
+  useEffect(() => {
+    if (isScanningModalOpen && window.Html5Qrcode) {
+       const html5QrCode = new window.Html5Qrcode("reader-barcode");
+       html5QrCodeRef.current = html5QrCode;
+       
+       html5QrCode.start(
+         { facingMode: "environment" },
+         { fps: 10, qrbox: { width: 250, height: 250 } },
+         (decodedText) => {
+           playBeep();
+           html5QrCode.stop().then(() => {
+              html5QrCode.clear();
+              setIsScanningModalOpen(false);
+              if (scanTarget === 'toko') handleBarcodeResultToko(decodedText);
+              else handleBarcodeResultAdmin(decodedText);
+           });
+         },
+         (errorMessage) => { /* ignore quiet errors */ }
+       ).catch((err) => {
+         showToast("Kamera tidak ditemukan atau akses ditolak.", "error");
+         setIsScanningModalOpen(false);
+       });
+    }
+  }, [isScanningModalOpen, scanTarget]);
 
   const handleBarcodeResultToko = (code) => {
     const foundProduct = products.find(p => p.barcode === code);
@@ -423,28 +465,6 @@ function MainApp() {
     } catch (err) {}
   };
 
-  useEffect(() => {
-    let interval;
-    if (isScanningModalOpen && videoRef.current) {
-      const detector = new window.BarcodeDetector({ formats: ['qr_code', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39'] });
-      interval = setInterval(async () => {
-        if (videoRef.current && videoRef.current.readyState >= 2) {
-          try {
-            const barcodes = await detector.detect(videoRef.current);
-            if (barcodes.length > 0) {
-              const code = barcodes[0].rawValue;
-              playBeep(); 
-              stopScanner();
-              if (scanTarget === 'toko') handleBarcodeResultToko(code);
-              else handleBarcodeResultAdmin(code);
-            }
-          } catch (e) {}
-        }
-      }, 300); 
-    }
-    return () => clearInterval(interval);
-  }, [isScanningModalOpen, scanTarget, products]);
-
   const handleGenerateGeminiImage = async () => {
     if (!geminiKey) return showToast('Harap masukkan API Key Gemini di tab Pengaturan!', 'error');
     if (!newProduct.nama) return showToast('Isi nama barang terlebih dahulu!', 'error');
@@ -472,7 +492,7 @@ function MainApp() {
     if (!newProduct.gambar || !newProduct.gambar.startsWith('data:image')) return showToast('Silakan ambil foto dari kamera terlebih dahulu!', 'error');
     
     setIsProcessing(true);
-    showToast('Gemini Flash 2.5 sedang membersihkan foto...', 'success');
+    showToast('Gemini Flash sedang membersihkan foto...', 'success');
     try {
       const base64Data = newProduct.gambar.split(',')[1];
       const mimeType = newProduct.gambar.split(';')[0].split(':')[1];
@@ -963,12 +983,7 @@ function MainApp() {
             <span className="font-bold text-lg tracking-widest uppercase">Arahkan ke Barcode</span>
             <button onClick={stopScanner} className="p-3 bg-red-500/80 hover:bg-red-500 rounded-full transition-colors backdrop-blur-sm shadow-xl"><X size={24}/></button>
           </div>
-          <video ref={videoRef} autoPlay playsInline className="w-full h-full object-cover" />
-          <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-            <div className="w-64 h-40 border-4 border-emerald-500 rounded-3xl shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] relative flex items-center justify-center">
-              <div className="absolute w-full h-0.5 bg-emerald-400 animate-[scan_2s_ease-in-out_infinite] shadow-[0_0_10px_#34d399]"></div>
-            </div>
-          </div>
+          <div id="reader-barcode" className="w-full h-full object-cover bg-black flex items-center justify-center"></div>
         </div>
       )}
 
@@ -1044,7 +1059,7 @@ function MainApp() {
           <div className="flex justify-between items-center mb-4 max-w-5xl mx-auto">
             <div className="flex items-center gap-2 text-emerald-600 font-black text-lg md:text-xl truncate max-w-[50%]">
               {renderLogo("w-8 h-8")}
-              <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v3.5</span></span>
+              <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v4.0</span></span>
             </div>
             <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
               <button onClick={() => setView('riwayat')} className="p-2 md:p-2.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition shadow-sm relative" title="Riwayat Pembelian">
@@ -1658,7 +1673,7 @@ function MainApp() {
                     <h1 className="text-3xl font-black tracking-tighter text-slate-800">Manajemen Barang</h1>
                     <div className="flex flex-col sm:flex-row gap-2">
                       <button onClick={handleClearAllProducts} disabled={isProcessing} className="bg-rose-100 text-rose-600 px-4 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-sm hover:bg-rose-200 active:scale-95 transition-all uppercase text-xs w-full sm:w-auto"><Trash2 size={16}/> Hapus Semua</button>
-                      <button onClick={() => { setEditingId(null); setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '', gambar: '' }); setUseDiskon(false); setShowAddForm(!showAddForm); }} className="bg-emerald-600 text-white px-4 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-md hover:bg-emerald-500 active:scale-95 transition-all uppercase text-xs w-full sm:w-auto">{showAddForm ? <X size={16}/> : <PlusCircle size={16}/>} {showAddForm ? 'Tutup Form' : 'Tambah Barang'}</button>
+                      <button onClick={() => { setEditingId(null); setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '', gambar: '' }); setUseDiskon(false); setShowAddForm(!showAddForm); }} className="bg-emerald-600 text-white px-4 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-md hover:bg-emerald-50 active:scale-95 transition-all uppercase text-xs w-full sm:w-auto">{showAddForm ? <X size={16}/> : <PlusCircle size={16}/>} {showAddForm ? 'Tutup Form' : 'Tambah Barang'}</button>
                     </div>
                   </div>
 
@@ -1797,8 +1812,8 @@ function MainApp() {
                                   {p.diskon && <div className="text-[9px] text-orange-700 font-black bg-orange-100 px-1.5 py-0.5 rounded md:rounded-lg w-max mt-1 border border-orange-200">GROSIR: {p.diskon.min_qty} = {formatRupiah(p.diskon.harga_total)}</div>}
                                </td>
                                <td className="p-4 md:p-6 min-w-[180px] break-words">
-                                  <div className="text-xs md:text-sm font-extrabold text-rose-600 mb-1 leading-tight" title="Total Stok Awal x Modal">Modal Awal:<br/>{formatRupiah(p.modalTotalAwal)}</div>
-                                  <div className="text-[10px] md:text-xs font-bold text-emerald-600 mb-1 leading-tight" title="Potensi Sisa Profit (Sisa Stok x Untung)">Potensi Profit:<br/>{formatRupiah(p.potensiSisaProfit)}</div>
+                                  <div className="text-xs md:text-sm font-extrabold text-rose-600 mb-1 leading-tight" title="Total Stok Awal x Modal Saat Ini">Modal Awal:<br/>{formatRupiah(p.modalTotalAwal)}</div>
+                                  <div className="text-[10px] md:text-xs font-bold text-emerald-600 mb-1 leading-tight" title="Potensi Profit (Sisa Stok x Untung)">Potensi Profit:<br/>{formatRupiah(p.potensiSisaProfit)}</div>
                                   <div className="text-[9px] font-bold text-slate-500 inline-block bg-slate-100 px-2 py-0.5 rounded">Margin: {p.jual > 0 ? ((((p.jual||0) - (p.modal||0))/(p.jual||1))*100).toFixed(1) : '0'}%</div>
                                </td>
                                <td className="p-4 md:p-6 text-center whitespace-nowrap">
@@ -1845,7 +1860,7 @@ export default class App extends React.Component {
     if (this.state.hasError) {
       return (
         <div style={{ padding: '40px', background: '#f87171', color: 'white', minHeight: '100vh', fontFamily: 'sans-serif' }}>
-          <h1 style={{ fontSize: '2rem', fontWeight: '900' }}>⚠️ Aplikasi Mengalami Crash Server (V3.5 Locked Blueprint)</h1>
+          <h1 style={{ fontSize: '2rem', fontWeight: '900' }}>⚠️ Aplikasi Mengalami Crash Server (V4.0 Final Master)</h1>
           <p style={{ marginTop: '10px', fontSize: '1.2rem' }}>Layar putih berhasil dihindari! Masalahnya ada pada kode di bawah ini:</p>
           <pre style={{ background: 'rgba(0,0,0,0.3)', padding: '20px', borderRadius: '10px', marginTop: '20px', whiteSpace: 'pre-wrap', fontWeight: 'bold' }}>{String(this.state.errorInfo)}</pre>
           <button onClick={() => { localStorage.clear(); window.location.reload(true); }} style={{ marginTop: '20px', padding: '10px 20px', borderRadius: '10px', border: 'none', background: 'white', color: '#f87171', fontWeight: 'bold', cursor: 'pointer' }}>Hapus Cache & Muat Ulang</button>
