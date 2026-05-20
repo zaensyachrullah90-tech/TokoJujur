@@ -81,7 +81,7 @@ function MainApp() {
   const [products, setProducts] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [settings, setSettings] = useState({ 
-    nama_toko: 'Memuat Toko...', qris_url: '', rekening: '', admin_password: '', logo_url: '' 
+    nama_toko: 'Memuat Toko...', qris_url: '', rekening: '', admin_password: '', logo_url: '', margin_default: 0 
   });
   
   const [geminiKey, setGeminiKey] = useState(() => {
@@ -110,8 +110,6 @@ function MainApp() {
   const [tempQty, setTempQty] = useState(0);
 
   const [showShareApp, setShowShareApp] = useState(false);
-  
-  // STATE SCANNER CAMERA
   const [isScanningModalOpen, setIsScanningModalOpen] = useState(false);
   const [scanTarget, setScanTarget] = useState(''); 
   const html5QrCodeRef = useRef(null);
@@ -178,7 +176,7 @@ function MainApp() {
     const itemSalesMap = {};
     let totalBarangTerjual = 0;
     let totalPendapatanKotor = 0;
-    let totalModalTerjualDinamis = 0; // Menggunakan harga modal terbaru untuk kalkulasi historis
+    let totalModalTerjualDinamis = 0; 
     
     filteredTransactions.forEach(t => {
       if (!t.items) return;
@@ -192,7 +190,7 @@ function MainApp() {
         const qtyItem = item.qty || 0;
         const omsetItem = item.totalHarga || 0;
         const modalItemDinamis = modalTerbaru * qtyItem;
-        const profitItemDinamis = omsetItem - modalItemDinamis; // Profit berdasarkan harga modal saat ini
+        const profitItemDinamis = omsetItem - modalItemDinamis; 
         
         itemSalesMap[item.id].qty += qtyItem;
         itemSalesMap[item.id].revenue += omsetItem;
@@ -207,10 +205,10 @@ function MainApp() {
 
     const totalKeuntunganBersihDinamis = totalPendapatanKotor - totalModalTerjualDinamis;
 
-    // MENGGABUNGKAN DATA STOK AWAL & MODAL TOTAL KESELURUHAN (SESUAI REQUEST)
+    // MENGGABUNGKAN DATA STOK AWAL & MODAL TOTAL KESELURUHAN
     const inventoryList = products.map(p => {
       const qtyTerjual = itemSalesMap[p.id]?.qty || 0;
-      // Stok Awal = Sisa Stok + Total Terjual
+      // Stok Awal = Sisa Stok + Total Terjual (Akumulasi Sejak Awal)
       const stokAwal = (p.stok || 0) + qtyTerjual; 
       
       // Menghitung Modal: Total Stok Awal * Harga Modal Saat Ini
@@ -235,14 +233,14 @@ function MainApp() {
     const topSelling = productRankings.filter(p => p.qtyTerjual > 0).slice(0, 10);
     const bottomSelling = [...inventoryList].filter(p => p.stok > 0).sort((a, b) => (a.qtyTerjual - b.qtyTerjual) || (b.daysActive - a.daysActive)).slice(0, 5);
 
-    // KALKULASI KESELURUHAN (MASTER)
+    // KALKULASI KESELURUHAN (MASTER AWAL)
     const grandTotalModalAwal = inventoryList.reduce((sum, p) => sum + p.modalTotalAwal, 0);
     const grandTotalStokAwal = inventoryList.reduce((sum, p) => sum + p.stokAwal, 0);
-    const grandTotalPotensiSisaProfit = inventoryList.reduce((sum, p) => sum + p.potensiSisaProfit, 0);
     const grandTotalSisaStok = products.reduce((sum, p) => sum + (p.stok || 0), 0);
+    const grandTotalPotensiSisaProfit = inventoryList.reduce((sum, p) => sum + p.potensiSisaProfit, 0);
     const totalJenisBarang = products.length;
 
-    // SISA INVENTORI SAAT INI
+    // SISA INVENTORI SAAT INI (UANG MATI)
     const totalInventoryModal = products.reduce((sum, p) => sum + ((p.modal || 0) * (p.stok || 0)), 0);
     const totalInventoryPotentialRevenue = products.reduce((sum, p) => sum + ((p.jual || 0) * (p.stok || 0)), 0);
 
@@ -267,21 +265,24 @@ function MainApp() {
     setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 4000); 
   };
 
-  // SYSTEM PWA & NOTIFIKASI & PUSTAKA SCANNER CANGGIH
+  // SYSTEM PWA & NOTIFIKASI
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') Notification.requestPermission();
       
       const logoUrl = settings.logo_url ? formatImageUrl(settings.logo_url) : "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏪</text></svg>";
+      
       let link = document.querySelector("link[rel~='icon']");
       if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
       link.href = logoUrl;
+
       let appleIcon = document.querySelector("link[rel='apple-touch-icon']");
       if (!appleIcon) { appleIcon = document.createElement('link'); appleIcon.rel = 'apple-touch-icon'; document.head.appendChild(appleIcon); }
       appleIcon.href = logoUrl;
+      
       document.title = settings.nama_toko || 'Toko Kejujuran';
 
-      // Load Scanner Library Khusus Untuk PC/Laptop/HP Semua Merek
+      // Load Html5Qrcode dynamically
       if (!document.getElementById('html5qrcode-script')) {
         const script = document.createElement('script');
         script.id = 'html5qrcode-script';
@@ -297,14 +298,18 @@ function MainApp() {
   useEffect(() => { try { localStorage.setItem('tokojujur_local_history', JSON.stringify(localHistory)); } catch(e){} }, [localHistory]);
   useEffect(() => { try { localStorage.setItem('tokojujur_gemini_key', geminiKey); } catch(e){} }, [geminiKey]);
 
-  // INISIALISASI SUPABASE LANGSUNG MENGGUNAKAN KEY
+  // INISIALISASI SUPABASE
   useEffect(() => {
     const initSupabase = () => {
       try {
         const env = typeof import.meta !== 'undefined' ? import.meta.env : {};
         let url = env.VITE_SUPABASE_URL || localStorage.getItem('tokojujur_sb_url') || SUPABASE_URL;
         let key = env.VITE_SUPABASE_ANON_KEY || localStorage.getItem('tokojujur_sb_key') || SUPABASE_KEY;
-        if (url.endsWith('/rest/v1/')) { url = url.replace('/rest/v1/', ''); }
+        
+        if (url.endsWith('/rest/v1/')) {
+            url = url.replace('/rest/v1/', '');
+        }
+
         if (url && key && window.supabase) {
           supabaseClient = window.supabase.createClient(url, key);
           setIsConnected(true);
@@ -339,6 +344,7 @@ function MainApp() {
           supabaseClient.from('transaksi').select('*').order('id', { ascending: false }),
           supabaseClient.from('pengaturan').select('*').eq('id', 1).single()
         ]);
+        
         if (prodRes.error) console.error(prodRes.error);
         if (prodRes.data) setProducts(prodRes.data);
         if (trxRes.data) setTransactions(trxRes.data);
@@ -350,7 +356,6 @@ function MainApp() {
     };
 
     loadData(true);
-
     const pollInterval = setInterval(() => loadData(false), 5000);
 
     const channel = supabaseClient.channel('toko-realtime')
@@ -365,32 +370,39 @@ function MainApp() {
     };
   }, [dbReady, isConnected]);
 
-  const handleCopyRekening = () => {
-    const amanRekening = settings.rekening || '';
-    const matchAngka = amanRekening.match(/\d+/);
-    const textToCopy = matchAngka ? matchAngka[0] : amanRekening;
-    
-    if (navigator.clipboard && navigator.clipboard.writeText && textToCopy) {
-      navigator.clipboard.writeText(textToCopy);
-      showToast('Berhasil Menyalin Nomor Rekening!', 'success');
-    } else if (textToCopy) {
-      const textArea = document.createElement("textarea");
-      textArea.value = textToCopy;
-      document.body.appendChild(textArea);
-      textArea.select();
-      try { document.execCommand('copy'); showToast('Berhasil Menyalin Nomor Rekening!', 'success'); } catch(e) {}
-      document.body.removeChild(textArea);
-    }
-  };
-
   // LOGIKA SCANNER KAMERA SUPER ROBUST (SEMUA DEVICE)
   const startScanner = (target) => {
     if (!window.Html5Qrcode) {
-       showToast("Pustaka Scanner sedang dimuat, coba 2 detik lagi.", "error");
+       showToast("Mesin scanner sedang dipanaskan, coba lagi dalam 2 detik.", "error");
        return;
     }
     setScanTarget(target);
     setIsScanningModalOpen(true);
+
+    setTimeout(() => {
+      try {
+        const html5QrCode = new window.Html5Qrcode("reader-barcode");
+        html5QrCodeRef.current = html5QrCode;
+        html5QrCode.start(
+          { facingMode: "environment" },
+          { fps: 10, qrbox: { width: 250, height: 250 } },
+          (decodedText) => {
+            playBeep();
+            html5QrCode.stop().then(() => {
+               html5QrCode.clear();
+               setIsScanningModalOpen(false);
+               if (target === 'toko') handleBarcodeResultToko(decodedText);
+               else handleBarcodeResultAdmin(decodedText);
+            });
+          },
+          (err) => { /* ignore normal quiet errors */ }
+        ).catch(err => {
+          showToast("Akses kamera ditolak. Silakan gunakan opsi Scan via Galeri.", "error");
+        });
+      } catch (e) {
+        showToast("Error membuka kamera.", "error");
+      }
+    }, 300);
   };
 
   const stopScanner = () => {
@@ -406,37 +418,29 @@ function MainApp() {
     }
   };
 
-  useEffect(() => {
-    if (isScanningModalOpen && window.Html5Qrcode) {
-       const html5QrCode = new window.Html5Qrcode("reader-barcode");
-       html5QrCodeRef.current = html5QrCode;
-       
-       html5QrCode.start(
-         { facingMode: "environment" },
-         { fps: 10, qrbox: { width: 250, height: 250 } },
-         (decodedText) => {
-           playBeep();
-           html5QrCode.stop().then(() => {
-              html5QrCode.clear();
-              setIsScanningModalOpen(false);
-              if (scanTarget === 'toko') handleBarcodeResultToko(decodedText);
-              else handleBarcodeResultAdmin(decodedText);
-           });
-         },
-         (errorMessage) => { /* ignore quiet errors */ }
-       ).catch((err) => {
-         showToast("Kamera tidak ditemukan atau akses ditolak.", "error");
-         setIsScanningModalOpen(false);
-       });
+  const handleScanFromFile = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!window.Html5Qrcode) return;
+
+    try {
+      const html5QrCode = new window.Html5Qrcode("reader-barcode");
+      const decodedText = await html5QrCode.scanFile(file, true);
+      playBeep();
+      setIsScanningModalOpen(false);
+      if (scanTarget === 'toko') handleBarcodeResultToko(decodedText);
+      else handleBarcodeResultAdmin(decodedText);
+    } catch (err) {
+      showToast('Gambar kurang jelas, barcode tidak ditemukan.', 'error');
     }
-  }, [isScanningModalOpen, scanTarget]);
+  };
 
   const handleBarcodeResultToko = (code) => {
     const foundProduct = products.find(p => p.barcode === code);
     if (foundProduct) {
       setSearchQuery('');
       openProductModal(foundProduct);
-      showToast(`Otomatis Membuka: ${foundProduct.nama}`, 'success');
+      showToast(`Membuka: ${foundProduct.nama}`, 'success');
     } else {
       setSearchQuery(code);
       showToast('Barang belum terdaftar', 'error');
@@ -450,7 +454,7 @@ function MainApp() {
       showToast(`Membaca data lokal: ${localProduct.nama}`, 'success');
       return; 
     }
-    showToast('Mencari nama & foto asli di internet...', 'success');
+    showToast('Mencari nama barang di internet...', 'success');
     try {
       const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
       const data = await res.json();
@@ -461,8 +465,23 @@ function MainApp() {
           gambar: data.product.image_url || prev.gambar 
         }));
         showToast('Nama otomatis terisi!', 'success');
+      } else {
+        showToast('Barang tidak ada di internet. Silakan isi manual.', 'success');
       }
-    } catch (err) {}
+    } catch (err) {
+        showToast('Silakan ketik nama barang manual.', 'success');
+    }
+  };
+
+  // Logika Auto-Margin Harga Jual
+  const handleModalChange = (val) => {
+    const modalValue = parseInt(val) || 0;
+    let jualValue = newProduct.jual;
+    const margin = parseInt(settings.margin_default) || 0;
+    if (margin > 0) {
+      jualValue = modalValue + Math.round(modalValue * (margin / 100));
+    }
+    setNewProduct(prev => ({ ...prev, modal: modalValue, jual: jualValue }));
   };
 
   const handleGenerateGeminiImage = async () => {
@@ -495,7 +514,11 @@ function MainApp() {
     showToast('Gemini Flash sedang membersihkan foto...', 'success');
     try {
       const base64Data = newProduct.gambar.split(',')[1];
-      const mimeType = newProduct.gambar.split(';')[0].split(':')[1];
+      let mimeType = "image/jpeg";
+      if(newProduct.gambar.includes(";")) {
+         mimeType = newProduct.gambar.split(';')[0].split(':')[1];
+      }
+      
       const payload = {
         contents: [{
           parts: [
@@ -517,8 +540,12 @@ function MainApp() {
       if (outputBase64) {
         setNewProduct(prev => ({ ...prev, gambar: `data:image/jpeg;base64,${outputBase64}` }));
         showToast('Foto berhasil dibersihkan AI Gemini!', 'success');
-      } else showToast('Gagal merapikan gambar. Cek API/Kuota.', 'error');
-    } catch (err) { showToast('Koneksi ke Gemini gagal.', 'error'); }
+      } else {
+        showToast('Gagal merapikan. Cek limit API Key Anda.', 'error');
+      }
+    } catch (err) { 
+      showToast('Koneksi AI Gagal/Timeout.', 'error'); 
+    }
     setIsProcessing(false);
   };
 
@@ -678,17 +705,6 @@ function MainApp() {
     }
   };
 
-  const handleExitApp = () => {
-    if (window.confirm('Keluar dari aplikasi Toko Kejujuran?')) {
-      try { window.close(); } catch (e) {}
-      setTimeout(() => {
-        showToast('Tutup tab/browser Anda secara manual jika jendela tidak menutup.', 'success');
-        setView('toko');
-        setIsAdminLogged(false);
-      }, 500);
-    }
-  };
-
   const handleLogin = (e) => {
     e.preventDefault();
     if (loginInput === settings.admin_password) {
@@ -741,10 +757,12 @@ function MainApp() {
       qris_url: settings.qris_url,
       rekening: settings.rekening, 
       admin_password: settings.admin_password,
-      logo_url: settings.logo_url
+      logo_url: settings.logo_url,
+      margin_default: settings.margin_default
     }).eq('id', 1);
     
     if (error && error.message.includes('logo_url')) {
+       // Fallback jika logo_url atau margin_default belum dibuat di Supabase
        const { error: fallbackError } = await supabaseClient.from('pengaturan').update({
           nama_toko: settings.nama_toko, 
           qris_url: settings.qris_url,
@@ -752,7 +770,7 @@ function MainApp() {
           admin_password: settings.admin_password
        }).eq('id', 1);
        error = fallbackError;
-       if (!error) showToast('Pengaturan disimpan, TAPI logo gagal. Harap buat kolom "logo_url" di Supabase.', 'error');
+       if (!error) showToast('Pengaturan disimpan, TAPI logo/margin gagal. Harap buat kolom "logo_url" & "margin_default" di Supabase.', 'error');
     } else if (error) {
        showToast(`Gagal: ${error.message}`, 'error');
     } else {
@@ -976,14 +994,24 @@ function MainApp() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-emerald-100 relative">
       
-      {/* MODALS AREA */}
+      {/* MODAL SCANNER KAMERA (ROBUST & BISA UPLOAD FILE JIKA KAMERA GAGAL) */}
       {isScanningModalOpen && (
         <div className="fixed inset-0 bg-black z-[999] flex flex-col animate-fade-in">
           <div className="flex justify-between items-center p-4 bg-gradient-to-b from-black/80 to-transparent text-white absolute top-0 w-full z-10">
             <span className="font-bold text-lg tracking-widest uppercase">Arahkan ke Barcode</span>
             <button onClick={stopScanner} className="p-3 bg-red-500/80 hover:bg-red-500 rounded-full transition-colors backdrop-blur-sm shadow-xl"><X size={24}/></button>
           </div>
-          <div id="reader-barcode" className="w-full h-full object-cover bg-black flex items-center justify-center"></div>
+          <div id="reader-barcode" className="w-full h-full bg-black flex flex-col items-center justify-center pt-20">
+            {/* Fallback Jika Kamera Di-blok Browser */}
+            <div className="text-center text-white p-4">
+              <Camera size={48} className="mx-auto mb-4 opacity-50"/>
+              <p className="font-bold mb-4">Jika kamera tidak muncul, gunakan file/foto.</p>
+              <label className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold cursor-pointer inline-flex items-center gap-2">
+                <ImageIcon size={20}/> Pilih Foto Barcode
+                <input type="file" accept="image/*" className="hidden" onChange={handleScanFromFile} />
+              </label>
+            </div>
+          </div>
         </div>
       )}
 
@@ -1107,20 +1135,9 @@ function MainApp() {
               <div key={p.id} onClick={() => openProductModal(p)} className="bg-white p-3 md:p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center text-center relative active:scale-95 transition-transform cursor-pointer border-b-4 border-b-slate-100 overflow-hidden w-full h-full">
                 {cart[p.id] > 0 && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] md:text-xs font-black px-2 md:px-3 py-1 rounded-bl-xl shadow-lg z-20">{cart[p.id]}</div>}
                 
-                {/* GAMBAR PRODUK RAKSASA DENGAN PENGHILANG ERROR VISUAL */}
                 <div className="mb-3 md:mb-4 w-32 h-32 md:w-48 md:h-48 rounded-2xl border border-slate-100 shadow-inner relative overflow-hidden bg-slate-50 flex items-center justify-center shrink-0">
                   {p.gambar ? (
-                    <img 
-                      loading="lazy" 
-                      referrerPolicy="no-referrer" 
-                      src={formatImageUrl(p.gambar)} 
-                      className="absolute inset-0 w-full h-full object-cover z-10 bg-white will-change-transform" 
-                      alt={p.nama} 
-                      onError={(e) => { 
-                        e.target.onerror = null; 
-                        e.target.src = FALLBACK_IMAGE; 
-                      }} 
-                    />
+                    <img loading="lazy" referrerPolicy="no-referrer" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" alt={p.nama} onError={(e) => { e.target.onerror = null; e.target.src = FALLBACK_IMAGE; }} />
                   ) : (
                     <img src={FALLBACK_IMAGE} className="w-16 h-16 opacity-50" alt="kosong"/>
                   )}
@@ -1432,6 +1449,13 @@ function MainApp() {
                      <hr className="border-slate-100"/>
                      <div className="space-y-3"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><CreditCard size={14}/> Info Rekening Manual (Cadangan)</label><input value={settings.rekening || ''} onChange={e => setSettings({...settings, rekening: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-3xl font-bold focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all text-xs md:text-sm"/><p className="text-[10px] text-slate-400 font-bold ml-2">Format: NAMA BANK [SPASI] NO REKENING [SPASI] a.n NAMA PEMILIK</p></div>
                      <hr className="border-slate-100"/>
+                     {/* PENGATURAN MARGIN DEFAULT */}
+                     <div className="space-y-3">
+                        <label className="text-[10px] font-black text-orange-500 uppercase tracking-widest ml-2 flex items-center gap-2"><TrendingUp size={14}/> Margin Keuntungan Default (%)</label>
+                        <input type="number" value={settings.margin_default || ''} onChange={e => setSettings({...settings, margin_default: e.target.value})} placeholder="Misal: 10" className="w-full p-4 bg-orange-50/50 text-orange-900 rounded-3xl font-bold border border-orange-200 focus:border-orange-400 focus:ring-4 focus:ring-orange-500/20 outline-none transition-all text-xs md:text-sm"/>
+                        <p className="text-[10px] text-slate-400 font-bold ml-2">Persentase ini akan otomatis mengkalkulasi harga jual saat Anda mengetik harga modal di menu tambah barang.</p>
+                     </div>
+                     <hr className="border-slate-100"/>
                      <div className="space-y-3"><label className="text-[10px] font-black text-blue-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Sparkles size={14}/> Gemini API Key (Untuk AI Gambar)</label><input type="password" value={geminiKey} onChange={e => setGeminiKey(e.target.value)} placeholder="AIzaSy..." className="w-full p-4 bg-blue-50/50 text-blue-900 rounded-3xl font-bold border border-blue-200 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/20 outline-none transition-all text-xs md:text-sm"/><p className="text-[10px] text-slate-400 font-bold ml-2">Tersimpan aman di memori HP Anda. Diperlukan untuk merapihkan foto otomatis.</p></div>
                      <hr className="border-slate-100"/>
                      <div className="space-y-3"><label className="text-[10px] font-black text-rose-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Lock size={14}/> Sandi Rahasia Admin</label><input type="text" value={settings.admin_password || ''} onChange={e => setSettings({...settings, admin_password: e.target.value})} className="w-full p-4 bg-rose-50/50 text-rose-900 rounded-3xl font-black border border-rose-200 focus:border-rose-400 focus:ring-4 focus:ring-rose-500/20 outline-none transition-all tracking-[0.5em] text-lg md:text-xl text-center"/></div>
@@ -1556,7 +1580,7 @@ function MainApp() {
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Modal Telah Kembali</p>
                            <p className="text-lg sm:text-xl xl:text-2xl font-black text-blue-600 tracking-tighter">{formatRupiah(adminData.totalModalTerjual)}</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10">Sesuai historis saat terjual</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10">Harga modal saat ini</p>
                      </div>
                      <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
                         <div className="absolute top-0 right-0 p-4 opacity-5"><TrendingUp size={60}/></div>
@@ -1723,7 +1747,7 @@ function MainApp() {
                            <div className="flex flex-col gap-2">
                              <div className="flex flex-wrap gap-2">
                                <button type="button" onClick={handleGenerateGeminiImage} disabled={isProcessing} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 text-white px-3 py-2 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 shadow-sm disabled:opacity-50"><Sparkles size={14}/> Generate AI</button>
-                               <label className="bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-3 py-2 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"><Camera size={14}/> Kamera / Upload <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleUploadProductImage} /></label>
+                               <label className="bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-3 py-2 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"><Camera size={14}/> Kamera / Upload <input type="file" accept="image/*" className="hidden" onChange={handleUploadProductImage} /></label>
                                {newProduct.gambar && newProduct.gambar.startsWith('data:image') && <button type="button" onClick={handleEnhanceWithAI} disabled={isProcessing} className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 px-3 py-2 rounded-lg font-bold text-[10px] active:scale-95 disabled:opacity-50"><Wand2 size={14}/> Rapihkan AI</button>}
                              </div>
                              <div className="bg-blue-50 border border-blue-100 rounded-lg p-2 flex items-center justify-between gap-2 mt-1">
@@ -1747,7 +1771,7 @@ function MainApp() {
                        </div>
                        <div className="md:col-span-2">
                          <label className="text-[10px] font-black uppercase text-slate-500 mb-1 block">Harga Modal</label>
-                         <input required type="number" value={newProduct.modal} onChange={e => setNewProduct({...newProduct, modal: parseInt(e.target.value)})} className="w-full p-3 bg-white rounded-xl font-bold border border-slate-200 outline-none text-sm"/>
+                         <input required type="number" value={newProduct.modal} onChange={e => handleModalChange(e.target.value)} className="w-full p-3 bg-white rounded-xl font-bold border border-slate-200 outline-none text-sm"/>
                        </div>
                        <div className="md:col-span-1">
                          <label className="text-[10px] font-black uppercase text-slate-500 mb-1 block">Harga Jual</label>
@@ -1860,7 +1884,7 @@ export default class App extends React.Component {
     if (this.state.hasError) {
       return (
         <div style={{ padding: '40px', background: '#f87171', color: 'white', minHeight: '100vh', fontFamily: 'sans-serif' }}>
-          <h1 style={{ fontSize: '2rem', fontWeight: '900' }}>⚠️ Aplikasi Mengalami Crash Server (V4.0 Final Master)</h1>
+          <h1 style={{ fontSize: '2rem', fontWeight: '900' }}>⚠️ Aplikasi Mengalami Crash Server (V5.0 Final Master)</h1>
           <p style={{ marginTop: '10px', fontSize: '1.2rem' }}>Layar putih berhasil dihindari! Masalahnya ada pada kode di bawah ini:</p>
           <pre style={{ background: 'rgba(0,0,0,0.3)', padding: '20px', borderRadius: '10px', marginTop: '20px', whiteSpace: 'pre-wrap', fontWeight: 'bold' }}>{String(this.state.errorInfo)}</pre>
           <button onClick={() => { localStorage.clear(); window.location.reload(true); }} style={{ marginTop: '20px', padding: '10px 20px', borderRadius: '10px', border: 'none', background: 'white', color: '#f87171', fontWeight: 'bold', cursor: 'pointer' }}>Hapus Cache & Muat Ulang</button>
