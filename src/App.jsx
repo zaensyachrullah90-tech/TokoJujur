@@ -108,6 +108,7 @@ function MainApp() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [tempQty, setTempQty] = useState(0);
+  const [metodeBayar, setMetodeBayar] = useState(null);
 
   const [showShareApp, setShowShareApp] = useState(false);
   const [isScanningModalOpen, setIsScanningModalOpen] = useState(false);
@@ -132,6 +133,9 @@ function MainApp() {
   const [useDiskon, setUseDiskon] = useState(false);
   const [editingTrx, setEditingTrx] = useState(null);
 
+  // COUNTDOWN AUTO-CHECKOUT (LUPA CETAK STRUK)
+  const [autoSelesaiCountdown, setAutoSelesaiCountdown] = useState(45);
+
   const searchFilteredProducts = useMemo(() => {
     return products.filter(p => p.nama?.toLowerCase().includes(searchQuery.toLowerCase()) || p.barcode?.includes(searchQuery));
   }, [products, searchQuery]);
@@ -146,8 +150,7 @@ function MainApp() {
   const jumlahItem = Object.values(cart).reduce((a, b) => a + b, 0);
 
   // =========================================================================
-  // OTAR ATIK LOGIKA ADMIN & DATA BARANG (STOK AWAL x HARGA MODAL BARU)
-  // Sesuai permintaan mutlak user: "Jika berubah harga modalnya maka menyesuaikan dengan yang baru, namun stoknya dihitung stok awal meskipun sudah laku"
+  // LOGIKA ADMIN & DATA BARANG (STOK AWAL x HARGA MODAL BARU) - MASTER KUNCI
   // =========================================================================
   const adminData = useMemo(() => {
     if (view !== 'admin' || !isAdminLogged) return null;
@@ -177,13 +180,14 @@ function MainApp() {
     let totalBarangTerjual = 0;
     let totalPendapatanKotor = 0;
     let totalModalTerjualDinamis = 0; 
+    let totalKeuntunganBersihDinamis = 0;
     
     filteredTransactions.forEach(t => {
       if (!t.items) return;
       t.items.forEach(item => {
         if (!itemSalesMap[item.id]) itemSalesMap[item.id] = { qty: 0, revenue: 0, profit: 0, modalTerjual: 0 };
         
-        // Cari produk di DB untuk mendapatkan harga modal TERBARU
+        // Selalu gunakan harga modal TERBARU dari tabel produk (jika masih ada)
         const currentProduct = products.find(p => p.id === item.id);
         const modalTerbaru = currentProduct ? (currentProduct.modal || 0) : (item.modal || 0);
         
@@ -200,10 +204,9 @@ function MainApp() {
         totalBarangTerjual += qtyItem;
         totalPendapatanKotor += omsetItem;
         totalModalTerjualDinamis += modalItemDinamis;
+        totalKeuntunganBersihDinamis += profitItemDinamis;
       });
     });
-
-    const totalKeuntunganBersihDinamis = totalPendapatanKotor - totalModalTerjualDinamis;
 
     // MENGGABUNGKAN DATA STOK AWAL & MODAL TOTAL KESELURUHAN
     const inventoryList = products.map(p => {
@@ -211,9 +214,14 @@ function MainApp() {
       // Stok Awal = Sisa Stok + Total Terjual (Akumulasi Sejak Awal)
       const stokAwal = (p.stok || 0) + qtyTerjual; 
       
-      // Menghitung Modal: Total Stok Awal * Harga Modal Saat Ini
+      // Menghitung Modal Awal: Total Stok Awal * Harga Modal Saat Ini
       const modalTotalAwal = stokAwal * (p.modal || 0);
-      const potensiSisaProfit = ((p.jual || 0) - (p.modal || 0)) * (p.stok || 0);
+      // Potensi Profit Awal Keseluruhan = Stok Awal * (Jual - Modal)
+      const potensiProfitAwal = stokAwal * ((p.jual || 0) - (p.modal || 0));
+      
+      // Sisa Potensi (Mengendap)
+      const potensiSisaProfit = (p.stok || 0) * ((p.jual || 0) - (p.modal || 0));
+      const sisaModal = (p.stok || 0) * (p.modal || 0);
 
       const daysActive = Math.max(1, Math.floor((new Date() - new Date(p.tanggal_dibuat || new Date())) / (1000 * 60 * 60 * 24)));
       
@@ -222,7 +230,9 @@ function MainApp() {
         qtyTerjual,
         stokAwal,
         modalTotalAwal,
+        potensiProfitAwal,
         potensiSisaProfit,
+        sisaModal,
         revenue: itemSalesMap[p.id]?.revenue || 0,
         profitTerjual: itemSalesMap[p.id]?.profit || 0,
         daysActive
@@ -236,17 +246,15 @@ function MainApp() {
     // KALKULASI KESELURUHAN (MASTER AWAL)
     const grandTotalModalAwal = inventoryList.reduce((sum, p) => sum + p.modalTotalAwal, 0);
     const grandTotalStokAwal = inventoryList.reduce((sum, p) => sum + p.stokAwal, 0);
-    const grandTotalSisaStok = products.reduce((sum, p) => sum + (p.stok || 0), 0);
-    const grandTotalPotensiSisaProfit = inventoryList.reduce((sum, p) => sum + p.potensiSisaProfit, 0);
+    const totalOmsetKeseluruhan = inventoryList.reduce((sum, p) => sum + (p.stokAwal * (p.jual || 0)), 0);
+    const totalProfitKeseluruhan = inventoryList.reduce((sum, p) => sum + p.potensiProfitAwal, 0);
     const totalJenisBarang = products.length;
 
     // SISA INVENTORI SAAT INI (UANG MATI)
-    const totalInventoryModal = products.reduce((sum, p) => sum + ((p.modal || 0) * (p.stok || 0)), 0);
-    const totalInventoryPotentialRevenue = products.reduce((sum, p) => sum + ((p.jual || 0) * (p.stok || 0)), 0);
-
-    // KESELURUHAN GLOBAL (Laku + Sisa)
-    const totalOmsetKeseluruhan = totalPendapatanKotor + totalInventoryPotentialRevenue;
-    const totalProfitKeseluruhan = totalKeuntunganBersihDinamis + grandTotalPotensiSisaProfit;
+    const grandTotalSisaStok = inventoryList.reduce((sum, p) => sum + (p.stok || 0), 0);
+    const totalInventoryModal = inventoryList.reduce((sum, p) => sum + p.sisaModal, 0);
+    const totalInventoryPotentialRevenue = inventoryList.reduce((sum, p) => sum + ((p.jual || 0) * (p.stok || 0)), 0);
+    const grandTotalPotensiSisaProfit = inventoryList.reduce((sum, p) => sum + p.potensiSisaProfit, 0);
 
     return {
       // 1. MASTER
@@ -265,24 +273,21 @@ function MainApp() {
     setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 4000); 
   };
 
-  // SYSTEM PWA & NOTIFIKASI
+  // SYSTEM PWA & NOTIFIKASI & PUSTAKA SCANNER CANGGIH
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') Notification.requestPermission();
       
       const logoUrl = settings.logo_url ? formatImageUrl(settings.logo_url) : "data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏪</text></svg>";
-      
       let link = document.querySelector("link[rel~='icon']");
       if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
       link.href = logoUrl;
-
       let appleIcon = document.querySelector("link[rel='apple-touch-icon']");
       if (!appleIcon) { appleIcon = document.createElement('link'); appleIcon.rel = 'apple-touch-icon'; document.head.appendChild(appleIcon); }
       appleIcon.href = logoUrl;
-      
       document.title = settings.nama_toko || 'Toko Kejujuran';
 
-      // Load Html5Qrcode dynamically
+      // Load Scanner Library Khusus Untuk PC/Laptop/HP Semua Merek
       if (!document.getElementById('html5qrcode-script')) {
         const script = document.createElement('script');
         script.id = 'html5qrcode-script';
@@ -298,18 +303,14 @@ function MainApp() {
   useEffect(() => { try { localStorage.setItem('tokojujur_local_history', JSON.stringify(localHistory)); } catch(e){} }, [localHistory]);
   useEffect(() => { try { localStorage.setItem('tokojujur_gemini_key', geminiKey); } catch(e){} }, [geminiKey]);
 
-  // INISIALISASI SUPABASE
+  // INISIALISASI SUPABASE LANGSUNG MENGGUNAKAN KEY
   useEffect(() => {
     const initSupabase = () => {
       try {
         const env = typeof import.meta !== 'undefined' ? import.meta.env : {};
         let url = env.VITE_SUPABASE_URL || localStorage.getItem('tokojujur_sb_url') || SUPABASE_URL;
         let key = env.VITE_SUPABASE_ANON_KEY || localStorage.getItem('tokojujur_sb_key') || SUPABASE_KEY;
-        
-        if (url.endsWith('/rest/v1/')) {
-            url = url.replace('/rest/v1/', '');
-        }
-
+        if (url.endsWith('/rest/v1/')) { url = url.replace('/rest/v1/', ''); }
         if (url && key && window.supabase) {
           supabaseClient = window.supabase.createClient(url, key);
           setIsConnected(true);
@@ -370,7 +371,25 @@ function MainApp() {
     };
   }, [dbReady, isConnected]);
 
-  // LOGIKA SCANNER KAMERA SUPER ROBUST (SEMUA DEVICE)
+  const handleCopyRekening = () => {
+    const amanRekening = settings.rekening || '';
+    const matchAngka = amanRekening.match(/\d+/);
+    const textToCopy = matchAngka ? matchAngka[0] : amanRekening;
+    
+    if (navigator.clipboard && navigator.clipboard.writeText && textToCopy) {
+      navigator.clipboard.writeText(textToCopy);
+      showToast('Berhasil Menyalin Nomor Rekening!', 'success');
+    } else if (textToCopy) {
+      const textArea = document.createElement("textarea");
+      textArea.value = textToCopy;
+      document.body.appendChild(textArea);
+      textArea.select();
+      try { document.execCommand('copy'); showToast('Berhasil Menyalin Nomor Rekening!', 'success'); } catch(e) {}
+      document.body.removeChild(textArea);
+    }
+  };
+
+  // LOGIKA SCANNER KAMERA SUPER ROBUST
   const startScanner = (target) => {
     if (!window.Html5Qrcode) {
        showToast("Mesin scanner sedang dipanaskan, coba lagi dalam 2 detik.", "error");
@@ -397,7 +416,7 @@ function MainApp() {
           },
           (err) => { /* ignore normal quiet errors */ }
         ).catch(err => {
-          showToast("Akses kamera ditolak. Silakan gunakan opsi Scan via Galeri.", "error");
+          showToast("Kamera diblokir/tidak tersedia. Gunakan tombol 'Pilih Foto'.", "error");
         });
       } catch (e) {
         showToast("Error membuka kamera.", "error");
@@ -440,10 +459,10 @@ function MainApp() {
     if (foundProduct) {
       setSearchQuery('');
       openProductModal(foundProduct);
-      showToast(`Membuka: ${foundProduct.nama}`, 'success');
+      showToast(`Otomatis Membuka: ${foundProduct.nama}`, 'success');
     } else {
       setSearchQuery(code);
-      showToast('Barang belum terdaftar', 'error');
+      showToast('Barang belum terdaftar, coba cek namanya', 'error');
     }
   };
 
@@ -454,7 +473,7 @@ function MainApp() {
       showToast(`Membaca data lokal: ${localProduct.nama}`, 'success');
       return; 
     }
-    showToast('Mencari nama barang di internet...', 'success');
+    showToast('Barcode baru! Mencari nama barang di internet...', 'success');
     try {
       const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
       const data = await res.json();
@@ -464,20 +483,20 @@ function MainApp() {
           nama: data.product.product_name,
           gambar: data.product.image_url || prev.gambar 
         }));
-        showToast('Nama otomatis terisi!', 'success');
+        showToast('Nama otomatis terisi dari Database Global!', 'success');
       } else {
-        showToast('Barang tidak ada di internet. Silakan isi manual.', 'success');
+        showToast('Barang belum ada di internet. Silakan ketik nama manual.', 'success');
       }
     } catch (err) {
-        showToast('Silakan ketik nama barang manual.', 'success');
+        showToast('Server gagal merespon. Silakan ketik nama manual.', 'error');
     }
   };
 
-  // Logika Auto-Margin Harga Jual
+  // LOGIKA AUTO-MARGIN HARGA JUAL
   const handleModalChange = (val) => {
     const modalValue = parseInt(val) || 0;
     let jualValue = newProduct.jual;
-    const margin = parseInt(settings.margin_default) || 0;
+    const margin = parseFloat(settings.margin_default) || 0;
     if (margin > 0) {
       jualValue = modalValue + Math.round(modalValue * (margin / 100));
     }
@@ -508,10 +527,10 @@ function MainApp() {
 
   const handleEnhanceWithAI = async () => {
     if (!geminiKey) return showToast('Harap masukkan API Key Gemini di tab Pengaturan!', 'error');
-    if (!newProduct.gambar || !newProduct.gambar.startsWith('data:image')) return showToast('Silakan ambil foto dari kamera terlebih dahulu!', 'error');
+    if (!newProduct.gambar || !newProduct.gambar.startsWith('data:image')) return showToast('Silakan ambil foto dari kamera/galeri terlebih dahulu!', 'error');
     
     setIsProcessing(true);
-    showToast('Gemini Flash sedang membersihkan foto...', 'success');
+    showToast('Gemini Flash sedang membersihkan latar belakang foto...', 'success');
     try {
       const base64Data = newProduct.gambar.split(',')[1];
       let mimeType = "image/jpeg";
@@ -541,7 +560,7 @@ function MainApp() {
         setNewProduct(prev => ({ ...prev, gambar: `data:image/jpeg;base64,${outputBase64}` }));
         showToast('Foto berhasil dibersihkan AI Gemini!', 'success');
       } else {
-        showToast('Gagal merapikan. Cek limit API Key Anda.', 'error');
+        showToast('Gagal merapikan. Pastikan limit API Key Anda mencukupi dan format didukung.', 'error');
       }
     } catch (err) { 
       showToast('Koneksi AI Gagal/Timeout.', 'error'); 
@@ -637,7 +656,7 @@ function MainApp() {
     }
   };
 
-  const handleSelesaiBayar = async () => {
+  const handleSelesaiBayar = async (isAuto = false) => {
     if (!supabaseClient) return showToast('Database Sedang Tidak Terhubung!', 'error');
     setIsProcessing(true);
 
@@ -656,6 +675,11 @@ function MainApp() {
     const totalOmsetTrx = totalBelanja;
     const totalProfitTrx = totalOmsetTrx - totalModalTrx;
 
+    let metodeString = metodeBayar === 'qris' ? 'QRIS Cepat' : 'Transfer Bank';
+    if (isAuto) {
+      metodeString += ' (Selesai Otomatis)';
+    }
+
     const newTransaction = { 
       id: `TRX-${Date.now()}`, 
       tanggal: new Date().toLocaleString('id-ID'), 
@@ -663,7 +687,7 @@ function MainApp() {
       total: totalOmsetTrx, 
       modal: totalModalTrx, 
       profit: totalProfitTrx, 
-      metode: 'QRIS / Kasir Etalase'
+      metode: metodeString
     };
 
     setTransactions(prev => [newTransaction, ...prev]);
@@ -704,6 +728,27 @@ function MainApp() {
       window.print(); 
     }
   };
+
+  // TIMEOUT LOGIKA SINKRONISASI KASIR JIKA PEMBELI LUPA TAPE SELESAI
+  useEffect(() => {
+    if (view !== 'checkout' || !metodeBayar || isProcessing) {
+      setAutoSelesaiCountdown(45);
+      return;
+    }
+    
+    const timer = setInterval(() => {
+      setAutoSelesaiCountdown(prev => {
+        if (prev <= 1) {
+          clearInterval(timer);
+          handleSelesaiBayar(true);
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [view, metodeBayar, isProcessing, cart, products]);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -762,7 +807,6 @@ function MainApp() {
     }).eq('id', 1);
     
     if (error && error.message.includes('logo_url')) {
-       // Fallback jika logo_url atau margin_default belum dibuat di Supabase
        const { error: fallbackError } = await supabaseClient.from('pengaturan').update({
           nama_toko: settings.nama_toko, 
           qris_url: settings.qris_url,
@@ -770,7 +814,7 @@ function MainApp() {
           admin_password: settings.admin_password
        }).eq('id', 1);
        error = fallbackError;
-       if (!error) showToast('Pengaturan disimpan, TAPI logo/margin gagal. Harap buat kolom "logo_url" & "margin_default" di Supabase.', 'error');
+       if (!error) showToast('Pengaturan disimpan, TAPI logo gagal. Harap buat kolom "logo_url" di Supabase.', 'error');
     } else if (error) {
        showToast(`Gagal: ${error.message}`, 'error');
     } else {
@@ -1002,11 +1046,10 @@ function MainApp() {
             <button onClick={stopScanner} className="p-3 bg-red-500/80 hover:bg-red-500 rounded-full transition-colors backdrop-blur-sm shadow-xl"><X size={24}/></button>
           </div>
           <div id="reader-barcode" className="w-full h-full bg-black flex flex-col items-center justify-center pt-20">
-            {/* Fallback Jika Kamera Di-blok Browser */}
             <div className="text-center text-white p-4">
               <Camera size={48} className="mx-auto mb-4 opacity-50"/>
               <p className="font-bold mb-4">Jika kamera tidak muncul, gunakan file/foto.</p>
-              <label className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold cursor-pointer inline-flex items-center gap-2">
+              <label className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold cursor-pointer inline-flex items-center gap-2 hover:bg-emerald-500 transition-colors">
                 <ImageIcon size={20}/> Pilih Foto Barcode
                 <input type="file" accept="image/*" className="hidden" onChange={handleScanFromFile} />
               </label>
@@ -1087,7 +1130,7 @@ function MainApp() {
           <div className="flex justify-between items-center mb-4 max-w-5xl mx-auto">
             <div className="flex items-center gap-2 text-emerald-600 font-black text-lg md:text-xl truncate max-w-[50%]">
               {renderLogo("w-8 h-8")}
-              <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v4.0</span></span>
+              <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v5.0</span></span>
             </div>
             <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
               <button onClick={() => setView('riwayat')} className="p-2 md:p-2.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition shadow-sm relative" title="Riwayat Pembelian">
@@ -1135,9 +1178,20 @@ function MainApp() {
               <div key={p.id} onClick={() => openProductModal(p)} className="bg-white p-3 md:p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center text-center relative active:scale-95 transition-transform cursor-pointer border-b-4 border-b-slate-100 overflow-hidden w-full h-full">
                 {cart[p.id] > 0 && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] md:text-xs font-black px-2 md:px-3 py-1 rounded-bl-xl shadow-lg z-20">{cart[p.id]}</div>}
                 
+                {/* GAMBAR PRODUK RAKSASA DENGAN PENGHILANG ERROR VISUAL */}
                 <div className="mb-3 md:mb-4 w-32 h-32 md:w-48 md:h-48 rounded-2xl border border-slate-100 shadow-inner relative overflow-hidden bg-slate-50 flex items-center justify-center shrink-0">
                   {p.gambar ? (
-                    <img loading="lazy" referrerPolicy="no-referrer" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" alt={p.nama} onError={(e) => { e.target.onerror = null; e.target.src = FALLBACK_IMAGE; }} />
+                    <img 
+                      loading="lazy" 
+                      referrerPolicy="no-referrer" 
+                      src={formatImageUrl(p.gambar)} 
+                      className="absolute inset-0 w-full h-full object-cover z-10 bg-white will-change-transform" 
+                      alt={p.nama} 
+                      onError={(e) => { 
+                        e.target.onerror = null; 
+                        e.target.src = FALLBACK_IMAGE; 
+                      }} 
+                    />
                   ) : (
                     <img src={FALLBACK_IMAGE} className="w-16 h-16 opacity-50" alt="kosong"/>
                   )}
@@ -1243,10 +1297,65 @@ function MainApp() {
              <h2 className="text-3xl md:text-5xl font-black tracking-tighter truncate">{formatRupiah(totalBelanja)}</h2>
           </div>
 
-          <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 backdrop-blur-sm border-t border-slate-100 z-50">
-            <button onClick={handleSelesaiBayar} disabled={isProcessing || Object.keys(cart).length === 0} className="w-full max-w-md mx-auto block py-4 md:py-5 bg-slate-900 text-white rounded-[20px] font-black text-lg md:text-xl shadow-2xl disabled:opacity-30 active:scale-95 transition-all hover:bg-slate-800">
-              {isProcessing ? 'MENYIMPAN...' : 'Selesai & Cetak Struk'}
+          <h3 className="font-semibold text-gray-800 mb-3 ml-1">Metode Pembayaran:</h3>
+          <div className="grid gap-3">
+            <button 
+              onClick={() => setMetodeBayar('qris')}
+              className={`p-4 rounded-xl border-2 flex items-center gap-4 transition-all text-left ${metodeBayar === 'qris' ? 'border-emerald-500 bg-emerald-50 shadow-sm' : 'border-gray-200 bg-white hover:border-gray-300'}`}
+            >
+              <div className="p-3 bg-white rounded-lg shadow-sm border"><QrCode className="text-emerald-600" size={28}/></div>
+              <div className="text-left">
+                <p className="font-bold text-gray-800">QRIS Cepat</p>
+                <p className="text-xs text-gray-500">Scan via e-Wallet/M-Banking</p>
+              </div>
             </button>
+
+            <button 
+              onClick={() => setMetodeBayar('transfer')}
+              className={`p-4 rounded-xl border-2 flex items-center gap-4 transition-all text-left ${metodeBayar === 'transfer' ? 'border-emerald-500 bg-emerald-50 shadow-sm' : 'border-gray-200 bg-white hover:border-gray-300'}`}
+            >
+              <div className="p-3 bg-white rounded-lg shadow-sm border"><CreditCard className="text-blue-600" size={28}/></div>
+              <div className="text-left">
+                <p className="font-bold text-gray-800">Transfer Bank</p>
+                <p className="text-xs text-gray-500">Transfer manual ke rekening</p>
+              </div>
+            </button>
+          </div>
+
+          {metodeBayar === 'qris' && (
+             <div className="mt-6 p-6 bg-white rounded-2xl flex flex-col items-center animate-fade-in border shadow-sm">
+               <img src={formatImageUrl(settings.qris_url)} alt="QRIS" className="w-56 h-56 rounded-xl border p-2 mb-4" />
+               <p className="text-sm text-gray-500 text-center">Silakan scan QR Code di atas. Kejujuran Anda adalah kebanggaan kami.</p>
+             </div>
+          )}
+
+          {metodeBayar === 'transfer' && (
+             <div className="mt-6 p-6 bg-white rounded-2xl flex flex-col items-center animate-fade-in border shadow-sm">
+               <p className="text-sm text-gray-500 mb-2">Transfer ke Rekening Resmi:</p>
+               <p className="font-bold text-xl text-slate-800 tracking-wider mb-1 text-center leading-relaxed break-words w-full">{settings.rekening}</p>
+               <button onClick={handleCopyRekening} className="mt-2 text-xs bg-emerald-100 text-emerald-800 px-3 py-1.5 rounded-lg font-bold flex items-center gap-1.5"><Copy size={12}/>Salin Rekening</button>
+             </div>
+          )}
+
+          {/* SENSOR TIMER AUTO CHECKOUT JIKA DITINGGAL PERGI */}
+          {metodeBayar && (
+             <div className="mt-6 p-4 bg-amber-50 text-amber-800 border border-amber-200 rounded-2xl text-xs text-center font-bold animate-pulse flex flex-col items-center gap-2">
+                <div className="flex items-center gap-1.5 text-amber-600">
+                   <RefreshCw className="animate-spin" size={16} />
+                   <span>Mencatat Transaksi Otomatis dalam <strong>{autoSelesaiCountdown} detik</strong></span>
+                </div>
+                <p className="text-slate-500 font-medium leading-relaxed">Sistem akan menyelesaikan belanjaan secara otomatis apabila Anda lupa menekan tombol "Selesai & Cetak Struk" di bawah.</p>
+             </div>
+          )}
+
+          <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 border-t z-50">
+             <button 
+               onClick={() => handleSelesaiBayar(false)}
+               disabled={isProcessing || !metodeBayar}
+               className="w-full max-w-md mx-auto block py-4 bg-slate-900 text-white rounded-xl font-bold text-lg disabled:opacity-30 transition-opacity"
+             >
+               {isProcessing ? 'MENYIMPAN...' : 'Selesai & Cetak Struk'}
+             </button>
           </div>
         </div>
       )}
@@ -1697,7 +1806,7 @@ function MainApp() {
                     <h1 className="text-3xl font-black tracking-tighter text-slate-800">Manajemen Barang</h1>
                     <div className="flex flex-col sm:flex-row gap-2">
                       <button onClick={handleClearAllProducts} disabled={isProcessing} className="bg-rose-100 text-rose-600 px-4 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-sm hover:bg-rose-200 active:scale-95 transition-all uppercase text-xs w-full sm:w-auto"><Trash2 size={16}/> Hapus Semua</button>
-                      <button onClick={() => { setEditingId(null); setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '', gambar: '' }); setUseDiskon(false); setShowAddForm(!showAddForm); }} className="bg-emerald-600 text-white px-4 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-md hover:bg-emerald-50 active:scale-95 transition-all uppercase text-xs w-full sm:w-auto">{showAddForm ? <X size={16}/> : <PlusCircle size={16}/>} {showAddForm ? 'Tutup Form' : 'Tambah Barang'}</button>
+                      <button onClick={() => { setEditingId(null); setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '', gambar: '' }); setUseDiskon(false); setShowAddForm(!showAddForm); }} className="bg-emerald-600 text-white px-4 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-md hover:bg-emerald-500 active:scale-95 transition-all uppercase text-xs w-full sm:w-auto">{showAddForm ? <X size={16}/> : <PlusCircle size={16}/>} {showAddForm ? 'Tutup Form' : 'Tambah Barang'}</button>
                     </div>
                   </div>
 
@@ -1728,10 +1837,10 @@ function MainApp() {
                       <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-slate-100 flex flex-col justify-between h-full relative overflow-hidden">
                         <div className="absolute top-0 right-0 p-4 opacity-5"><Sparkles size={60}/></div>
                         <div className="relative z-10 w-full">
-                          <span className="text-slate-400 text-[10px] md:text-xs font-black uppercase tracking-wider mb-1.5 break-words block">Potensi Sisa Profit</span>
-                          <span className="text-lg sm:text-xl xl:text-2xl font-extrabold text-emerald-600 block break-words whitespace-normal tracking-tighter">{formatRupiah(adminData.grandTotalPotensiSisaProfit)}</span>
+                          <span className="text-slate-400 text-[10px] md:text-xs font-black uppercase tracking-wider mb-1.5 break-words block">Potensi Profit Awal</span>
+                          <span className="text-lg sm:text-xl xl:text-2xl font-extrabold text-emerald-600 block break-words whitespace-normal tracking-tighter">{formatRupiah(adminData.totalProfitKeseluruhan)}</span>
                         </div>
-                        <div className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Jika sisa stok habis terjual</div>
+                        <div className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Target untung jika laku semua</div>
                       </div>
                   </div>
 
@@ -1747,7 +1856,7 @@ function MainApp() {
                            <div className="flex flex-col gap-2">
                              <div className="flex flex-wrap gap-2">
                                <button type="button" onClick={handleGenerateGeminiImage} disabled={isProcessing} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 text-white px-3 py-2 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 shadow-sm disabled:opacity-50"><Sparkles size={14}/> Generate AI</button>
-                               <label className="bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-3 py-2 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"><Camera size={14}/> Kamera / Upload <input type="file" accept="image/*" className="hidden" onChange={handleUploadProductImage} /></label>
+                               <label className="bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-3 py-2 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"><Camera size={14}/> Kamera / Upload <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleUploadProductImage} /></label>
                                {newProduct.gambar && newProduct.gambar.startsWith('data:image') && <button type="button" onClick={handleEnhanceWithAI} disabled={isProcessing} className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 px-3 py-2 rounded-lg font-bold text-[10px] active:scale-95 disabled:opacity-50"><Wand2 size={14}/> Rapihkan AI</button>}
                              </div>
                              <div className="bg-blue-50 border border-blue-100 rounded-lg p-2 flex items-center justify-between gap-2 mt-1">
@@ -1837,7 +1946,7 @@ function MainApp() {
                                </td>
                                <td className="p-4 md:p-6 min-w-[180px] break-words">
                                   <div className="text-xs md:text-sm font-extrabold text-rose-600 mb-1 leading-tight" title="Total Stok Awal x Modal Saat Ini">Modal Awal:<br/>{formatRupiah(p.modalTotalAwal)}</div>
-                                  <div className="text-[10px] md:text-xs font-bold text-emerald-600 mb-1 leading-tight" title="Potensi Profit (Sisa Stok x Untung)">Potensi Profit:<br/>{formatRupiah(p.potensiSisaProfit)}</div>
+                                  <div className="text-[10px] md:text-xs font-bold text-emerald-600 mb-1 leading-tight" title="Potensi Profit Awal (Stok Awal x Untung)">Potensi Profit:<br/>{formatRupiah(p.potensiProfitAwal)}</div>
                                   <div className="text-[9px] font-bold text-slate-500 inline-block bg-slate-100 px-2 py-0.5 rounded">Margin: {p.jual > 0 ? ((((p.jual||0) - (p.modal||0))/(p.jual||1))*100).toFixed(1) : '0'}%</div>
                                </td>
                                <td className="p-4 md:p-6 text-center whitespace-nowrap">
@@ -1859,7 +1968,7 @@ function MainApp() {
                              <td className="p-4 md:p-6 text-center font-black text-slate-500">-</td>
                              <td className="p-4 md:p-6 break-words">
                                 <div className="text-sm md:text-base font-extrabold text-rose-700 mb-1 leading-tight">Total Modal:<br/>{formatRupiah(adminData.grandTotalModalAwal)}</div>
-                                <div className="text-xs md:text-sm font-extrabold text-emerald-700 leading-tight">Total Potensi:<br/>{formatRupiah(adminData.grandTotalPotensiSisaProfit)}</div>
+                                <div className="text-xs md:text-sm font-extrabold text-emerald-700 leading-tight">Total Potensi Profit:<br/>{formatRupiah(adminData.totalProfitKeseluruhan)}</div>
                              </td>
                              <td className="p-4 md:p-6"></td>
                            </tr>
