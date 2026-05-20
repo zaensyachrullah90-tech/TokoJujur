@@ -282,12 +282,13 @@ function MainApp() {
       let link = document.querySelector("link[rel~='icon']");
       if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
       link.href = logoUrl;
+
       let appleIcon = document.querySelector("link[rel='apple-touch-icon']");
       if (!appleIcon) { appleIcon = document.createElement('link'); appleIcon.rel = 'apple-touch-icon'; document.head.appendChild(appleIcon); }
       appleIcon.href = logoUrl;
+      
       document.title = settings.nama_toko || 'Toko Kejujuran';
 
-      // Load Scanner Library Khusus Untuk PC/Laptop/HP Semua Merek
       if (!document.getElementById('html5qrcode-script')) {
         const script = document.createElement('script');
         script.id = 'html5qrcode-script';
@@ -389,7 +390,7 @@ function MainApp() {
     }
   };
 
-  // LOGIKA SCANNER KAMERA SUPER ROBUST
+  // LOGIKA SCANNER KAMERA SUPER ROBUST MEMANJANG (LANDSCAPE)
   const startScanner = (target) => {
     if (!window.Html5Qrcode) {
        showToast("Mesin scanner sedang dipanaskan, coba lagi dalam 2 detik.", "error");
@@ -402,9 +403,11 @@ function MainApp() {
       try {
         const html5QrCode = new window.Html5Qrcode("reader-barcode");
         html5QrCodeRef.current = html5QrCode;
+        
+        // Konfigurasi Aspect Ratio Landscape (Memanjang) khusus Barcode
         html5QrCode.start(
           { facingMode: "environment" },
-          { fps: 10, qrbox: { width: 250, height: 250 } },
+          { fps: 15, qrbox: { width: 320, height: 160 }, aspectRatio: 2.0 },
           (decodedText) => {
             playBeep();
             html5QrCode.stop().then(() => {
@@ -466,6 +469,7 @@ function MainApp() {
     }
   };
 
+  // LOGIKA AUTO-FETCH DATA DAN FOTO DARI INTERNET
   const handleBarcodeResultAdmin = async (code) => {
     setNewProduct(prev => ({ ...prev, barcode: code }));
     const localProduct = products.find(p => p.barcode === code);
@@ -473,22 +477,45 @@ function MainApp() {
       showToast(`Membaca data lokal: ${localProduct.nama}`, 'success');
       return; 
     }
-    showToast('Barcode baru! Mencari nama barang di internet...', 'success');
+    showToast('Barcode baru! Mencari nama dan foto di internet...', 'success');
     try {
       const res = await fetch(`https://world.openfoodfacts.org/api/v0/product/${code}.json`);
       const data = await res.json();
       if (data.status === 1 && data.product && data.product.product_name) {
+        let fetchedImage = data.product.image_url;
+        
+        // Otomatis convert gambar internet ke base64 agar Gemini AI bisa langsung bekerja merapihkan gambar
+        if (fetchedImage) {
+          try {
+            const imgRes = await fetch(fetchedImage);
+            const blob = await imgRes.blob();
+            const reader = new FileReader();
+            reader.onloadend = () => {
+              setNewProduct(prev => ({ 
+                ...prev, 
+                nama: data.product.product_name,
+                gambar: reader.result 
+              }));
+              showToast('Nama dan foto otomatis terisi & siap dirapihkan AI!', 'success');
+            };
+            reader.readAsDataURL(blob);
+            return; // Exit early since FileReader is async
+          } catch (e) {
+            // Jika konversi gagal (CORS dll), tetap pakai URL internet biasa
+          }
+        }
+        
         setNewProduct(prev => ({ 
           ...prev, 
           nama: data.product.product_name,
-          gambar: data.product.image_url || prev.gambar 
+          gambar: fetchedImage || prev.gambar
         }));
         showToast('Nama otomatis terisi dari Database Global!', 'success');
       } else {
         showToast('Barang belum ada di internet. Silakan ketik nama manual.', 'success');
       }
     } catch (err) {
-        showToast('Server gagal merespon. Silakan ketik nama manual.', 'error');
+        showToast('Server internet sibuk. Silakan ketik nama manual.', 'error');
     }
   };
 
@@ -527,7 +554,9 @@ function MainApp() {
 
   const handleEnhanceWithAI = async () => {
     if (!geminiKey) return showToast('Harap masukkan API Key Gemini di tab Pengaturan!', 'error');
-    if (!newProduct.gambar || !newProduct.gambar.startsWith('data:image')) return showToast('Silakan ambil foto dari kamera/galeri terlebih dahulu!', 'error');
+    if (!newProduct.gambar || !newProduct.gambar.startsWith('data:image')) {
+       return showToast('Silakan ambil foto dari kamera/galeri terlebih dahulu, atau pastikan gambar dari scan barcode telah termuat sempurna.', 'error');
+    }
     
     setIsProcessing(true);
     showToast('Gemini Flash sedang membersihkan latar belakang foto...', 'success');
@@ -807,6 +836,7 @@ function MainApp() {
     }).eq('id', 1);
     
     if (error && error.message.includes('logo_url')) {
+       // Fallback jika logo_url atau margin_default belum dibuat di Supabase
        const { error: fallbackError } = await supabaseClient.from('pengaturan').update({
           nama_toko: settings.nama_toko, 
           qris_url: settings.qris_url,
@@ -1038,7 +1068,7 @@ function MainApp() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-emerald-100 relative">
       
-      {/* MODAL SCANNER KAMERA (ROBUST & BISA UPLOAD FILE JIKA KAMERA GAGAL) */}
+      {/* MODAL SCANNER KAMERA (LANDSCAPE/MEMANJANG) */}
       {isScanningModalOpen && (
         <div className="fixed inset-0 bg-black z-[999] flex flex-col animate-fade-in">
           <div className="flex justify-between items-center p-4 bg-gradient-to-b from-black/80 to-transparent text-white absolute top-0 w-full z-10">
@@ -1049,10 +1079,16 @@ function MainApp() {
             <div className="text-center text-white p-4">
               <Camera size={48} className="mx-auto mb-4 opacity-50"/>
               <p className="font-bold mb-4">Jika kamera tidak muncul, gunakan file/foto.</p>
-              <label className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold cursor-pointer inline-flex items-center gap-2 hover:bg-emerald-500 transition-colors">
+              <label className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold cursor-pointer inline-flex items-center gap-2 hover:bg-emerald-500 transition-colors shadow-lg">
                 <ImageIcon size={20}/> Pilih Foto Barcode
                 <input type="file" accept="image/*" className="hidden" onChange={handleScanFromFile} />
               </label>
+            </div>
+          </div>
+          <div className="absolute inset-0 pointer-events-none flex items-center justify-center pt-20">
+            {/* Box memanjang (Landscape) khusus Barcode */}
+            <div className="w-80 h-40 border-4 border-emerald-500 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] relative flex items-center justify-center">
+              <div className="absolute w-full h-0.5 bg-emerald-400 animate-[scan_2s_ease-in-out_infinite] shadow-[0_0_10px_#34d399]"></div>
             </div>
           </div>
         </div>
@@ -1130,7 +1166,7 @@ function MainApp() {
           <div className="flex justify-between items-center mb-4 max-w-5xl mx-auto">
             <div className="flex items-center gap-2 text-emerald-600 font-black text-lg md:text-xl truncate max-w-[50%]">
               {renderLogo("w-8 h-8")}
-              <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v5.0</span></span>
+              <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v5.1 (Master)</span></span>
             </div>
             <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
               <button onClick={() => setView('riwayat')} className="p-2 md:p-2.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition shadow-sm relative" title="Riwayat Pembelian">
@@ -1856,7 +1892,7 @@ function MainApp() {
                            <div className="flex flex-col gap-2">
                              <div className="flex flex-wrap gap-2">
                                <button type="button" onClick={handleGenerateGeminiImage} disabled={isProcessing} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 text-white px-3 py-2 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 shadow-sm disabled:opacity-50"><Sparkles size={14}/> Generate AI</button>
-                               <label className="bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-3 py-2 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"><Camera size={14}/> Kamera / Upload <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleUploadProductImage} /></label>
+                               <label className="bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-3 py-2 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"><Camera size={14}/> Kamera / Upload <input type="file" accept="image/*" className="hidden" onChange={handleUploadProductImage} /></label>
                                {newProduct.gambar && newProduct.gambar.startsWith('data:image') && <button type="button" onClick={handleEnhanceWithAI} disabled={isProcessing} className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 px-3 py-2 rounded-lg font-bold text-[10px] active:scale-95 disabled:opacity-50"><Wand2 size={14}/> Rapihkan AI</button>}
                              </div>
                              <div className="bg-blue-50 border border-blue-100 rounded-lg p-2 flex items-center justify-between gap-2 mt-1">
@@ -1993,7 +2029,7 @@ export default class App extends React.Component {
     if (this.state.hasError) {
       return (
         <div style={{ padding: '40px', background: '#f87171', color: 'white', minHeight: '100vh', fontFamily: 'sans-serif' }}>
-          <h1 style={{ fontSize: '2rem', fontWeight: '900' }}>⚠️ Aplikasi Mengalami Crash Server (V5.0 Final Master)</h1>
+          <h1 style={{ fontSize: '2rem', fontWeight: '900' }}>⚠️ Aplikasi Mengalami Crash Server (V5.1 Master)</h1>
           <p style={{ marginTop: '10px', fontSize: '1.2rem' }}>Layar putih berhasil dihindari! Masalahnya ada pada kode di bawah ini:</p>
           <pre style={{ background: 'rgba(0,0,0,0.3)', padding: '20px', borderRadius: '10px', marginTop: '20px', whiteSpace: 'pre-wrap', fontWeight: 'bold' }}>{String(this.state.errorInfo)}</pre>
           <button onClick={() => { localStorage.clear(); window.location.reload(true); }} style={{ marginTop: '20px', padding: '10px 20px', borderRadius: '10px', border: 'none', background: 'white', color: '#f87171', fontWeight: 'bold', cursor: 'pointer' }}>Hapus Cache & Muat Ulang</button>
