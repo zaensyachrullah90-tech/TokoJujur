@@ -81,7 +81,12 @@ function MainApp() {
   const [products, setProducts] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [settings, setSettings] = useState({ 
-    nama_toko: 'Memuat Toko...', qris_url: '', rekening: '', admin_password: '', logo_url: '', margin_default: 0 
+    nama_toko: 'Memuat Toko...', 
+    qris_url: '', 
+    rekening: '', 
+    admin_password: '', 
+    logo_url: '', 
+    margin_default: 0
   });
   
   const [geminiKey, setGeminiKey] = useState(() => {
@@ -129,15 +134,19 @@ function MainApp() {
   
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null); 
-  const [newProduct, setNewProduct] = useState({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '', gambar: '' });
+  // Ditambahkan stok_real pada newProduct (meski utamanya diisi via inline table)
+  const [newProduct, setNewProduct] = useState({ nama: '', modal: 0, jual: 0, stok: 0, stok_real: null, barcode: '', diskonQty: '', diskonHarga: '', gambar: '' });
   const [useDiskon, setUseDiskon] = useState(false);
   const [editingTrx, setEditingTrx] = useState(null);
 
   // COUNTDOWN AUTO-CHECKOUT (LUPA CETAK STRUK)
   const [autoSelesaiCountdown, setAutoSelesaiCountdown] = useState(45);
 
+  // PENGURUTAN ABJAD UNTUK ETALASE TOKO (A-Z Mulus Tanpa Peduli Kapital/Kecil)
   const searchFilteredProducts = useMemo(() => {
-    return products.filter(p => p.nama?.toLowerCase().includes(searchQuery.toLowerCase()) || p.barcode?.includes(searchQuery));
+    return products
+      .filter(p => p.nama?.toLowerCase().includes(searchQuery.toLowerCase()) || p.barcode?.includes(searchQuery))
+      .sort((a, b) => (a.nama || '').toLowerCase().localeCompare((b.nama || '').toLowerCase()));
   }, [products, searchQuery]);
 
   const totalBelanja = useMemo(() => {
@@ -150,7 +159,7 @@ function MainApp() {
   const jumlahItem = Object.values(cart).reduce((a, b) => a + b, 0);
 
   // =========================================================================
-  // LOGIKA ADMIN & DATA BARANG (STOK AWAL x HARGA MODAL BARU) - MASTER KUNCI
+  // LOGIKA ADMIN & DATA BARANG (STOK AWAL x HARGA MODAL BARU + SELISIH FISIK)
   // =========================================================================
   const adminData = useMemo(() => {
     if (view !== 'admin' || !isAdminLogged) return null;
@@ -208,7 +217,10 @@ function MainApp() {
       });
     });
 
-    // MENGGABUNGKAN DATA STOK AWAL & MODAL TOTAL KESELURUHAN
+    let totalSelisihBarang = 0;
+    let totalKerugianSelisih = 0;
+
+    // MENGGABUNGKAN DATA STOK AWAL & MODAL TOTAL KESELURUHAN & ANALISA FISIK
     const inventoryList = products.map(p => {
       const qtyTerjual = itemSalesMap[p.id]?.qty || 0;
       // Stok Awal = Sisa Stok + Total Terjual (Akumulasi Sejak Awal)
@@ -219,9 +231,18 @@ function MainApp() {
       // Potensi Profit Awal Keseluruhan = Stok Awal * (Jual - Modal)
       const potensiProfitAwal = stokAwal * ((p.jual || 0) - (p.modal || 0));
       
-      // Sisa Potensi (Mengendap)
+      // Sisa Potensi (Mengendap) berdasarkan stok sistem
       const potensiSisaProfit = (p.stok || 0) * ((p.jual || 0) - (p.modal || 0));
       const sisaModal = (p.stok || 0) * (p.modal || 0);
+
+      // ANALISA FISIK / REAL
+      const stokReal = p.stok_real !== null && p.stok_real !== undefined ? p.stok_real : (p.stok || 0);
+      const selisihFisik = (p.stok || 0) - stokReal; // Plus jika ada barang hilang
+      
+      if(selisihFisik > 0) {
+        totalSelisihBarang += selisihFisik;
+        totalKerugianSelisih += (selisihFisik * (p.modal || 0)); // Kerugian dihitung dari modal
+      }
 
       const daysActive = Math.max(1, Math.floor((new Date() - new Date(p.tanggal_dibuat || new Date())) / (1000 * 60 * 60 * 24)));
       
@@ -229,6 +250,8 @@ function MainApp() {
         ...p,
         qtyTerjual,
         stokAwal,
+        stokReal,
+        selisihFisik,
         modalTotalAwal,
         potensiProfitAwal,
         potensiSisaProfit,
@@ -238,6 +261,9 @@ function MainApp() {
         daysActive
       };
     });
+
+    // SORTING BERDASARKAN ABJAD (Sempurna Mulus Lowercase Check)
+    const sortedInventoryList = [...inventoryList].sort((a, b) => (a.nama || '').toLowerCase().localeCompare((b.nama || '').toLowerCase()));
 
     const productRankings = [...inventoryList].sort((a, b) => b.qtyTerjual - a.qtyTerjual);
     const topSelling = productRankings.filter(p => p.qtyTerjual > 0).slice(0, 10);
@@ -250,7 +276,7 @@ function MainApp() {
     const totalProfitKeseluruhan = inventoryList.reduce((sum, p) => sum + p.potensiProfitAwal, 0);
     const totalJenisBarang = products.length;
 
-    // SISA INVENTORI SAAT INI (UANG MATI)
+    // SISA INVENTORI SAAT INI (UANG MATI BERDASARKAN SISTEM)
     const grandTotalSisaStok = inventoryList.reduce((sum, p) => sum + (p.stok || 0), 0);
     const totalInventoryModal = inventoryList.reduce((sum, p) => sum + p.sisaModal, 0);
     const totalInventoryPotentialRevenue = inventoryList.reduce((sum, p) => sum + ((p.jual || 0) * (p.stok || 0)), 0);
@@ -263,8 +289,10 @@ function MainApp() {
       grandTotalSisaStok, totalInventoryModal, totalInventoryPotentialRevenue, grandTotalPotensiSisaProfit,
       // 3. TEREALISASI / TERJUAL
       totalBarangTerjual, totalPendapatanKotor, totalKeuntunganBersih: totalKeuntunganBersihDinamis, totalModalTerjual: totalModalTerjualDinamis,
-      
-      filteredTransactions, sortedTransactions, productRankings, topSelling, bottomSelling, inventoryList
+      // 4. FISIK / SELISIH
+      totalSelisihBarang, totalKerugianSelisih,
+
+      filteredTransactions, sortedTransactions, productRankings, topSelling, bottomSelling, sortedInventoryList
     };
   }, [transactions, products, filterStart, filterEnd, sortTrx, view, isAdminLogged]);
 
@@ -289,6 +317,7 @@ function MainApp() {
       
       document.title = settings.nama_toko || 'Toko Kejujuran';
 
+      // Load Html5Qrcode dynamically (Pustaka Handal Scanner)
       if (!document.getElementById('html5qrcode-script')) {
         const script = document.createElement('script');
         script.id = 'html5qrcode-script';
@@ -311,7 +340,11 @@ function MainApp() {
         const env = typeof import.meta !== 'undefined' ? import.meta.env : {};
         let url = env.VITE_SUPABASE_URL || localStorage.getItem('tokojujur_sb_url') || SUPABASE_URL;
         let key = env.VITE_SUPABASE_ANON_KEY || localStorage.getItem('tokojujur_sb_key') || SUPABASE_KEY;
-        if (url.endsWith('/rest/v1/')) { url = url.replace('/rest/v1/', ''); }
+        
+        if (url.endsWith('/rest/v1/')) {
+            url = url.replace('/rest/v1/', '');
+        }
+
         if (url && key && window.supabase) {
           supabaseClient = window.supabase.createClient(url, key);
           setIsConnected(true);
@@ -350,7 +383,7 @@ function MainApp() {
         if (prodRes.error) console.error(prodRes.error);
         if (prodRes.data) setProducts(prodRes.data);
         if (trxRes.data) setTransactions(trxRes.data);
-        if (setRes.data) setSettings(setRes.data);
+        if (setRes.data) setSettings(prev => ({...prev, ...setRes.data})); 
       } catch (e) {
         if (isInitial) showToast("Gagal terhubung ke Database.", "error");
       }
@@ -685,7 +718,7 @@ function MainApp() {
     }
   };
 
-  const handleSelesaiBayar = async (isAuto = false) => {
+  const handleSelesaiBayar = async (isAuto = false, overrideMethodName = null) => {
     if (!supabaseClient) return showToast('Database Sedang Tidak Terhubung!', 'error');
     setIsProcessing(true);
 
@@ -704,8 +737,9 @@ function MainApp() {
     const totalOmsetTrx = totalBelanja;
     const totalProfitTrx = totalOmsetTrx - totalModalTrx;
 
-    let metodeString = metodeBayar === 'qris' ? 'QRIS Cepat' : 'Transfer Bank';
-    if (isAuto) {
+    // Perbaikan: Hilangkan Midtrans dari opsi, hanya QRIS dan Transfer
+    let metodeString = overrideMethodName || (metodeBayar === 'qris' ? 'QRIS Cepat' : 'Transfer Bank');
+    if (isAuto && !overrideMethodName) {
       metodeString += ' (Selesai Otomatis)';
     }
 
@@ -835,8 +869,8 @@ function MainApp() {
       margin_default: settings.margin_default
     }).eq('id', 1);
     
-    if (error && error.message.includes('logo_url')) {
-       // Fallback jika logo_url atau margin_default belum dibuat di Supabase
+    // Auto Fallback jika kolom baru belum ada di Supabase
+    if (error) {
        const { error: fallbackError } = await supabaseClient.from('pengaturan').update({
           nama_toko: settings.nama_toko, 
           qris_url: settings.qris_url,
@@ -844,8 +878,10 @@ function MainApp() {
           admin_password: settings.admin_password
        }).eq('id', 1);
        error = fallbackError;
-       if (!error) showToast('Pengaturan disimpan, TAPI logo gagal. Harap buat kolom "logo_url" di Supabase.', 'error');
-    } else if (error) {
+       if (!error) showToast('Pengaturan dasar disimpan. Harap pastikan kolom logo/margin di Supabase sesuai.', 'error');
+    } 
+    
+    if (error) {
        showToast(`Gagal: ${error.message}`, 'error');
     } else {
        showToast('Pengaturan Disimpan ke Database', 'success');
@@ -864,6 +900,23 @@ function MainApp() {
     setEditingId(product.id);
     setShowAddForm(true);
     window.scrollTo({ top: 0, behavior: 'smooth' }); 
+  };
+
+  // LOGIKA UPDATE REAL STOK FISIK (ON BLUR)
+  const handleUpdateStokReal = async (id, val) => {
+    if (isNaN(val) || val < 0) return;
+    if (!supabaseClient) return;
+    
+    // Optimistic Update Frontend
+    setProducts(prev => prev.map(p => p.id === id ? { ...p, stok_real: val } : p));
+    
+    // Save to Supabase (Background)
+    const { error } = await supabaseClient.from('produk').update({ stok_real: val }).eq('id', id);
+    if (error && error.message.includes('stok_real')) {
+        showToast('Kolom stok_real belum ada di Supabase. Silakan tambahkan kolom tersebut (tipe number).', 'error');
+    } else if (!error) {
+        showToast('Data fisik berhasil disinkronkan', 'success');
+    }
   };
 
   const handleAddProduct = async (e) => {
@@ -895,7 +948,7 @@ function MainApp() {
 
     setShowAddForm(false);
     setEditingId(null);
-    setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '', gambar: '' });
+    setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, stok_real: null, barcode: '', diskonQty: '', diskonHarga: '', gambar: '' });
     setUseDiskon(false);
     
     if (editingId) {
@@ -1076,9 +1129,9 @@ function MainApp() {
             <button onClick={stopScanner} className="p-3 bg-red-500/80 hover:bg-red-500 rounded-full transition-colors backdrop-blur-sm shadow-xl"><X size={24}/></button>
           </div>
           <div id="reader-barcode" className="w-full h-full bg-black flex flex-col items-center justify-center pt-20">
-            <div className="text-center text-white p-4">
+            <div className="text-center text-white p-4 relative z-20">
               <Camera size={48} className="mx-auto mb-4 opacity-50"/>
-              <p className="font-bold mb-4">Jika kamera tidak muncul, gunakan file/foto.</p>
+              <p className="font-bold mb-4 drop-shadow-md">Jika kamera tidak muncul, gunakan file/foto.</p>
               <label className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold cursor-pointer inline-flex items-center gap-2 hover:bg-emerald-500 transition-colors shadow-lg">
                 <ImageIcon size={20}/> Pilih Foto Barcode
                 <input type="file" accept="image/*" className="hidden" onChange={handleScanFromFile} />
@@ -1166,7 +1219,7 @@ function MainApp() {
           <div className="flex justify-between items-center mb-4 max-w-5xl mx-auto">
             <div className="flex items-center gap-2 text-emerald-600 font-black text-lg md:text-xl truncate max-w-[50%]">
               {renderLogo("w-8 h-8")}
-              <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v5.1 (Master)</span></span>
+              <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v8.0</span></span>
             </div>
             <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
               <button onClick={() => setView('riwayat')} className="p-2 md:p-2.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition shadow-sm relative" title="Riwayat Pembelian">
@@ -1641,33 +1694,33 @@ function MainApp() {
                         <div className="absolute top-0 right-0 p-4 opacity-5"><Package size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Total Barang Awal</p>
-                           <p className="text-lg sm:text-xl xl:text-2xl font-black text-slate-900 tracking-tighter">{adminData.grandTotalStokAwal} Pcs</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-slate-900 break-words whitespace-normal block">{adminData.grandTotalStokAwal} Pcs</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10">Total kuantitas kulakan awal</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Total kuantitas kulakan awal</p>
                      </div>
                      <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
                         <div className="absolute top-0 right-0 p-4 opacity-5"><CreditCard size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Total Modal Keseluruhan</p>
-                           <p className="text-lg sm:text-xl xl:text-2xl font-black text-rose-600 tracking-tighter">{formatRupiah(adminData.grandTotalModalAwal)}</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-rose-600 break-words whitespace-normal block">{formatRupiah(adminData.grandTotalModalAwal)}</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10">Modal investasi stok awal</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Modal investasi stok awal</p>
                      </div>
                      <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
                         <div className="absolute top-0 right-0 p-4 opacity-5"><BarChart3 size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Potensi Omset Keseluruhan</p>
-                           <p className="text-lg sm:text-xl xl:text-2xl font-black text-blue-600 tracking-tighter">{formatRupiah(adminData.totalOmsetKeseluruhan)}</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-blue-600 break-words whitespace-normal block">{formatRupiah(adminData.totalOmsetKeseluruhan)}</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10">Target omset jika laku semua</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Target omset jika laku semua</p>
                      </div>
                      <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm text-white relative overflow-hidden flex flex-col justify-between h-full">
                         <div className="absolute top-0 right-0 p-4 opacity-10"><Sparkles size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-emerald-100 uppercase tracking-wider mb-1.5 break-normal">Potensi Profit Keseluruhan</p>
-                           <p className="text-lg sm:text-xl xl:text-2xl font-black drop-shadow-sm tracking-tighter">{formatRupiah(adminData.totalProfitKeseluruhan)}</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold drop-shadow-sm break-words whitespace-normal block">{formatRupiah(adminData.totalProfitKeseluruhan)}</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-emerald-50 mt-2 relative z-10">Target untung bersih maksimal</p>
+                        <p className="text-[10px] md:text-xs font-bold text-emerald-50 mt-2 relative z-10 break-words">Target untung bersih maksimal</p>
                      </div>
                   </div>
 
@@ -1678,33 +1731,33 @@ function MainApp() {
                         <div className="absolute top-0 right-0 p-4 opacity-5"><List size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Sisa Stok Barang</p>
-                           <p className="text-lg sm:text-xl xl:text-2xl font-black text-slate-900 tracking-tighter">{adminData.grandTotalSisaStok} Pcs</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-slate-900 break-words whitespace-normal block">{adminData.grandTotalSisaStok} Pcs</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10">Dari {adminData.totalJenisBarang} jenis item aktif</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Dari {adminData.totalJenisBarang} jenis item aktif</p>
                      </div>
                      <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
                         <div className="absolute top-0 right-0 p-4 opacity-5"><Store size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Modal Masih Mengendap</p>
-                           <p className="text-lg sm:text-xl xl:text-2xl font-black text-rose-600 tracking-tighter">{formatRupiah(adminData.totalInventoryModal)}</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-rose-600 break-words whitespace-normal block">{formatRupiah(adminData.totalInventoryModal)}</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10">Uang modal tertahan di sisa stok</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Uang modal tertahan di sisa stok</p>
                      </div>
                      <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
                         <div className="absolute top-0 right-0 p-4 opacity-5"><BarChart3 size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Potensi Sisa Omset</p>
-                           <p className="text-lg sm:text-xl xl:text-2xl font-black text-blue-600 tracking-tighter">{formatRupiah(adminData.totalInventoryPotentialRevenue)}</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-blue-600 break-words whitespace-normal block">{formatRupiah(adminData.totalInventoryPotentialRevenue)}</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10">Omset jika sisa stok habis terjual</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Omset jika sisa stok habis terjual</p>
                      </div>
                      <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
                         <div className="absolute top-0 right-0 p-4 opacity-5"><Sparkles size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Potensi Sisa Profit</p>
-                           <p className="text-lg sm:text-xl xl:text-2xl font-black text-emerald-600 tracking-tighter">{formatRupiah(adminData.grandTotalPotensiSisaProfit)}</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-emerald-600 break-words whitespace-normal block">{formatRupiah(adminData.grandTotalPotensiSisaProfit)}</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10">Sisa target keuntungan</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Sisa target keuntungan</p>
                      </div>
                   </div>
 
@@ -1715,33 +1768,70 @@ function MainApp() {
                         <div className="absolute top-0 right-0 p-4 opacity-5"><Package size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Total Barang Laku</p>
-                           <p className="text-lg sm:text-xl xl:text-2xl font-black text-slate-900 tracking-tighter">{adminData.totalBarangTerjual} Pcs</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-slate-900 break-words whitespace-normal block">{adminData.totalBarangTerjual} Pcs</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10">Dari {adminData.filteredTransactions.length} nota transaksi</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Dari {adminData.filteredTransactions.length} nota transaksi</p>
                      </div>
                      <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
                         <div className="absolute top-0 right-0 p-4 opacity-5"><Store size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Modal Telah Kembali</p>
-                           <p className="text-lg sm:text-xl xl:text-2xl font-black text-blue-600 tracking-tighter">{formatRupiah(adminData.totalModalTerjual)}</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-blue-600 break-words whitespace-normal block">{formatRupiah(adminData.totalModalTerjual)}</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10">Harga modal saat ini</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Modal dari barang yang terjual</p>
                      </div>
                      <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
                         <div className="absolute top-0 right-0 p-4 opacity-5"><TrendingUp size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Omset Masuk Laci</p>
-                           <p className="text-lg sm:text-xl xl:text-2xl font-black text-slate-900 tracking-tighter">{formatRupiah(adminData.totalPendapatanKotor)}</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-slate-900 break-words whitespace-normal block">{formatRupiah(adminData.totalPendapatanKotor)}</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10">Penjualan kotor nyata</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Penjualan kotor nyata</p>
                      </div>
                      <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm text-white relative overflow-hidden flex flex-col justify-between h-full">
                         <div className="absolute top-0 right-0 p-4 opacity-10"><Sparkles size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-emerald-100 uppercase tracking-wider mb-1.5 break-normal">Profit Bersih Realisasi</p>
-                           <p className="text-lg sm:text-xl xl:text-2xl font-black drop-shadow-sm tracking-tighter">{formatRupiah(adminData.totalKeuntunganBersih)}</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold drop-shadow-sm break-words whitespace-normal block">{formatRupiah(adminData.totalKeuntunganBersih)}</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-emerald-50 mt-2 flex items-center gap-1.5 relative z-10"><TrendingUp size={14}/> Margin Bersih: {adminData.totalPendapatanKotor > 0 ? ((adminData.totalKeuntunganBersih / adminData.totalPendapatanKotor) * 100).toFixed(1) : '0'}%</p>
+                        <p className="text-[10px] md:text-xs font-bold text-emerald-50 mt-2 flex items-center gap-1.5 relative z-10 break-words"><TrendingUp size={14}/> Margin Bersih: {adminData.totalPendapatanKotor > 0 ? ((adminData.totalKeuntunganBersih / adminData.totalPendapatanKotor) * 100).toFixed(1) : '0'}%</p>
+                     </div>
+                  </div>
+
+                  {/* 4. SECTION BARU: REKAPITULASI REALITA KASIR (SINKRONISASI STRUK & FISIK) */}
+                  <h2 className="text-lg md:text-2xl font-black text-slate-800 mb-5 flex items-center gap-3"><ShoppingCart className="text-purple-500" size={26}/> 4. Rekapitulasi Realita Kasir (Sinkronisasi Struk & Fisik)</h2>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-12">
+                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
+                        <div className="absolute top-0 right-0 p-4 opacity-5"><List size={60}/></div>
+                        <div className="relative z-10 w-full">
+                           <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Total Struk / Nota</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-slate-900 break-words whitespace-normal block">{adminData.filteredTransactions.length} Lembar</p>
+                        </div>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Bukti transaksi di sistem</p>
+                     </div>
+                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
+                        <div className="absolute top-0 right-0 p-4 opacity-5"><Package size={60}/></div>
+                        <div className="relative z-10 w-full">
+                           <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Total Laku di Struk</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-blue-600 break-words whitespace-normal block">{adminData.totalBarangTerjual} Pcs</p>
+                        </div>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Kuantitas fisik yang terjual</p>
+                     </div>
+                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
+                        <div className="absolute top-0 right-0 p-4 opacity-5"><CreditCard size={60}/></div>
+                        <div className="relative z-10 w-full">
+                           <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Uang Realita Struk</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-emerald-600 break-words whitespace-normal block">{formatRupiah(adminData.totalPendapatanKotor)}</p>
+                        </div>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Uang tunai/transfer valid di laci</p>
+                     </div>
+                     <div className={`p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm relative overflow-hidden flex flex-col justify-between h-full ${adminData.totalSelisihBarang > 0 ? 'bg-rose-600 text-white' : 'bg-slate-900 text-white'}`}>
+                        <div className="absolute top-0 right-0 p-4 opacity-10"><AlertTriangle size={60}/></div>
+                        <div className="relative z-10 w-full">
+                           <p className="text-[10px] md:text-xs font-black text-slate-300 uppercase tracking-wider mb-1.5 break-normal">Selisih / Hilang (Sistem vs Fisik)</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold drop-shadow-sm break-words whitespace-normal block">{adminData.totalSelisihBarang} Pcs</p>
+                        </div>
+                        <p className="text-[10px] md:text-xs font-bold text-rose-200 mt-2 relative z-10 break-words">Potensi Kerugian: {formatRupiah(adminData.totalKerugianSelisih)}</p>
                      </div>
                   </div>
 
@@ -1754,7 +1844,7 @@ function MainApp() {
                              <th className="p-4 md:p-6">Nama Barang</th>
                              <th className="p-4 md:p-6 text-center">Qty Terjual</th>
                              <th className="p-4 md:p-6 text-center">Profit Satuan</th>
-                             <th className="p-4 md:p-6 text-center">Sisa Stok</th>
+                             <th className="p-4 md:p-6 text-center">Sisa Stok Sistem</th>
                              <th className="p-4 md:p-6 text-right">Omset (Terjual)</th>
                              <th className="p-4 md:p-6 text-right">Profit Terjual</th>
                            </tr>
@@ -1842,7 +1932,7 @@ function MainApp() {
                     <h1 className="text-3xl font-black tracking-tighter text-slate-800">Manajemen Barang</h1>
                     <div className="flex flex-col sm:flex-row gap-2">
                       <button onClick={handleClearAllProducts} disabled={isProcessing} className="bg-rose-100 text-rose-600 px-4 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-sm hover:bg-rose-200 active:scale-95 transition-all uppercase text-xs w-full sm:w-auto"><Trash2 size={16}/> Hapus Semua</button>
-                      <button onClick={() => { setEditingId(null); setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '', gambar: '' }); setUseDiskon(false); setShowAddForm(!showAddForm); }} className="bg-emerald-600 text-white px-4 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-md hover:bg-emerald-500 active:scale-95 transition-all uppercase text-xs w-full sm:w-auto">{showAddForm ? <X size={16}/> : <PlusCircle size={16}/>} {showAddForm ? 'Tutup Form' : 'Tambah Barang'}</button>
+                      <button onClick={() => { setEditingId(null); setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, stok_real: null, barcode: '', diskonQty: '', diskonHarga: '', gambar: '' }); setUseDiskon(false); setShowAddForm(!showAddForm); }} className="bg-emerald-600 text-white px-4 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-md hover:bg-emerald-500 active:scale-95 transition-all uppercase text-xs w-full sm:w-auto">{showAddForm ? <X size={16}/> : <PlusCircle size={16}/>} {showAddForm ? 'Tutup Form' : 'Tambah Barang'}</button>
                     </div>
                   </div>
 
@@ -1892,7 +1982,7 @@ function MainApp() {
                            <div className="flex flex-col gap-2">
                              <div className="flex flex-wrap gap-2">
                                <button type="button" onClick={handleGenerateGeminiImage} disabled={isProcessing} className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 text-white px-3 py-2 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 shadow-sm disabled:opacity-50"><Sparkles size={14}/> Generate AI</button>
-                               <label className="bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-3 py-2 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"><Camera size={14}/> Kamera / Upload <input type="file" accept="image/*" className="hidden" onChange={handleUploadProductImage} /></label>
+                               <label className="bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 px-3 py-2 rounded-lg font-bold text-[10px] md:text-xs flex items-center gap-1.5 shadow-sm cursor-pointer"><Camera size={14}/> Kamera / Upload <input type="file" accept="image/*" capture="environment" className="hidden" onChange={handleUploadProductImage} /></label>
                                {newProduct.gambar && newProduct.gambar.startsWith('data:image') && <button type="button" onClick={handleEnhanceWithAI} disabled={isProcessing} className="bg-emerald-100 text-emerald-800 hover:bg-emerald-200 px-3 py-2 rounded-lg font-bold text-[10px] active:scale-95 disabled:opacity-50"><Wand2 size={14}/> Rapihkan AI</button>}
                              </div>
                              <div className="bg-blue-50 border border-blue-100 rounded-lg p-2 flex items-center justify-between gap-2 mt-1">
@@ -1947,19 +2037,20 @@ function MainApp() {
                  )}
                  <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden w-full">
                     <div className="overflow-x-auto w-full block">
-                      <table className="w-full text-left min-w-[800px] border-collapse">
+                      <table className="w-full text-left min-w-[850px] border-collapse">
                          <thead className="bg-slate-50 border-b border-slate-200">
                            <tr className="text-[10px] font-black uppercase text-slate-500 tracking-widest whitespace-nowrap">
-                             <th className="p-4 md:p-6">Produk</th>
+                             <th className="p-4 md:p-6">Produk (A-Z)</th>
                              <th className="p-4 md:p-6 text-center">Stok & Histori</th>
+                             <th className="p-4 md:p-6 text-center bg-blue-50 border-l border-r border-blue-100">Real Barang (Fisik)</th>
                              <th className="p-4 md:p-6">Info Harga</th>
                              <th className="p-4 md:p-6">Total Modal & Potensi</th>
                              <th className="p-4 md:p-6 text-center">Aksi (CRUD)</th>
                            </tr>
                          </thead>
                          <tbody className="divide-y divide-slate-100">
-                           {adminData.inventoryList.length === 0 && <tr><td colSpan="5" className="p-10 text-center text-slate-400 font-bold text-sm">Barang masih kosong.</td></tr>}
-                           {adminData.inventoryList.map(p => (
+                           {adminData.sortedInventoryList.length === 0 && <tr><td colSpan="6" className="p-10 text-center text-slate-400 font-bold text-sm">Barang masih kosong.</td></tr>}
+                           {adminData.sortedInventoryList.map(p => (
                              <tr key={p.id} className={`transition-colors ${editingId === p.id ? 'bg-blue-50/50' : 'hover:bg-slate-50'}`}>
                                <td className="p-4 md:p-6 flex items-center gap-3 md:gap-4 break-words min-w-[200px]">
                                  <div className="w-12 h-12 md:w-16 md:h-16 bg-slate-50 rounded-xl md:rounded-2xl border shadow-sm flex items-center justify-center shrink-0 overflow-hidden relative">
@@ -1971,9 +2062,23 @@ function MainApp() {
                                  </div>
                                </td>
                                <td className="p-4 md:p-6 text-center whitespace-nowrap">
-                                  <span className={`px-3 py-1 md:px-4 md:py-2 rounded-lg md:rounded-xl text-[10px] md:text-xs font-black tracking-widest uppercase ${p.stok > 10 ? 'bg-emerald-100 text-emerald-800' : p.stok > 0 ? 'bg-orange-100 text-orange-800' : 'bg-rose-100 text-rose-800'}`}>Sisa: {p.stok}</span>
+                                  <span className={`px-3 py-1 md:px-4 md:py-2 rounded-lg md:rounded-xl text-[10px] md:text-xs font-black tracking-widest uppercase ${p.stok > 10 ? 'bg-emerald-100 text-emerald-800' : p.stok > 0 ? 'bg-orange-100 text-orange-800' : 'bg-rose-100 text-rose-800'}`}>Sistem: {p.stok}</span>
                                   <div className="text-[10px] md:text-xs font-bold text-slate-500 mt-2">Terjual: {p.qtyTerjual}</div>
                                   <div className="text-[10px] md:text-xs font-bold text-blue-600 mt-0.5">Total Awal: {p.stokAwal}</div>
+                               </td>
+                               {/* KOLOM REAL BARANG (FISIK) */}
+                               <td className="p-4 md:p-6 text-center bg-blue-50/30 border-l border-r border-blue-50 align-middle">
+                                  <div className="flex flex-col items-center gap-1 w-full max-w-[100px] mx-auto">
+                                    <input 
+                                       type="number" 
+                                       defaultValue={p.stokReal}
+                                       onBlur={(e) => handleUpdateStokReal(p.id, parseInt(e.target.value))}
+                                       className="w-full text-center p-2 rounded-xl border border-blue-200 font-black text-blue-900 focus:ring-2 focus:ring-blue-500 outline-none text-sm shadow-inner bg-white"
+                                       title="Edit stok fisik nyata di rak"
+                                    />
+                                    {p.selisihFisik > 0 && <span className="text-[9px] font-black text-rose-600 bg-rose-100 px-1.5 py-0.5 rounded-md mt-1 animate-pulse border border-rose-200">Hilang {p.selisihFisik}</span>}
+                                    {p.selisihFisik < 0 && <span className="text-[9px] font-black text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-md mt-1 border border-emerald-200">Lebih {Math.abs(p.selisihFisik)}</span>}
+                                  </div>
                                </td>
                                <td className="p-4 md:p-6 min-w-[150px] break-words">
                                   <div className="font-black text-sm md:text-base text-emerald-700">Jual: {formatRupiah(p.jual)}</div>
@@ -2000,6 +2105,9 @@ function MainApp() {
                              <td className="p-4 md:p-6 text-center">
                                <div className="font-black text-slate-800 text-sm md:text-base">Awal: {adminData.grandTotalStokAwal}</div>
                                <div className="font-bold text-blue-600 text-xs md:text-sm mt-0.5">Sisa: {adminData.grandTotalSisaStok}</div>
+                             </td>
+                             <td className="p-4 md:p-6 text-center font-black text-rose-600 bg-blue-100/50">
+                                {adminData.totalSelisihBarang > 0 && `Hilang ${adminData.totalSelisihBarang}`}
                              </td>
                              <td className="p-4 md:p-6 text-center font-black text-slate-500">-</td>
                              <td className="p-4 md:p-6 break-words">
@@ -2029,7 +2137,7 @@ export default class App extends React.Component {
     if (this.state.hasError) {
       return (
         <div style={{ padding: '40px', background: '#f87171', color: 'white', minHeight: '100vh', fontFamily: 'sans-serif' }}>
-          <h1 style={{ fontSize: '2rem', fontWeight: '900' }}>⚠️ Aplikasi Mengalami Crash Server (V5.1 Master)</h1>
+          <h1 style={{ fontSize: '2rem', fontWeight: '900' }}>⚠️ Aplikasi Mengalami Crash Server (V8.0 Ultimate Reconciliation)</h1>
           <p style={{ marginTop: '10px', fontSize: '1.2rem' }}>Layar putih berhasil dihindari! Masalahnya ada pada kode di bawah ini:</p>
           <pre style={{ background: 'rgba(0,0,0,0.3)', padding: '20px', borderRadius: '10px', marginTop: '20px', whiteSpace: 'pre-wrap', fontWeight: 'bold' }}>{String(this.state.errorInfo)}</pre>
           <button onClick={() => { localStorage.clear(); window.location.reload(true); }} style={{ marginTop: '20px', padding: '10px 20px', borderRadius: '10px', border: 'none', background: 'white', color: '#f87171', fontWeight: 'bold', cursor: 'pointer' }}>Hapus Cache & Muat Ulang</button>
