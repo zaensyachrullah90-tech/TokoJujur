@@ -4,7 +4,7 @@ import {
   ChevronRight, Copy, CreditCard, Download, Edit, ExternalLink, History, 
   Image as ImageIcon, List, Lock, LogOut, Package, PlusCircle, Power, 
   QrCode, RefreshCw, Search, Settings, Share2, ShoppingCart, Sparkles, 
-  Store, Trash2, TrendingDown, TrendingUp, UploadCloud, Wand2, X 
+  Store, Trash2, TrendingDown, TrendingUp, UploadCloud, Wand2, X, AlertCircle
 } from 'lucide-react';
 
 // =========================================================================
@@ -132,9 +132,10 @@ function MainApp() {
   const [filterEnd, setFilterEnd] = useState('');
   const [sortTrx, setSortTrx] = useState('terbaru'); 
   
+  const [filterPendapatan, setFilterPendapatan] = useState('hari_ini'); // State untuk filter menu pendapatan
+
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null); 
-  // Ditambahkan stok_real pada newProduct (meski utamanya diisi via inline table)
   const [newProduct, setNewProduct] = useState({ nama: '', modal: 0, jual: 0, stok: 0, stok_real: null, barcode: '', diskonQty: '', diskonHarga: '', gambar: '' });
   const [useDiskon, setUseDiskon] = useState(false);
   const [editingTrx, setEditingTrx] = useState(null);
@@ -196,7 +197,6 @@ function MainApp() {
       t.items.forEach(item => {
         if (!itemSalesMap[item.id]) itemSalesMap[item.id] = { qty: 0, revenue: 0, profit: 0, modalTerjual: 0 };
         
-        // Selalu gunakan harga modal TERBARU dari tabel produk (jika masih ada)
         const currentProduct = products.find(p => p.id === item.id);
         const modalTerbaru = currentProduct ? (currentProduct.modal || 0) : (item.modal || 0);
         
@@ -217,32 +217,23 @@ function MainApp() {
       });
     });
 
-    let totalSelisihBarang = 0;
-    let totalKerugianSelisih = 0;
-
-    // MENGGABUNGKAN DATA STOK AWAL & MODAL TOTAL KESELURUHAN & ANALISA FISIK
+    // MENGGABUNGKAN DATA STOK AWAL & MODAL TOTAL KESELURUHAN & REALITAS FISIK
     const inventoryList = products.map(p => {
       const qtyTerjual = itemSalesMap[p.id]?.qty || 0;
-      // Stok Awal = Sisa Stok + Total Terjual (Akumulasi Sejak Awal)
       const stokAwal = (p.stok || 0) + qtyTerjual; 
       
-      // Menghitung Modal Awal: Total Stok Awal * Harga Modal Saat Ini
       const modalTotalAwal = stokAwal * (p.modal || 0);
-      // Potensi Profit Awal Keseluruhan = Stok Awal * (Jual - Modal)
       const potensiProfitAwal = stokAwal * ((p.jual || 0) - (p.modal || 0));
       
-      // Sisa Potensi (Mengendap) berdasarkan stok sistem
       const potensiSisaProfit = (p.stok || 0) * ((p.jual || 0) - (p.modal || 0));
       const sisaModal = (p.stok || 0) * (p.modal || 0);
 
-      // ANALISA FISIK / REAL
-      const stokReal = p.stok_real !== null && p.stok_real !== undefined ? p.stok_real : (p.stok || 0);
-      const selisihFisik = (p.stok || 0) - stokReal; // Plus jika ada barang hilang
-      
-      if(selisihFisik > 0) {
-        totalSelisihBarang += selisihFisik;
-        totalKerugianSelisih += (selisihFisik * (p.modal || 0)); // Kerugian dihitung dari modal
+      // Logika Selisih Real Fisik vs Sistem
+      let selisihFisik = 0; // 0 = balance, negatif = kurang/hilang, positif = lebih
+      if (p.stok_real !== null && p.stok_real !== undefined) {
+         selisihFisik = p.stok_real - (p.stok || 0);
       }
+      const kerugianSelisih = selisihFisik < 0 ? Math.abs(selisihFisik) * (p.modal || 0) : 0;
 
       const daysActive = Math.max(1, Math.floor((new Date() - new Date(p.tanggal_dibuat || new Date())) / (1000 * 60 * 60 * 24)));
       
@@ -250,19 +241,19 @@ function MainApp() {
         ...p,
         qtyTerjual,
         stokAwal,
-        stokReal,
-        selisihFisik,
         modalTotalAwal,
         potensiProfitAwal,
         potensiSisaProfit,
         sisaModal,
+        selisihFisik,
+        kerugianSelisih,
         revenue: itemSalesMap[p.id]?.revenue || 0,
         profitTerjual: itemSalesMap[p.id]?.profit || 0,
         daysActive
       };
     });
 
-    // SORTING BERDASARKAN ABJAD (Sempurna Mulus Lowercase Check)
+    // SORTING BERDASARKAN ABJAD A-Z
     const sortedInventoryList = [...inventoryList].sort((a, b) => (a.nama || '').toLowerCase().localeCompare((b.nama || '').toLowerCase()));
 
     const productRankings = [...inventoryList].sort((a, b) => b.qtyTerjual - a.qtyTerjual);
@@ -276,25 +267,91 @@ function MainApp() {
     const totalProfitKeseluruhan = inventoryList.reduce((sum, p) => sum + p.potensiProfitAwal, 0);
     const totalJenisBarang = products.length;
 
-    // SISA INVENTORI SAAT INI (UANG MATI BERDASARKAN SISTEM)
+    // SISA INVENTORI SAAT INI (UANG MATI)
     const grandTotalSisaStok = inventoryList.reduce((sum, p) => sum + (p.stok || 0), 0);
     const totalInventoryModal = inventoryList.reduce((sum, p) => sum + p.sisaModal, 0);
     const totalInventoryPotentialRevenue = inventoryList.reduce((sum, p) => sum + ((p.jual || 0) * (p.stok || 0)), 0);
     const grandTotalPotensiSisaProfit = inventoryList.reduce((sum, p) => sum + p.potensiSisaProfit, 0);
 
-    return {
-      // 1. MASTER
-      grandTotalModalAwal, grandTotalStokAwal, totalOmsetKeseluruhan, totalProfitKeseluruhan, totalJenisBarang,
-      // 2. SISA / INVENTORI
-      grandTotalSisaStok, totalInventoryModal, totalInventoryPotentialRevenue, grandTotalPotensiSisaProfit,
-      // 3. TEREALISASI / TERJUAL
-      totalBarangTerjual, totalPendapatanKotor, totalKeuntunganBersih: totalKeuntunganBersihDinamis, totalModalTerjual: totalModalTerjualDinamis,
-      // 4. FISIK / SELISIH
-      totalSelisihBarang, totalKerugianSelisih,
+    // TOTAL SELISIH (KEJUJURAN KASIR)
+    const totalSelisihBarangMinus = inventoryList.reduce((sum, p) => sum + (p.selisihFisik < 0 ? Math.abs(p.selisihFisik) : 0), 0);
+    const totalKerugianSelisih = inventoryList.reduce((sum, p) => sum + p.kerugianSelisih, 0);
 
+    return {
+      grandTotalModalAwal, grandTotalStokAwal, totalOmsetKeseluruhan, totalProfitKeseluruhan, totalJenisBarang,
+      grandTotalSisaStok, totalInventoryModal, totalInventoryPotentialRevenue, grandTotalPotensiSisaProfit,
+      totalBarangTerjual, totalPendapatanKotor, totalKeuntunganBersih: totalKeuntunganBersihDinamis, totalModalTerjual: totalModalTerjualDinamis,
+      totalSelisihBarangMinus, totalKerugianSelisih,
       filteredTransactions, sortedTransactions, productRankings, topSelling, bottomSelling, sortedInventoryList
     };
   }, [transactions, products, filterStart, filterEnd, sortTrx, view, isAdminLogged]);
+
+  // =========================================================================
+  // LOGIKA MENU PENDAPATAN (RINCIAN FILTER WAKTU)
+  // =========================================================================
+  const pendapatanData = useMemo(() => {
+    if (view !== 'admin' || !isAdminLogged || adminTab !== 'pendapatan') return null;
+
+    const now = new Date();
+    const filteredTrx = transactions.filter(t => {
+      if (!t.id) return false;
+      const match = t.id.match(/\d+/);
+      const tDate = match ? new Date(parseInt(match[0])) : new Date();
+
+      if (filterPendapatan === 'hari_ini') {
+        return tDate.toDateString() === now.toDateString();
+      } else if (filterPendapatan === 'minggu_ini') {
+        const sevenDaysAgo = new Date(now);
+        sevenDaysAgo.setDate(now.getDate() - 7);
+        return tDate >= sevenDaysAgo && tDate <= now;
+      } else if (filterPendapatan === 'bulan_ini') {
+        return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
+      }
+      return true; // 'semua'
+    });
+
+    let totalOmset = 0;
+    let totalProfit = 0;
+    let totalBarangTerjual = 0;
+    const itemMap = {};
+
+    filteredTrx.forEach(t => {
+      totalOmset += (t.total || 0);
+      
+      let tProfit = 0;
+      if(t.items) {
+        t.items.forEach(item => {
+          const currentProduct = products.find(p => p.id === item.id);
+          const modalTerbaru = currentProduct ? (currentProduct.modal || 0) : (item.modal || 0);
+          const omsetItem = item.totalHarga || 0;
+          const modalItemDinamis = modalTerbaru * (item.qty || 0);
+          const profitItemDinamis = omsetItem - modalItemDinamis;
+          
+          tProfit += profitItemDinamis;
+
+          if (!itemMap[item.id]) {
+            itemMap[item.id] = { id: item.id, nama: item.nama, gambar: item.gambar, qtyTerjual: 0, omset: 0, profit: 0 };
+          }
+          itemMap[item.id].qtyTerjual += (item.qty || 0);
+          itemMap[item.id].omset += omsetItem;
+          itemMap[item.id].profit += profitItemDinamis;
+          totalBarangTerjual += (item.qty || 0);
+        });
+      }
+      totalProfit += tProfit;
+    });
+
+    const rincianBarang = Object.values(itemMap).sort((a, b) => b.qtyTerjual - a.qtyTerjual);
+
+    return {
+      totalStruk: filteredTrx.length,
+      totalOmset,
+      totalProfit,
+      totalBarangTerjual,
+      rincianBarang
+    };
+
+  }, [transactions, products, filterPendapatan, view, isAdminLogged, adminTab]);
 
   const showToast = (msg, type = 'success') => {
     setToast({ show: true, msg: String(msg), type });
@@ -737,7 +794,6 @@ function MainApp() {
     const totalOmsetTrx = totalBelanja;
     const totalProfitTrx = totalOmsetTrx - totalModalTrx;
 
-    // Perbaikan: Hilangkan Midtrans dari opsi, hanya QRIS dan Transfer
     let metodeString = overrideMethodName || (metodeBayar === 'qris' ? 'QRIS Cepat' : 'Transfer Bank');
     if (isAuto && !overrideMethodName) {
       metodeString += ' (Selesai Otomatis)';
@@ -1198,7 +1254,7 @@ function MainApp() {
                  </div>
                  <div className="flex gap-3 mt-8">
                     <button type="button" onClick={() => setEditingTrx(null)} className="flex-1 py-4 bg-slate-100 font-bold rounded-2xl text-slate-600 hover:bg-slate-200 transition-colors">Batal</button>
-                    <button type="submit" disabled={isProcessing} className="flex-1 py-4 bg-emerald-600 font-bold rounded-2xl text-white hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">{isProcessing ? 'Menyimpan...' : 'Simpan Edit'}</button>
+                    <button type="submit" disabled={isProcessing} className="flex-1 py-4 bg-emerald-600 font-bold rounded-2xl text-white hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">Simpan Edit</button>
                  </div>
               </form>
            </div>
@@ -1455,7 +1511,7 @@ function MainApp() {
           <div className="mb-6 flex flex-col items-center animate-slide-up text-center">
             <div className="w-14 h-14 md:w-16 md:h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center mb-3 shadow-lg shadow-emerald-200"><CheckCircle size={32} /></div>
             <h2 className="text-xl md:text-2xl font-extrabold text-slate-800">Struk Tersimpan!</h2>
-            <p className="text-slate-500 text-xs md:text-sm mt-1 font-bold">Lanjutkan dengan pembayaran di bawah.</p>
+            <p className="text-slate-500 text-xs md:text-sm mt-1 font-bold">Terima kasih atas pembelian Anda.</p>
           </div>
 
           <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden animate-fade-in relative mb-6 border border-slate-200">
@@ -1596,16 +1652,99 @@ function MainApp() {
                {renderLogo("w-8 h-8")}
                <div><h2 className="font-extrabold text-xl text-white leading-tight tracking-wide">Admin Area</h2><p className="text-[10px] text-emerald-400 font-black uppercase tracking-widest mt-1">Toko Kejujuran</p></div>
             </div>
-            <nav className="p-2 md:p-4 grid grid-cols-4 md:flex md:flex-col gap-2 w-full">
-              <button onClick={() => {setAdminTab('analisa'); setEditingId(null); setShowAddForm(false);}} className={`flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='analisa' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><BarChart3 size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Analisa<br className="md:hidden"/>Penjualan</span></button>
-              <button onClick={() => {setAdminTab('barang'); setEditingId(null); setShowAddForm(false);}} className={`flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='barang' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Package size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Data<br className="md:hidden"/>Barang</span></button>
-              <button onClick={() => {setAdminTab('pengaturan'); setEditingId(null); setShowAddForm(false);}} className={`flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='pengaturan' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Settings size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Pengaturan<br className="md:hidden"/>Toko</span></button>
-              <button onClick={handleLogout} className="flex flex-col md:flex-row md:mt-auto items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl text-rose-500 hover:bg-slate-800 hover:text-rose-400 transition-all"><LogOut size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Keluar<br className="md:hidden"/>Admin</span></button>
+            <nav className="p-2 md:p-4 flex overflow-x-auto md:grid md:grid-cols-1 md:flex-col gap-2 w-full pb-3 md:pb-4 scrollbar-hide">
+              <button onClick={() => {setAdminTab('analisa'); setEditingId(null); setShowAddForm(false);}} className={`flex-1 min-w-[80px] flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='analisa' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><BarChart3 size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Analisa<br className="md:hidden"/>Penjualan</span></button>
+              <button onClick={() => {setAdminTab('pendapatan'); setEditingId(null); setShowAddForm(false);}} className={`flex-1 min-w-[80px] flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='pendapatan' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><TrendingUp size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Laporan<br className="md:hidden"/>Pendapatan</span></button>
+              <button onClick={() => {setAdminTab('barang'); setEditingId(null); setShowAddForm(false);}} className={`flex-1 min-w-[80px] flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='barang' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Package size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Data<br className="md:hidden"/>Barang</span></button>
+              <button onClick={() => {setAdminTab('pengaturan'); setEditingId(null); setShowAddForm(false);}} className={`flex-1 min-w-[80px] flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='pengaturan' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Settings size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Pengaturan<br className="md:hidden"/>Toko</span></button>
+              <button onClick={handleLogout} className="flex-1 min-w-[80px] flex flex-col md:flex-row md:mt-auto items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl text-rose-500 hover:bg-slate-800 hover:text-rose-400 transition-all"><LogOut size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Keluar<br className="md:hidden"/>Admin</span></button>
             </nav>
           </aside>
           
           <main className="flex-1 p-4 md:p-10 overflow-y-auto w-full max-w-7xl mx-auto">
              
+             {/* TAB PENDAPATAN BARU */}
+             {adminTab === 'pendapatan' && pendapatanData && (
+               <div className="animate-fade-in max-w-7xl mx-auto w-full pb-10">
+                  <div className="flex flex-col xl:flex-row justify-between xl:items-center mb-8 gap-6 w-full">
+                    <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-slate-800 flex items-center gap-3"><TrendingUp className="text-emerald-500" size={36}/> Laporan Pendapatan</h1>
+                  </div>
+
+                  {/* FILTER BUTTONS */}
+                  <div className="bg-white p-2 rounded-2xl md:rounded-[32px] border border-slate-200 shadow-sm flex flex-wrap mb-8 w-full md:w-max mx-auto md:mx-0">
+                     <button onClick={() => setFilterPendapatan('hari_ini')} className={`flex-1 md:flex-none px-6 py-3 rounded-xl md:rounded-3xl font-black text-[10px] md:text-sm transition-all ${filterPendapatan === 'hari_ini' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>HARI INI</button>
+                     <button onClick={() => setFilterPendapatan('minggu_ini')} className={`flex-1 md:flex-none px-6 py-3 rounded-xl md:rounded-3xl font-black text-[10px] md:text-sm transition-all ${filterPendapatan === 'minggu_ini' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>7 HARI TERAKHIR</button>
+                     <button onClick={() => setFilterPendapatan('bulan_ini')} className={`flex-1 md:flex-none px-6 py-3 rounded-xl md:rounded-3xl font-black text-[10px] md:text-sm transition-all ${filterPendapatan === 'bulan_ini' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>BULAN INI</button>
+                     <button onClick={() => setFilterPendapatan('semua')} className={`flex-1 md:flex-none px-6 py-3 rounded-xl md:rounded-3xl font-black text-[10px] md:text-sm transition-all ${filterPendapatan === 'semua' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>SEMUA WAKTU</button>
+                  </div>
+
+                  {/* CARDS METRICS */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
+                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
+                        <div className="absolute top-0 right-0 p-4 opacity-5"><TrendingUp size={60}/></div>
+                        <div className="relative z-10 w-full">
+                           <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Total Pendapatan (Omset)</p>
+                           <p className="text-lg sm:text-xl xl:text-3xl font-extrabold text-slate-900 break-words whitespace-normal tracking-tighter">{formatRupiah(pendapatanData.totalOmset)}</p>
+                        </div>
+                     </div>
+                     <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm text-white relative overflow-hidden flex flex-col justify-between h-full">
+                        <div className="absolute top-0 right-0 p-4 opacity-10"><Sparkles size={60}/></div>
+                        <div className="relative z-10 w-full">
+                           <p className="text-[10px] md:text-xs font-black text-emerald-100 uppercase tracking-wider mb-1.5 break-normal">Total Profit Bersih</p>
+                           <p className="text-lg sm:text-xl xl:text-3xl font-extrabold drop-shadow-sm tracking-tighter break-words whitespace-normal">{formatRupiah(pendapatanData.totalProfit)}</p>
+                        </div>
+                     </div>
+                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
+                        <div className="absolute top-0 right-0 p-4 opacity-5"><List size={60}/></div>
+                        <div className="relative z-10 w-full">
+                           <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Jumlah Struk Pembelian</p>
+                           <p className="text-lg sm:text-xl xl:text-3xl font-extrabold text-blue-600 tracking-tighter">{pendapatanData.totalStruk} Nota</p>
+                        </div>
+                     </div>
+                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
+                        <div className="absolute top-0 right-0 p-4 opacity-5"><Package size={60}/></div>
+                        <div className="relative z-10 w-full">
+                           <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Barang Laku Terjual</p>
+                           <p className="text-lg sm:text-xl xl:text-3xl font-extrabold text-rose-600 tracking-tighter">{pendapatanData.totalBarangTerjual} Pcs</p>
+                        </div>
+                     </div>
+                  </div>
+
+                  {/* TABLE RINCIAN */}
+                  <div className="bg-white rounded-3xl md:rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col w-full">
+                    <div className="p-4 md:p-6 border-b border-slate-100"><h2 className="font-black text-base md:text-xl text-slate-800 flex items-center gap-2"><Package className="text-blue-500" size={20}/> Rincian Barang Terjual ({filterPendapatan.replace('_', ' ').toUpperCase()})</h2></div>
+                    <div className="overflow-x-auto w-full block">
+                      <table className="w-full text-left min-w-[700px] border-collapse">
+                         <thead className="bg-slate-50 border-b border-slate-200">
+                           <tr className="text-[10px] font-black uppercase text-slate-500 tracking-widest whitespace-nowrap">
+                             <th className="p-4 md:p-6">Nama Barang</th>
+                             <th className="p-4 md:p-6 text-center">Qty Terjual</th>
+                             <th className="p-4 md:p-6 text-right">Total Pendapatan</th>
+                             <th className="p-4 md:p-6 text-right">Total Profit</th>
+                           </tr>
+                         </thead>
+                         <tbody className="divide-y divide-slate-50">
+                           {pendapatanData.rincianBarang.length === 0 && <tr><td colSpan="4" className="p-10 text-center text-slate-400 font-bold text-sm">Belum ada barang yang terjual di rentang waktu ini.</td></tr>}
+                           {pendapatanData.rincianBarang.map((p, idx) => (
+                             <tr key={idx} className="text-xs md:text-sm font-bold hover:bg-slate-50 transition-colors">
+                               <td className="p-3 md:p-4 flex items-center gap-3 break-words min-w-[200px]">
+                                 <div className="w-10 h-10 rounded-lg border border-slate-200 flex items-center justify-center bg-white shrink-0 overflow-hidden relative">
+                                    {p.gambar ? <img loading="lazy" referrerPolicy="no-referrer" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" alt="img" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/> : <img src={FALLBACK_IMAGE} className="w-4 h-4 opacity-50" alt="kosong"/>}
+                                 </div>
+                                 <span className="text-slate-700 leading-tight">{p.nama}</span>
+                               </td>
+                               <td className="p-3 md:p-4 text-center text-emerald-600 font-black whitespace-nowrap">{p.qtyTerjual}</td>
+                               <td className="p-3 md:p-4 text-right text-slate-800 break-words min-w-[120px]">{formatRupiah(p.omset)}</td>
+                               <td className="p-3 md:p-4 text-right text-emerald-700 font-black break-words min-w-[120px]">{formatRupiah(p.profit)}</td>
+                             </tr>
+                           ))}
+                         </tbody>
+                      </table>
+                    </div>
+                  </div>
+               </div>
+             )}
+
              {/* TAB PENGATURAN */}
              {adminTab === 'pengaturan' && (
                <div className="max-w-4xl animate-fade-in mx-auto md:mx-0">
@@ -1694,33 +1833,33 @@ function MainApp() {
                         <div className="absolute top-0 right-0 p-4 opacity-5"><Package size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Total Barang Awal</p>
-                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-slate-900 break-words whitespace-normal block">{adminData.grandTotalStokAwal} Pcs</p>
+                           <p className="text-lg sm:text-xl xl:text-2xl font-black text-slate-900 tracking-tighter">{adminData.grandTotalStokAwal} Pcs</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Total kuantitas kulakan awal</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10">Total kuantitas kulakan awal</p>
                      </div>
                      <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
                         <div className="absolute top-0 right-0 p-4 opacity-5"><CreditCard size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Total Modal Keseluruhan</p>
-                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-rose-600 break-words whitespace-normal block">{formatRupiah(adminData.grandTotalModalAwal)}</p>
+                           <p className="text-lg sm:text-xl xl:text-2xl font-black text-rose-600 tracking-tighter">{formatRupiah(adminData.grandTotalModalAwal)}</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Modal investasi stok awal</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10">Modal investasi stok awal</p>
                      </div>
                      <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
                         <div className="absolute top-0 right-0 p-4 opacity-5"><BarChart3 size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Potensi Omset Keseluruhan</p>
-                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-blue-600 break-words whitespace-normal block">{formatRupiah(adminData.totalOmsetKeseluruhan)}</p>
+                           <p className="text-lg sm:text-xl xl:text-2xl font-black text-blue-600 tracking-tighter">{formatRupiah(adminData.totalOmsetKeseluruhan)}</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Target omset jika laku semua</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10">Target omset jika laku semua</p>
                      </div>
                      <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm text-white relative overflow-hidden flex flex-col justify-between h-full">
                         <div className="absolute top-0 right-0 p-4 opacity-10"><Sparkles size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-emerald-100 uppercase tracking-wider mb-1.5 break-normal">Potensi Profit Keseluruhan</p>
-                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold drop-shadow-sm break-words whitespace-normal block">{formatRupiah(adminData.totalProfitKeseluruhan)}</p>
+                           <p className="text-lg sm:text-xl xl:text-2xl font-black drop-shadow-sm tracking-tighter">{formatRupiah(adminData.totalProfitKeseluruhan)}</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-emerald-50 mt-2 relative z-10 break-words">Target untung bersih maksimal</p>
+                        <p className="text-[10px] md:text-xs font-bold text-emerald-50 mt-2 relative z-10">Target untung bersih maksimal</p>
                      </div>
                   </div>
 
@@ -1731,33 +1870,33 @@ function MainApp() {
                         <div className="absolute top-0 right-0 p-4 opacity-5"><List size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Sisa Stok Barang</p>
-                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-slate-900 break-words whitespace-normal block">{adminData.grandTotalSisaStok} Pcs</p>
+                           <p className="text-lg sm:text-xl xl:text-2xl font-black text-slate-900 tracking-tighter">{adminData.grandTotalSisaStok} Pcs</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Dari {adminData.totalJenisBarang} jenis item aktif</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10">Dari {adminData.totalJenisBarang} jenis item aktif</p>
                      </div>
                      <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
                         <div className="absolute top-0 right-0 p-4 opacity-5"><Store size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Modal Masih Mengendap</p>
-                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-rose-600 break-words whitespace-normal block">{formatRupiah(adminData.totalInventoryModal)}</p>
+                           <p className="text-lg sm:text-xl xl:text-2xl font-black text-rose-600 tracking-tighter">{formatRupiah(adminData.totalInventoryModal)}</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Uang modal tertahan di sisa stok</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10">Uang modal tertahan di sisa stok</p>
                      </div>
                      <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
                         <div className="absolute top-0 right-0 p-4 opacity-5"><BarChart3 size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Potensi Sisa Omset</p>
-                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-blue-600 break-words whitespace-normal block">{formatRupiah(adminData.totalInventoryPotentialRevenue)}</p>
+                           <p className="text-lg sm:text-xl xl:text-2xl font-black text-blue-600 tracking-tighter">{formatRupiah(adminData.totalInventoryPotentialRevenue)}</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Omset jika sisa stok habis terjual</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10">Omset jika sisa stok habis terjual</p>
                      </div>
                      <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
                         <div className="absolute top-0 right-0 p-4 opacity-5"><Sparkles size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Potensi Sisa Profit</p>
-                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-emerald-600 break-words whitespace-normal block">{formatRupiah(adminData.grandTotalPotensiSisaProfit)}</p>
+                           <p className="text-lg sm:text-xl xl:text-2xl font-black text-emerald-600 tracking-tighter">{formatRupiah(adminData.grandTotalPotensiSisaProfit)}</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Sisa target keuntungan</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10">Sisa target keuntungan</p>
                      </div>
                   </div>
 
@@ -1768,33 +1907,33 @@ function MainApp() {
                         <div className="absolute top-0 right-0 p-4 opacity-5"><Package size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Total Barang Laku</p>
-                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-slate-900 break-words whitespace-normal block">{adminData.totalBarangTerjual} Pcs</p>
+                           <p className="text-lg sm:text-xl xl:text-2xl font-black text-slate-900 tracking-tighter">{adminData.totalBarangTerjual} Pcs</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Dari {adminData.filteredTransactions.length} nota transaksi</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10">Dari {adminData.filteredTransactions.length} nota transaksi</p>
                      </div>
                      <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
                         <div className="absolute top-0 right-0 p-4 opacity-5"><Store size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Modal Telah Kembali</p>
-                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-blue-600 break-words whitespace-normal block">{formatRupiah(adminData.totalModalTerjual)}</p>
+                           <p className="text-lg sm:text-xl xl:text-2xl font-black text-blue-600 tracking-tighter">{formatRupiah(adminData.totalModalTerjual)}</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Modal dari barang yang terjual</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10">Harga modal saat ini</p>
                      </div>
                      <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
                         <div className="absolute top-0 right-0 p-4 opacity-5"><TrendingUp size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Omset Masuk Laci</p>
-                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-slate-900 break-words whitespace-normal block">{formatRupiah(adminData.totalPendapatanKotor)}</p>
+                           <p className="text-lg sm:text-xl xl:text-2xl font-black text-slate-900 tracking-tighter">{formatRupiah(adminData.totalPendapatanKotor)}</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Penjualan kotor nyata</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10">Penjualan kotor nyata</p>
                      </div>
                      <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm text-white relative overflow-hidden flex flex-col justify-between h-full">
                         <div className="absolute top-0 right-0 p-4 opacity-10"><Sparkles size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-emerald-100 uppercase tracking-wider mb-1.5 break-normal">Profit Bersih Realisasi</p>
-                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold drop-shadow-sm break-words whitespace-normal block">{formatRupiah(adminData.totalKeuntunganBersih)}</p>
+                           <p className="text-lg sm:text-xl xl:text-2xl font-black drop-shadow-sm tracking-tighter">{formatRupiah(adminData.totalKeuntunganBersih)}</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-emerald-50 mt-2 flex items-center gap-1.5 relative z-10 break-words"><TrendingUp size={14}/> Margin Bersih: {adminData.totalPendapatanKotor > 0 ? ((adminData.totalKeuntunganBersih / adminData.totalPendapatanKotor) * 100).toFixed(1) : '0'}%</p>
+                        <p className="text-[10px] md:text-xs font-bold text-emerald-50 mt-2 flex items-center gap-1.5 relative z-10"><TrendingUp size={14}/> Margin Bersih: {adminData.totalPendapatanKotor > 0 ? ((adminData.totalKeuntunganBersih / adminData.totalPendapatanKotor) * 100).toFixed(1) : '0'}%</p>
                      </div>
                   </div>
 
@@ -1805,7 +1944,7 @@ function MainApp() {
                         <div className="absolute top-0 right-0 p-4 opacity-5"><List size={60}/></div>
                         <div className="relative z-10 w-full">
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Total Struk / Nota</p>
-                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-slate-900 break-words whitespace-normal block">{adminData.filteredTransactions.length} Lembar</p>
+                           <p className="text-lg sm:text-xl xl:text-2xl font-black text-slate-900 tracking-tighter">{adminData.filteredTransactions.length} Lembar</p>
                         </div>
                         <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Bukti transaksi di sistem</p>
                      </div>
@@ -1825,11 +1964,11 @@ function MainApp() {
                         </div>
                         <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Uang tunai/transfer valid di laci</p>
                      </div>
-                     <div className={`p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm relative overflow-hidden flex flex-col justify-between h-full ${adminData.totalSelisihBarang > 0 ? 'bg-rose-600 text-white' : 'bg-slate-900 text-white'}`}>
+                     <div className={`p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm relative overflow-hidden flex flex-col justify-between h-full ${adminData.totalSelisihBarangMinus > 0 ? 'bg-rose-600 text-white' : 'bg-slate-900 text-white'}`}>
                         <div className="absolute top-0 right-0 p-4 opacity-10"><AlertTriangle size={60}/></div>
                         <div className="relative z-10 w-full">
-                           <p className="text-[10px] md:text-xs font-black text-slate-300 uppercase tracking-wider mb-1.5 break-normal">Selisih / Hilang (Sistem vs Fisik)</p>
-                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold drop-shadow-sm break-words whitespace-normal block">{adminData.totalSelisihBarang} Pcs</p>
+                           <p className="text-[10px] md:text-xs font-black text-slate-300 uppercase tracking-wider mb-1.5 break-normal">Barang Hilang (Sistem vs Fisik)</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold drop-shadow-sm break-words whitespace-normal block">{adminData.totalSelisihBarangMinus} Pcs</p>
                         </div>
                         <p className="text-[10px] md:text-xs font-bold text-rose-200 mt-2 relative z-10 break-words">Potensi Kerugian: {formatRupiah(adminData.totalKerugianSelisih)}</p>
                      </div>
@@ -2071,13 +2210,13 @@ function MainApp() {
                                   <div className="flex flex-col items-center gap-1 w-full max-w-[100px] mx-auto">
                                     <input 
                                        type="number" 
-                                       defaultValue={p.stokReal}
+                                       defaultValue={p.stok_real}
                                        onBlur={(e) => handleUpdateStokReal(p.id, parseInt(e.target.value))}
                                        className="w-full text-center p-2 rounded-xl border border-blue-200 font-black text-blue-900 focus:ring-2 focus:ring-blue-500 outline-none text-sm shadow-inner bg-white"
                                        title="Edit stok fisik nyata di rak"
                                     />
-                                    {p.selisihFisik > 0 && <span className="text-[9px] font-black text-rose-600 bg-rose-100 px-1.5 py-0.5 rounded-md mt-1 animate-pulse border border-rose-200">Hilang {p.selisihFisik}</span>}
-                                    {p.selisihFisik < 0 && <span className="text-[9px] font-black text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-md mt-1 border border-emerald-200">Lebih {Math.abs(p.selisihFisik)}</span>}
+                                    {p.selisihFisik < 0 && <span className="text-[9px] font-black text-rose-600 bg-rose-100 px-1.5 py-0.5 rounded-md mt-1 animate-pulse border border-rose-200 flex items-center gap-1"><AlertCircle size={10}/> Hilang {Math.abs(p.selisihFisik)}</span>}
+                                    {p.selisihFisik > 0 && <span className="text-[9px] font-black text-emerald-600 bg-emerald-100 px-1.5 py-0.5 rounded-md mt-1 border border-emerald-200">Lebih {p.selisihFisik}</span>}
                                   </div>
                                </td>
                                <td className="p-4 md:p-6 min-w-[150px] break-words">
@@ -2107,7 +2246,7 @@ function MainApp() {
                                <div className="font-bold text-blue-600 text-xs md:text-sm mt-0.5">Sisa: {adminData.grandTotalSisaStok}</div>
                              </td>
                              <td className="p-4 md:p-6 text-center font-black text-rose-600 bg-blue-100/50">
-                                {adminData.totalSelisihBarang > 0 && `Hilang ${adminData.totalSelisihBarang}`}
+                                {adminData.totalSelisihBarangMinus > 0 && `Hilang ${adminData.totalSelisihBarangMinus}`}
                              </td>
                              <td className="p-4 md:p-6 text-center font-black text-slate-500">-</td>
                              <td className="p-4 md:p-6 break-words">
@@ -2137,7 +2276,7 @@ export default class App extends React.Component {
     if (this.state.hasError) {
       return (
         <div style={{ padding: '40px', background: '#f87171', color: 'white', minHeight: '100vh', fontFamily: 'sans-serif' }}>
-          <h1 style={{ fontSize: '2rem', fontWeight: '900' }}>⚠️ Aplikasi Mengalami Crash Server (V8.0 Ultimate Reconciliation)</h1>
+          <h1 style={{ fontSize: '2rem', fontWeight: '900' }}>⚠️ Aplikasi Mengalami Crash Server (V8.1 Auto-Fix)</h1>
           <p style={{ marginTop: '10px', fontSize: '1.2rem' }}>Layar putih berhasil dihindari! Masalahnya ada pada kode di bawah ini:</p>
           <pre style={{ background: 'rgba(0,0,0,0.3)', padding: '20px', borderRadius: '10px', marginTop: '20px', whiteSpace: 'pre-wrap', fontWeight: 'bold' }}>{String(this.state.errorInfo)}</pre>
           <button onClick={() => { localStorage.clear(); window.location.reload(true); }} style={{ marginTop: '20px', padding: '10px 20px', borderRadius: '10px', border: 'none', background: 'white', color: '#f87171', fontWeight: 'bold', cursor: 'pointer' }}>Hapus Cache & Muat Ulang</button>
