@@ -142,6 +142,8 @@ function MainApp() {
 
   // COUNTDOWN AUTO-CHECKOUT (LUPA CETAK STRUK)
   const [autoSelesaiCountdown, setAutoSelesaiCountdown] = useState(45);
+  // REF UNTUK MENGHINDARI STALE CLOSURE PADA AUTO-CHECKOUT
+  const autoCheckoutCallback = useRef(null);
 
   // PENGURUTAN ABJAD UNTUK ETALASE TOKO (A-Z Mulus)
   const searchFilteredProducts = useMemo(() => {
@@ -859,6 +861,11 @@ function MainApp() {
   };
 
   // TIMEOUT LOGIKA SINKRONISASI KASIR JIKA PEMBELI LUPA TAPE SELESAI
+  // Menggunakan REF untuk menghindari Stale Closure (Bug Struk Tidak Tersimpan Otomatis)
+  useEffect(() => {
+    autoCheckoutCallback.current = () => handleSelesaiBayar(true);
+  }, [cart, products, totalBelanja, metodeBayar]);
+
   useEffect(() => {
     if (view !== 'checkout' || !metodeBayar || isProcessing) {
       setAutoSelesaiCountdown(45);
@@ -869,7 +876,7 @@ function MainApp() {
       setAutoSelesaiCountdown(prev => {
         if (prev <= 1) {
           clearInterval(timer);
-          handleSelesaiBayar(true);
+          if(autoCheckoutCallback.current) autoCheckoutCallback.current();
           return 0;
         }
         return prev - 1;
@@ -877,7 +884,7 @@ function MainApp() {
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [view, metodeBayar, isProcessing, cart, products]);
+  }, [view, metodeBayar, isProcessing]);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -969,16 +976,14 @@ function MainApp() {
     window.scrollTo({ top: 0, behavior: 'smooth' }); 
   };
 
-  // LOGIKA UPDATE REAL STOK FISIK LANGSUNG (SIMPAN TOMBOL)
+  // LOGIKA UPDATE REAL STOK FISIK LANGSUNG (SIMPAN TOMBOL TUNGGAL)
   const handleUpdateStokReal = async (id, val) => {
     if (val === '' || val === null || isNaN(val) || val < 0) return;
     if (!supabaseClient) return showToast('Database tidak terhubung', 'error');
     
     setIsProcessing(true);
-    // Optimistic Update
     setProducts(prev => prev.map(p => p.id === id ? { ...p, stok_real: parseInt(val) } : p));
     
-    // Save to DB
     const { error } = await supabaseClient.from('produk').update({ stok_real: parseInt(val) }).eq('id', id);
     if (error && error.message.includes('stok_real')) {
         showToast('Kolom "stok_real" (tipe int8) belum ada di Supabase. Silakan tambahkan!', 'error');
@@ -986,6 +991,42 @@ function MainApp() {
         showToast('Stok Fisik berhasil diupdate!', 'success');
     } else {
         showToast(`Gagal menyimpan: ${error.message}`, 'error');
+    }
+    setIsProcessing(false);
+  };
+
+  // LOGIKA SIMPAN SEMUA SINKRONISASI FISIK (BULK UPDATE)
+  const handleSimpanSemuaFisik = async () => {
+    if (!supabaseClient) return showToast('Database tidak terhubung', 'error');
+    setIsProcessing(true);
+    
+    const updates = products.filter(p => p.stok_real !== null && p.stok_real !== undefined && p.stok_real !== '');
+    
+    if (updates.length === 0) {
+      setIsProcessing(false);
+      return showToast('Tidak ada data fisik yang perlu disimpan.', 'error');
+    }
+
+    let successCount = 0;
+    let failCount = 0;
+    let missingColumnError = false;
+
+    for (const p of updates) {
+      const { error } = await supabaseClient.from('produk').update({ stok_real: parseInt(p.stok_real) }).eq('id', p.id);
+      if (error) {
+        failCount++;
+        if(error.message.includes('stok_real')) missingColumnError = true;
+      } else {
+        successCount++;
+      }
+    }
+
+    if (missingColumnError) {
+      showToast('Kolom "stok_real" belum dibuat di Supabase!', 'error');
+    } else if (failCount > 0) {
+      showToast(`Selesai. Berhasil: ${successCount}, Gagal: ${failCount}`, 'error');
+    } else {
+      showToast(`Berhasil menyimpan ${successCount} data sinkronisasi fisik ke database!`, 'success');
     }
     setIsProcessing(false);
   };
@@ -1220,6 +1261,7 @@ function MainApp() {
             </div>
           </div>
           <div className="absolute inset-0 pointer-events-none flex items-center justify-center pt-20">
+            {/* Box memanjang (Landscape) khusus Barcode */}
             <div className="w-80 h-40 border-4 border-emerald-500 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] relative flex items-center justify-center">
               <div className="absolute w-full h-0.5 bg-emerald-400 animate-[scan_2s_ease-in-out_infinite] shadow-[0_0_10px_#34d399]"></div>
             </div>
@@ -1278,7 +1320,7 @@ function MainApp() {
                  </div>
                  <div className="flex gap-3 mt-8">
                     <button type="button" onClick={() => setEditingTrx(null)} className="flex-1 py-4 bg-slate-100 font-bold rounded-2xl text-slate-600 hover:bg-slate-200 transition-colors">Batal</button>
-                    <button type="submit" disabled={isProcessing} className="flex-1 py-4 bg-emerald-600 font-bold rounded-2xl text-white hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">Simpan Edit</button>
+                    <button type="submit" disabled={isProcessing} className="flex-1 py-4 bg-emerald-600 font-bold rounded-2xl text-white hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">{isProcessing ? 'Menyimpan...' : 'Simpan Edit'}</button>
                  </div>
               </form>
            </div>
@@ -1299,7 +1341,7 @@ function MainApp() {
           <div className="flex justify-between items-center mb-4 max-w-5xl mx-auto">
             <div className="flex items-center gap-2 text-emerald-600 font-black text-lg md:text-xl truncate max-w-[50%]">
               {renderLogo("w-8 h-8")}
-              <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v8.0</span></span>
+              <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v9.0</span></span>
             </div>
             <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
               <button onClick={() => setView('riwayat')} className="p-2 md:p-2.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition shadow-sm relative" title="Riwayat Pembelian">
@@ -1347,6 +1389,7 @@ function MainApp() {
               <div key={p.id} onClick={() => openProductModal(p)} className="bg-white p-3 md:p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center text-center relative active:scale-95 transition-transform cursor-pointer border-b-4 border-b-slate-100 overflow-hidden w-full h-full">
                 {cart[p.id] > 0 && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] md:text-xs font-black px-2 md:px-3 py-1 rounded-bl-xl shadow-lg z-20">{cart[p.id]}</div>}
                 
+                {/* GAMBAR PRODUK RAKSASA DENGAN PENGHILANG ERROR VISUAL */}
                 <div className="mb-3 md:mb-4 w-32 h-32 md:w-48 md:h-48 rounded-2xl border border-slate-100 shadow-inner relative overflow-hidden bg-slate-50 flex items-center justify-center shrink-0">
                   {p.gambar ? (
                     <img 
@@ -1373,6 +1416,7 @@ function MainApp() {
             {searchFilteredProducts.length === 0 && <div className="col-span-full text-center text-slate-400 mt-10 font-bold text-sm">Barang tidak ditemukan.</div>}
           </main>
 
+          {/* MODAL PILIH JUMLAH BELI */}
           {selectedProduct && (
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-4 animate-fade-in">
               <div className="bg-white w-full max-w-md rounded-3xl p-6 md:p-8 shadow-2xl animate-slide-up border-4 border-white flex flex-col">
@@ -1408,6 +1452,7 @@ function MainApp() {
             </div>
           )}
 
+          {/* FLOATING CHECKOUT BUTTON */}
           {jumlahItem > 0 && !selectedProduct && (
             <div className="fixed bottom-6 left-4 right-4 z-50 max-w-md mx-auto">
               <button onClick={() => setView('checkout')} className="w-full bg-emerald-600 text-white p-4 md:p-5 rounded-3xl shadow-2xl flex justify-between items-center active:scale-95 transition-all border border-emerald-400">
@@ -1515,9 +1560,16 @@ function MainApp() {
           )}
 
           <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 border-t z-50">
+             {/* TOMBOL SELESAI DENGAN VALIDASI ERROR (NOTIFIKASI) */}
              <button 
-               onClick={() => handleSelesaiBayar(false)}
-               disabled={isProcessing || !metodeBayar || Object.keys(cart).length === 0}
+               onClick={() => {
+                 if (!metodeBayar) {
+                   showToast('Silakan pilih Metode Pembayaran terlebih dahulu!', 'error');
+                 } else {
+                   handleSelesaiBayar(false);
+                 }
+               }}
+               disabled={isProcessing || Object.keys(cart).length === 0}
                className="w-full max-w-md mx-auto block py-4 bg-slate-900 text-white rounded-xl font-bold text-lg disabled:opacity-30 transition-opacity"
              >
                {isProcessing ? 'MENYIMPAN...' : 'Selesai & Cetak Struk'}
@@ -1532,7 +1584,7 @@ function MainApp() {
           <div className="mb-6 flex flex-col items-center animate-slide-up text-center">
             <div className="w-14 h-14 md:w-16 md:h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center mb-3 shadow-lg shadow-emerald-200"><CheckCircle size={32} /></div>
             <h2 className="text-xl md:text-2xl font-extrabold text-slate-800">Struk Tersimpan!</h2>
-            <p className="text-slate-500 text-xs md:text-sm mt-1 font-bold">Terima kasih atas pembelian Anda.</p>
+            <p className="text-slate-500 text-xs md:text-sm mt-1 font-bold">Lanjutkan dengan pembayaran di bawah.</p>
           </div>
 
           <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden animate-fade-in relative mb-6 border border-slate-200">
@@ -2140,7 +2192,7 @@ function MainApp() {
                     <h1 className="text-3xl font-black tracking-tighter text-slate-800">Manajemen Barang</h1>
                     <div className="flex flex-col sm:flex-row gap-2">
                       <button onClick={handleClearAllProducts} disabled={isProcessing} className="bg-rose-100 text-rose-600 px-4 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-sm hover:bg-rose-200 active:scale-95 transition-all uppercase text-xs w-full sm:w-auto"><Trash2 size={16}/> Hapus Semua</button>
-                      <button onClick={() => { setEditingId(null); setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, stok_real: '', barcode: '', diskonQty: '', diskonHarga: '', gambar: '' }); setUseDiskon(false); setShowAddForm(!showAddForm); }} className="bg-emerald-600 text-white px-4 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-md hover:bg-emerald-500 active:scale-95 transition-all uppercase text-xs w-full sm:w-auto">{showAddForm ? <X size={16}/> : <PlusCircle size={16}/>} {showAddForm ? 'Tutup Form' : 'Tambah Barang'}</button>
+                      <button onClick={() => { setEditingId(null); setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, stok_real: null, barcode: '', diskonQty: '', diskonHarga: '', gambar: '' }); setUseDiskon(false); setShowAddForm(!showAddForm); }} className="bg-emerald-600 text-white px-4 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-md hover:bg-emerald-500 active:scale-95 transition-all uppercase text-xs w-full sm:w-auto">{showAddForm ? <X size={16}/> : <PlusCircle size={16}/>} {showAddForm ? 'Tutup Form' : 'Tambah Barang'}</button>
                     </div>
                   </div>
 
@@ -2244,13 +2296,22 @@ function MainApp() {
                     </form>
                  )}
                  <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm overflow-hidden w-full">
+                    <div className="flex flex-col sm:flex-row justify-between sm:items-center bg-blue-50 p-4 border-b border-blue-100 gap-3">
+                       <div>
+                         <h3 className="font-black text-blue-800 text-sm md:text-base mb-1 flex items-center gap-1.5"><AlertCircle size={16}/> Sinkronisasi Realita Fisik</h3>
+                         <p className="text-[10px] md:text-xs font-bold text-blue-600">Isi kolom "Real Barang" pada tabel di bawah, lalu klik tombol Simpan Semua untuk mengamankan data.</p>
+                       </div>
+                       <button onClick={handleSimpanSemuaFisik} disabled={isProcessing} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-xl font-black text-xs md:text-sm shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 shrink-0 w-full sm:w-auto">
+                         <Save size={16}/> SIMPAN SEMUA FISIK
+                       </button>
+                    </div>
                     <div className="overflow-x-auto w-full block">
                       <table className="w-full text-left min-w-[850px] border-collapse">
                          <thead className="bg-slate-50 border-b border-slate-200">
                            <tr className="text-[10px] font-black uppercase text-slate-500 tracking-widest whitespace-nowrap">
                              <th className="p-4 md:p-6">Produk (A-Z)</th>
-                             <th className="p-4 md:p-6 text-center">Stok & Histori</th>
-                             <th className="p-4 md:p-6 text-center bg-blue-50 border-l border-r border-blue-100">Real Barang (Fisik)</th>
+                             <th className="p-4 md:p-6 text-center">Stok Sistem & Histori</th>
+                             <th className="p-4 md:p-6 text-center bg-blue-100/30 border-l border-r border-blue-100 text-blue-800">Real Barang (Fisik)</th>
                              <th className="p-4 md:p-6">Info Harga</th>
                              <th className="p-4 md:p-6">Total Modal & Potensi</th>
                              <th className="p-4 md:p-6 text-center">Aksi (CRUD)</th>
@@ -2274,10 +2335,10 @@ function MainApp() {
                                   <div className="text-[10px] md:text-xs font-bold text-slate-500 mt-2">Terjual: {p.qtyTerjual}</div>
                                   <div className="text-[10px] md:text-xs font-bold text-blue-600 mt-0.5">Total Awal: {p.stokAwal}</div>
                                </td>
-                               {/* KOLOM REAL BARANG (FISIK) DENGAN TOMBOL SIMPAN */}
-                               <td className="p-4 md:p-6 text-center bg-blue-50/30 border-l border-r border-blue-50 align-middle">
+                               {/* KOLOM REAL BARANG (FISIK) DENGAN INPUT */}
+                               <td className="p-4 md:p-6 text-center bg-blue-50/20 border-l border-r border-blue-50 align-middle">
                                   <div className="flex flex-col items-center gap-1 w-full max-w-[120px] mx-auto">
-                                    <div className="flex w-full shadow-sm rounded-xl">
+                                    <div className="flex w-full shadow-sm rounded-xl relative group">
                                       <input 
                                          type="number" 
                                          value={p.stok_real === null ? '' : p.stok_real}
@@ -2285,13 +2346,13 @@ function MainApp() {
                                             const val = e.target.value === '' ? null : parseInt(e.target.value);
                                             setProducts(prev => prev.map(prod => prod.id === p.id ? { ...prod, stok_real: val } : prod));
                                          }}
-                                         className="w-full text-center p-2 rounded-l-xl border-y border-l border-blue-200 font-black text-blue-900 focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white"
+                                         className="w-full text-center p-2.5 rounded-l-xl border-y border-l border-blue-200 font-black text-blue-900 focus:ring-2 focus:ring-blue-500 outline-none text-sm bg-white"
                                          placeholder="Fisik"
                                       />
                                       <button 
                                          onClick={() => handleUpdateStokReal(p.id, p.stok_real)}
                                          className="bg-blue-600 hover:bg-blue-700 text-white px-3 rounded-r-xl transition flex items-center justify-center border-y border-r border-blue-600"
-                                         title="Simpan Sinkronisasi Fisik"
+                                         title="Simpan Sinkronisasi Fisik Ini Saja"
                                       >
                                         <Save size={14}/>
                                       </button>
@@ -2358,26 +2419,21 @@ function MainApp() {
   );
 }
 
-export default function App() {
-  const [hasError, setHasError] = useState(false);
-  const [errorInfo, setErrorInfo] = useState('');
-
-  // Menangkap error di dalam komponen ini sangat penting untuk Blueprint
-  // Jika kode dirender dengan struktur yang salah, layar putih akan bisa dihindari
-  try {
-    return <MainApp />;
-  } catch (error) {
-    if (!hasError) {
-       setHasError(true);
-       setErrorInfo(String(error));
+export default class App extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, errorInfo: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true }; }
+  componentDidCatch(error, errorInfo) { this.setState({ errorInfo: String(error) + '\n' + errorInfo.componentStack }); }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: '40px', background: '#f87171', color: 'white', minHeight: '100vh', fontFamily: 'sans-serif' }}>
+          <h1 style={{ fontSize: '2rem', fontWeight: '900' }}>⚠️ Aplikasi Mengalami Crash Server (V9.0 Master)</h1>
+          <p style={{ marginTop: '10px', fontSize: '1.2rem' }}>Layar putih berhasil dihindari! Masalahnya ada pada kode di bawah ini:</p>
+          <pre style={{ background: 'rgba(0,0,0,0.3)', padding: '20px', borderRadius: '10px', marginTop: '20px', whiteSpace: 'pre-wrap', fontWeight: 'bold' }}>{String(this.state.errorInfo)}</pre>
+          <button onClick={() => { localStorage.clear(); window.location.reload(true); }} style={{ marginTop: '20px', padding: '10px 20px', borderRadius: '10px', border: 'none', background: 'white', color: '#f87171', fontWeight: 'bold', cursor: 'pointer' }}>Hapus Cache & Muat Ulang</button>
+        </div>
+      );
     }
-    return (
-      <div style={{ padding: '40px', background: '#f87171', color: 'white', minHeight: '100vh', fontFamily: 'sans-serif' }}>
-        <h1 style={{ fontSize: '2rem', fontWeight: '900' }}>⚠️ Aplikasi Mengalami Crash Server (V8.0 Master)</h1>
-        <p style={{ marginTop: '10px', fontSize: '1.2rem' }}>Layar putih berhasil dihindari! Masalahnya ada pada kode di bawah ini:</p>
-        <pre style={{ background: 'rgba(0,0,0,0.3)', padding: '20px', borderRadius: '10px', marginTop: '20px', whiteSpace: 'pre-wrap', fontWeight: 'bold' }}>{errorInfo}</pre>
-        <button onClick={() => { localStorage.clear(); window.location.reload(true); }} style={{ marginTop: '20px', padding: '10px 20px', borderRadius: '10px', border: 'none', background: 'white', color: '#f87171', fontWeight: 'bold', cursor: 'pointer' }}>Hapus Cache & Muat Ulang</button>
-      </div>
-    );
+    return <MainApp />;
   }
 }
