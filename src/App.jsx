@@ -1662,7 +1662,7 @@ function MainApp() {
           <div className="mb-6 flex flex-col items-center animate-slide-up text-center">
             <div className="w-14 h-14 md:w-16 md:h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center mb-3 shadow-lg shadow-emerald-200"><CheckCircle size={32} /></div>
             <h2 className="text-xl md:text-2xl font-extrabold text-slate-800">Struk Tersimpan!</h2>
-            <p className="text-slate-500 text-xs md:text-sm mt-1 font-bold">JUAL SEADANYA - Terima kasih atas pembelian Anda.</p>
+            <p className="text-slate-500 text-xs md:text-sm mt-1 font-bold">JUAL SEADANYA TERIMAKASIH.</p>
           </div>
 
           <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden animate-fade-in relative mb-6 border border-slate-200">
