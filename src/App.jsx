@@ -1293,6 +1293,13 @@ function MainApp() {
     link.click();
   };
 
+  const renderLogo = (sizeCls = "w-8 h-8") => {
+    if (settings.logo_url) {
+      return <img referrerPolicy="no-referrer" src={formatImageUrl(settings.logo_url)} className={`${sizeCls} object-contain rounded-lg shadow-sm`} alt="Logo" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }} />
+    }
+    return <Store className="text-emerald-500 shrink-0" size={28} />;
+  };
+
   // --- RENDER UI ---
   if (!isConnected || !supabaseClient) {
     return (
