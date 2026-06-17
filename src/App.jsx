@@ -4,7 +4,7 @@ import {
   ChevronRight, Copy, CreditCard, Download, Edit, ExternalLink, History, 
   Image as ImageIcon, List, Lock, LogOut, Package, PlusCircle, Power, 
   QrCode, RefreshCw, Search, Settings, Share2, ShoppingCart, Sparkles, 
-  Store, Trash2, TrendingDown, TrendingUp, UploadCloud, Wand2, X, AlertCircle, Save, Filter, BellRing
+  Store, Trash2, TrendingDown, TrendingUp, UploadCloud, Wand2, X, AlertCircle, Save, Filter
 } from 'lucide-react';
 
 // =========================================================================
@@ -16,7 +16,7 @@ const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 let supabaseClient = null;
 
 // --- EFEK SUARA ---
-const playBeep = (type = 'normal') => {
+const playBeep = () => {
   try {
     const AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
@@ -25,23 +25,12 @@ const playBeep = (type = 'normal') => {
     const gain = ctx.createGain();
     osc.connect(gain);
     gain.connect(ctx.destination);
-    
-    if (type === 'success') {
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(1200, ctx.currentTime);
-      osc.frequency.exponentialRampToValueAtTime(2000, ctx.currentTime + 0.3);
-      gain.gain.setValueAtTime(0.2, ctx.currentTime);
-      gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.3);
-      osc.start();
-      osc.stop(ctx.currentTime + 0.3);
-    } else {
-      osc.type = 'sine';
-      osc.frequency.setValueAtTime(800, ctx.currentTime);
-      gain.gain.setValueAtTime(0.1, ctx.currentTime);
-      osc.start();
-      gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.1);
-      osc.stop(ctx.currentTime + 0.1);
-    }
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(800, ctx.currentTime);
+    gain.gain.setValueAtTime(0.1, ctx.currentTime);
+    osc.start();
+    gain.gain.exponentialRampToValueAtTime(0.00001, ctx.currentTime + 0.1);
+    osc.stop(ctx.currentTime + 0.1);
   } catch (e) {}
 };
 
@@ -49,16 +38,21 @@ const formatRupiah = (angka) => {
   return new Intl.NumberFormat('id-ID', { style: 'currency', currency: 'IDR', minimumFractionDigits: 0 }).format(angka || 0);
 };
 
-// FORMATTER GAMBAR GOOGLE DRIVE
+// FORMATTER GAMBAR GOOGLE DRIVE (METODE VIP lh3.googleusercontent - PENEMBUS BLOKIR)
 const formatImageUrl = (url) => {
   if (!url) return '';
   if (url.startsWith('data:image') || url.startsWith('blob:')) return url; 
+  
   const driveMatch = url.match(/(?:file\/d\/|id=)([a-zA-Z0-9_-]+)/);
-  if (driveMatch && driveMatch[1]) return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
+  if (driveMatch && driveMatch[1]) {
+    return `https://lh3.googleusercontent.com/d/${driveMatch[1]}`;
+  }
+  
   if (url.includes('github.com') && url.includes('/blob/')) return url.replace('github.com', 'raw.githubusercontent.com').replace('/blob/', '/');
   return url;
 };
 
+// GAMBAR PENGGANTI JIKA LINK G-DRIVE SALAH / DIPRIVASI
 const FALLBACK_IMAGE = "https://placehold.co/400x400/f8fafc/94a3b8?text=Foto+Kosong";
 
 const hitungTotalHargaItem = (item, qty) => {
@@ -79,7 +73,6 @@ function MainApp() {
   const [isConnected, setIsConnected] = useState(false); 
   const [isProcessing, setIsProcessing] = useState(false);
   const [toast, setToast] = useState({ show: false, msg: '', type: 'success' });
-  const [liveNotif, setLiveNotif] = useState(null); 
   
   const [view, setView] = useState(() => {
     try { return localStorage.getItem('tokojujur_view') || 'toko'; } catch(e) { return 'toko'; }
@@ -88,13 +81,19 @@ function MainApp() {
   const [products, setProducts] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [settings, setSettings] = useState({ 
-    nama_toko: 'Memuat Toko...', qris_url: '', rekening: '', admin_password: '', logo_url: '', margin_default: 0 
+    nama_toko: 'Memuat Toko...', 
+    qris_url: '', 
+    rekening: '', 
+    admin_password: '', 
+    logo_url: '', 
+    margin_default: 0
   });
   
   const [geminiKey, setGeminiKey] = useState(() => {
     try { return localStorage.getItem('tokojujur_gemini_key') || ''; } catch(e) { return ''; }
   });
   
+  // KERANJANG TERSIMPAN LOKAL
   const [cart, setCart] = useState(() => {
     try {
       const savedCart = localStorage.getItem('tokojujur_cart');
@@ -102,6 +101,7 @@ function MainApp() {
     } catch(e) { return {}; }
   });
 
+  // RIWAYAT TRANSAKSI LOKAL
   const [localHistory, setLocalHistory] = useState(() => {
     try {
       const savedHistory = localStorage.getItem('tokojujur_local_history');
@@ -131,9 +131,15 @@ function MainApp() {
   const [filterStart, setFilterStart] = useState('');
   const [filterEnd, setFilterEnd] = useState('');
   const [sortTrx, setSortTrx] = useState('terbaru'); 
+  
   const [filterPendapatan, setFilterPendapatan] = useState('hari_ini'); 
+
+  // STATE BARU: FILTER & SORT BARANG KHUSUS
   const [filterBarang, setFilterBarang] = useState('semua');
   const [sortBarang, setSortBarang] = useState('az');
+
+  // STATE BARU: AI MUTASI CHECKER
+  const [mutasiResult, setMutasiResult] = useState('');
 
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState(null); 
@@ -141,12 +147,10 @@ function MainApp() {
   const [useDiskon, setUseDiskon] = useState(false);
   const [editingTrx, setEditingTrx] = useState(null);
 
+  // COUNTDOWN AUTO-CHECKOUT (LUPA CETAK STRUK)
   const [autoSelesaiCountdown, setAutoSelesaiCountdown] = useState(45);
-  
-  // STATE BARU: AI CEK MUTASI
-  const [showMutasiModal, setShowMutasiModal] = useState(false);
-  const [mutasiResult, setMutasiResult] = useState('');
 
+  // PENGURUTAN ABJAD UNTUK ETALASE TOKO (A-Z Mulus Tanpa Peduli Kapital/Kecil)
   const searchFilteredProducts = useMemo(() => {
     return products
       .filter(p => p.nama?.toLowerCase().includes(searchQuery.toLowerCase()) || p.barcode?.includes(searchQuery))
@@ -163,11 +167,12 @@ function MainApp() {
   const jumlahItem = Object.values(cart).reduce((a, b) => a + b, 0);
 
   // =========================================================================
-  // LOGIKA ADMIN & DATA BARANG (MASTER KUNCI)
+  // LOGIKA ADMIN & DATA BARANG (STOK AWAL x HARGA MODAL BARU + SELISIH FISIK)
   // =========================================================================
   const adminData = useMemo(() => {
     if (view !== 'admin' || !isAdminLogged) return null;
 
+    // FILTER TRANSAKSI WAKTU
     const filteredTransactions = transactions.filter(t => {
       if (!filterStart && !filterEnd) return true;
       let tDate;
@@ -187,15 +192,18 @@ function MainApp() {
       return 0;
     });
 
+    // MENGHITUNG PENJUALAN PER ITEM (REALISASI)
     const itemSalesMap = {};
     let totalBarangTerjual = 0;
     let totalPendapatanKotor = 0;
     let totalModalTerjualDinamis = 0; 
     let totalKeuntunganBersihDinamis = 0;
     
+    // PEMISAHAN LOG KERUGIAN DARI TRANSAKSI PENJUALAN ASLI
     const penjualanAsli = filteredTransactions.filter(t => t.metode !== 'Catatan Kerugian (Sistem)');
     const dbLogKerugian = filteredTransactions.filter(t => t.metode === 'Catatan Kerugian (Sistem)');
 
+    // 1. Ekstrak Data Penjualan Normal
     penjualanAsli.forEach(t => {
       if (!t.items) return;
       t.items.forEach(item => {
@@ -221,6 +229,7 @@ function MainApp() {
       });
     });
 
+    // 2. Ekstrak Data Log Kerugian (Untuk Tab Audit Kerugian Database)
     let totalPcsHilangDB = 0;
     let totalUangHilangDB = 0;
     const rincianHilangDB = [];
@@ -231,27 +240,37 @@ function MainApp() {
           const nominalRugi = Math.abs(item.profitItem || 0) || (item.modal * item.qty);
           totalUangHilangDB += nominalRugi;
           rincianHilangDB.push({
-             tanggal: trx.tanggal, id_trx: trx.id, nama: item.nama, gambar: item.gambar, qty: item.qty, nominalRugi: nominalRugi
+             tanggal: trx.tanggal,
+             id_trx: trx.id,
+             nama: item.nama,
+             gambar: item.gambar,
+             qty: item.qty,
+             nominalRugi: nominalRugi
           });
        });
     });
 
+    // MENGGABUNGKAN DATA STOK AWAL & MODAL TOTAL KESELURUHAN & REALITAS FISIK (YANG BELUM DI-SAVE)
     const inventoryList = [];
     const kerugianList = [];
     let totalSelisihBarangMinus = 0;
     let totalKerugianSelisihUang = 0;
 
     products.forEach(p => {
+      // Log DB juga harus dihitung sebagai bagian dari Stok Awal yang pernah dibeli
       const qtyTerjual = itemSalesMap[p.id]?.qty || 0;
       let qtyHilangSebelumnya = 0;
       dbLogKerugian.forEach(t => t.items.forEach(i => { if(i.id === p.id) qtyHilangSebelumnya += i.qty; }));
       
       const stokAwal = (p.stok || 0) + qtyTerjual + qtyHilangSebelumnya; 
+      
       const modalTotalAwal = stokAwal * (p.modal || 0);
       const potensiProfitAwal = stokAwal * ((p.jual || 0) - (p.modal || 0));
+      
       const potensiSisaProfit = (p.stok || 0) * ((p.jual || 0) - (p.modal || 0));
       const sisaModal = (p.stok || 0) * (p.modal || 0);
 
+      // Logika Selisih Real Fisik (Optimistic Temp) vs Sistem
       let selisihFisik = 0; 
       let isAdaFisik = false;
       if (p.stok_real !== null && p.stok_real !== undefined && p.stok_real !== '') {
@@ -262,8 +281,18 @@ function MainApp() {
       const kerugianSelisih = selisihFisik < 0 ? Math.abs(selisihFisik) * (p.modal || 0) : 0;
 
       const fullProductData = {
-        ...p, qtyTerjual, stokAwal, modalTotalAwal, potensiProfitAwal, potensiSisaProfit, sisaModal, selisihFisik, kerugianSelisih, isAdaFisik,
-        revenue: itemSalesMap[p.id]?.revenue || 0, profitTerjual: itemSalesMap[p.id]?.profit || 0,
+        ...p,
+        qtyTerjual,
+        stokAwal,
+        modalTotalAwal,
+        potensiProfitAwal,
+        potensiSisaProfit,
+        sisaModal,
+        selisihFisik,
+        kerugianSelisih,
+        isAdaFisik,
+        revenue: itemSalesMap[p.id]?.revenue || 0,
+        profitTerjual: itemSalesMap[p.id]?.profit || 0,
         daysActive: Math.max(1, Math.floor((new Date() - new Date(p.tanggal_dibuat || new Date())) / (1000 * 60 * 60 * 24)))
       };
 
@@ -276,9 +305,13 @@ function MainApp() {
       }
     });
 
+    // PENGURUTAN & FILTERING DATA BARANG BERDASARKAN ABJAD/STOK
     let processedInventory = [...inventoryList];
-    if (filterBarang === 'habis') processedInventory = processedInventory.filter(p => p.stok <= 0);
-    else if (filterBarang === 'ada') processedInventory = processedInventory.filter(p => p.stok > 0);
+    if (filterBarang === 'habis') {
+       processedInventory = processedInventory.filter(p => p.stok <= 0);
+    } else if (filterBarang === 'ada') {
+       processedInventory = processedInventory.filter(p => p.stok > 0);
+    }
 
     processedInventory.sort((a, b) => {
        if (sortBarang === 'az') return (a.nama || '').toLowerCase().localeCompare((b.nama || '').toLowerCase());
@@ -292,12 +325,14 @@ function MainApp() {
     const topSelling = productRankings.filter(p => p.qtyTerjual > 0).slice(0, 10);
     const bottomSelling = [...inventoryList].filter(p => p.stok > 0).sort((a, b) => (a.qtyTerjual - b.qtyTerjual) || (b.daysActive - a.daysActive)).slice(0, 5);
 
+    // KALKULASI KESELURUHAN (MASTER AWAL)
     const grandTotalModalAwal = inventoryList.reduce((sum, p) => sum + p.modalTotalAwal, 0);
     const grandTotalStokAwal = inventoryList.reduce((sum, p) => sum + p.stokAwal, 0);
     const totalOmsetKeseluruhan = inventoryList.reduce((sum, p) => sum + (p.stokAwal * (p.jual || 0)), 0);
     const totalProfitKeseluruhan = inventoryList.reduce((sum, p) => sum + p.potensiProfitAwal, 0);
     const totalJenisBarang = products.length;
 
+    // SISA INVENTORI SAAT INI (UANG MATI)
     const grandTotalSisaStok = inventoryList.reduce((sum, p) => sum + (p.stok || 0), 0);
     const totalInventoryModal = inventoryList.reduce((sum, p) => sum + p.sisaModal, 0);
     const totalInventoryPotentialRevenue = inventoryList.reduce((sum, p) => sum + ((p.jual || 0) * (p.stok || 0)), 0);
@@ -308,13 +343,17 @@ function MainApp() {
       grandTotalSisaStok, totalInventoryModal, totalInventoryPotentialRevenue, grandTotalPotensiSisaProfit,
       totalBarangTerjual, totalPendapatanKotor, totalKeuntunganBersih: totalKeuntunganBersihDinamis, totalModalTerjual: totalModalTerjualDinamis,
       totalSelisihBarangMinus, totalKerugianSelisih: totalKerugianSelisihUang, kerugianList,
-      filteredTransactions: penjualanAsli, sortedTransactions: penjualanAsli.sort((a,b)=>b.id.localeCompare(a.id)), productRankings, topSelling, bottomSelling, processedInventory,
-      dbLogKerugian, totalPcsHilangDB, totalUangHilangDB, rincianHilangDB 
+      filteredTransactions: penjualanAsli, sortedTransactions: penjualanAsli.sort((a,b)=>b.id.localeCompare(a.id)), productRankings, topSelling, bottomSelling, 
+      processedInventory, 
+      dbLogKerugian, totalPcsHilangDB, totalUangHilangDB, rincianHilangDB
     };
   }, [transactions, products, filterStart, filterEnd, sortTrx, view, isAdminLogged, filterBarang, sortBarang]);
 
+  // =========================================================================
+  // LOGIKA MENU PENDAPATAN (RINCIAN FILTER WAKTU)
+  // =========================================================================
   const pendapatanData = useMemo(() => {
-    if (view !== 'admin' || !isAdminLogged || adminTab !== 'pendapatan') return null;
+    if (view !== 'admin' || !isAdminLogged || (adminTab !== 'pendapatan' && adminTab !== 'mutasi')) return null;
 
     const now = new Date();
     const filteredTrx = transactions.filter(t => {
@@ -322,19 +361,26 @@ function MainApp() {
       const match = t.id.match(/\d+/);
       const tDate = match ? new Date(parseInt(match[0])) : new Date();
 
-      if (filterPendapatan === 'hari_ini') return tDate.toDateString() === now.toDateString();
-      else if (filterPendapatan === 'minggu_ini') {
-        const sevenDaysAgo = new Date(now); sevenDaysAgo.setDate(now.getDate() - 7);
+      if (filterPendapatan === 'hari_ini') {
+        return tDate.toDateString() === now.toDateString();
+      } else if (filterPendapatan === 'minggu_ini') {
+        const sevenDaysAgo = new Date(now);
+        sevenDaysAgo.setDate(now.getDate() - 7);
         return tDate >= sevenDaysAgo && tDate <= now;
-      } 
-      else if (filterPendapatan === 'bulan_ini') return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
-      return true; 
+      } else if (filterPendapatan === 'bulan_ini') {
+        return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
+      }
+      return true; // 'semua'
     });
 
-    let totalOmset = 0; let totalProfit = 0; let totalBarangTerjual = 0; const itemMap = {};
+    let totalOmset = 0;
+    let totalProfit = 0;
+    let totalBarangTerjual = 0;
+    const itemMap = {};
 
     filteredTrx.forEach(t => {
       totalOmset += (t.total || 0);
+      
       let tProfit = 0;
       if(t.items) {
         t.items.forEach(item => {
@@ -343,8 +389,12 @@ function MainApp() {
           const omsetItem = item.totalHarga || 0;
           const modalItemDinamis = modalTerbaru * (item.qty || 0);
           const profitItemDinamis = omsetItem - modalItemDinamis;
+          
           tProfit += profitItemDinamis;
-          if (!itemMap[item.id]) itemMap[item.id] = { id: item.id, nama: item.nama, gambar: item.gambar, qtyTerjual: 0, omset: 0, profit: 0 };
+
+          if (!itemMap[item.id]) {
+            itemMap[item.id] = { id: item.id, nama: item.nama, gambar: item.gambar, qtyTerjual: 0, omset: 0, profit: 0 };
+          }
           itemMap[item.id].qtyTerjual += (item.qty || 0);
           itemMap[item.id].omset += omsetItem;
           itemMap[item.id].profit += profitItemDinamis;
@@ -355,7 +405,15 @@ function MainApp() {
     });
 
     const rincianBarang = Object.values(itemMap).sort((a, b) => b.qtyTerjual - a.qtyTerjual);
-    return { totalStruk: filteredTrx.length, totalOmset, totalProfit, totalBarangTerjual, rincianBarang };
+
+    return {
+      totalStruk: filteredTrx.length,
+      totalOmset,
+      totalProfit,
+      totalBarangTerjual,
+      rincianBarang
+    };
+
   }, [transactions, products, filterPendapatan, view, isAdminLogged, adminTab]);
 
   const showToast = (msg, type = 'success') => {
@@ -363,12 +421,7 @@ function MainApp() {
     setTimeout(() => setToast({ show: false, msg: '', type: 'success' }), 4000); 
   };
 
-  const showLiveNotification = (msg) => {
-    playBeep('success');
-    setLiveNotif(msg);
-    setTimeout(() => setLiveNotif(null), 8000);
-  };
-
+  // SYSTEM PWA & NOTIFIKASI & PUSTAKA SCANNER CANGGIH
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if ('Notification' in window && Notification.permission !== 'granted' && Notification.permission !== 'denied') Notification.requestPermission();
@@ -377,11 +430,14 @@ function MainApp() {
       let link = document.querySelector("link[rel~='icon']");
       if (!link) { link = document.createElement('link'); link.rel = 'icon'; document.head.appendChild(link); }
       link.href = logoUrl;
+
       let appleIcon = document.querySelector("link[rel='apple-touch-icon']");
       if (!appleIcon) { appleIcon = document.createElement('link'); appleIcon.rel = 'apple-touch-icon'; document.head.appendChild(appleIcon); }
       appleIcon.href = logoUrl;
+      
       document.title = settings.nama_toko || 'Toko Kejujuran';
 
+      // Load Html5Qrcode dynamically (Pustaka Handal Scanner)
       if (!document.getElementById('html5qrcode-script')) {
         const script = document.createElement('script');
         script.id = 'html5qrcode-script';
@@ -397,20 +453,27 @@ function MainApp() {
   useEffect(() => { try { localStorage.setItem('tokojujur_local_history', JSON.stringify(localHistory)); } catch(e){} }, [localHistory]);
   useEffect(() => { try { localStorage.setItem('tokojujur_gemini_key', geminiKey); } catch(e){} }, [geminiKey]);
 
+  // INISIALISASI SUPABASE LANGSUNG MENGGUNAKAN KEY
   useEffect(() => {
     const initSupabase = () => {
       try {
         const env = typeof import.meta !== 'undefined' ? import.meta.env : {};
         let url = env.VITE_SUPABASE_URL || localStorage.getItem('tokojujur_sb_url') || SUPABASE_URL;
         let key = env.VITE_SUPABASE_ANON_KEY || localStorage.getItem('tokojujur_sb_key') || SUPABASE_KEY;
-        if (url.endsWith('/rest/v1/')) url = url.replace('/rest/v1/', '');
+        
+        if (url.endsWith('/rest/v1/')) {
+            url = url.replace('/rest/v1/', '');
+        }
+
         if (url && key && window.supabase) {
           supabaseClient = window.supabase.createClient(url, key);
           setIsConnected(true);
         } else {
           setIsConnected(false);
         }
-      } catch(e) { setIsConnected(false); }
+      } catch(e) {
+        setIsConnected(false);
+      }
       setDbReady(true);
     };
 
@@ -419,9 +482,12 @@ function MainApp() {
       script.src = "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2";
       script.onload = initSupabase;
       document.head.appendChild(script);
-    } else { initSupabase(); }
+    } else {
+      initSupabase();
+    }
   }, []);
 
+  // REALTIME INSTAN & SINKRONISASI
   useEffect(() => {
     if (!dbReady || !isConnected || !supabaseClient) return;
     
@@ -433,8 +499,10 @@ function MainApp() {
           supabaseClient.from('transaksi').select('*').order('id', { ascending: false }),
           supabaseClient.from('pengaturan').select('*').eq('id', 1).single()
         ]);
+        
         if (prodRes.error) console.error(prodRes.error);
         if (prodRes.data) {
+           // Pertahankan stok_real lokal agar tidak hilang saat auto-refresh
            setProducts(prev => {
               if (prev.length === 0) return prodRes.data;
               return prodRes.data.map(newP => {
@@ -456,20 +524,7 @@ function MainApp() {
 
     const channel = supabaseClient.channel('toko-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'produk' }, () => loadData(false))
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'transaksi' }, (payload) => {
-          loadData(false);
-          if (view === 'admin' && payload.new.metode && !payload.new.metode.includes('Sistem')) {
-              showLiveNotification(`Transaksi Baru Masuk: ${formatRupiah(payload.new.total)}`);
-          }
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'transaksi' }, (payload) => {
-          loadData(false);
-          if (payload.new.status_pembayaran === 'Lunas' && payload.old && payload.old.status_pembayaran !== 'Lunas') {
-              showLiveNotification(`✅ PEMBAYARAN ONLINE DITERIMA: ${formatRupiah(payload.new.total)}`);
-          } else if (payload.new.status_pembayaran === 'Lunas') {
-              showLiveNotification(`✅ PEMBAYARAN DIKONFIRMASI: ${formatRupiah(payload.new.total)}`);
-          }
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'transaksi' }, () => loadData(false))
       .on('postgres_changes', { event: '*', schema: 'public', table: 'pengaturan' }, () => loadData(false))
       .subscribe();
       
@@ -477,7 +532,7 @@ function MainApp() {
       clearInterval(pollInterval);
       supabaseClient.removeChannel(channel); 
     };
-  }, [dbReady, isConnected, view]);
+  }, [dbReady, isConnected]);
 
   const handleCopyRekening = () => {
     const amanRekening = settings.rekening || '';
@@ -497,6 +552,7 @@ function MainApp() {
     }
   };
 
+  // LOGIKA SCANNER KAMERA SUPER ROBUST MEMANJANG (LANDSCAPE)
   const startScanner = (target) => {
     if (!window.Html5Qrcode) {
        showToast("Mesin scanner sedang dipanaskan, coba lagi dalam 2 detik.", "error");
@@ -509,6 +565,8 @@ function MainApp() {
       try {
         const html5QrCode = new window.Html5Qrcode("reader-barcode");
         html5QrCodeRef.current = html5QrCode;
+        
+        // Konfigurasi Aspect Ratio Landscape (Memanjang) khusus Barcode (2:1 / lebar:tinggi)
         html5QrCode.start(
           { facingMode: "environment" },
           { fps: 15, qrbox: { width: 320, height: 160 }, aspectRatio: 2.0 },
@@ -521,9 +579,9 @@ function MainApp() {
                else handleBarcodeResultAdmin(decodedText);
             });
           },
-          (err) => { /* ignore quiet errors */ }
+          (err) => { /* ignore normal quiet errors */ }
         ).catch(err => {
-          showToast("Kamera diblokir browser. Gunakan tombol 'Pilih Foto' di layar scanner.", "error");
+          showToast("Kamera diblokir/tidak tersedia. Gunakan tombol 'Pilih Foto'.", "error");
         });
       } catch (e) {
         showToast("Error membuka kamera.", "error");
@@ -536,8 +594,12 @@ function MainApp() {
        html5QrCodeRef.current.stop().then(() => {
           html5QrCodeRef.current.clear();
           setIsScanningModalOpen(false);
-       }).catch(e => { setIsScanningModalOpen(false); });
-    } else { setIsScanningModalOpen(false); }
+       }).catch(e => {
+          setIsScanningModalOpen(false);
+       });
+    } else {
+       setIsScanningModalOpen(false);
+    }
   };
 
   const handleScanFromFile = async (e) => {
@@ -569,6 +631,7 @@ function MainApp() {
     }
   };
 
+  // LOGIKA AUTO-FETCH DATA DAN FOTO DARI INTERNET (OpenFoodFacts)
   const handleBarcodeResultAdmin = async (code) => {
     setNewProduct(prev => ({ ...prev, barcode: code }));
     const localProduct = products.find(p => p.barcode === code);
@@ -582,20 +645,32 @@ function MainApp() {
       const data = await res.json();
       if (data.status === 1 && data.product && data.product.product_name) {
         let fetchedImage = data.product.image_url;
+        
         if (fetchedImage) {
           try {
             const imgRes = await fetch(fetchedImage);
             const blob = await imgRes.blob();
             const reader = new FileReader();
             reader.onloadend = () => {
-              setNewProduct(prev => ({ ...prev, nama: data.product.product_name, gambar: reader.result }));
+              setNewProduct(prev => ({ 
+                ...prev, 
+                nama: data.product.product_name,
+                gambar: reader.result 
+              }));
               showToast('Nama dan foto otomatis terisi & siap dirapihkan AI!', 'success');
             };
             reader.readAsDataURL(blob);
             return; 
-          } catch (e) {}
+          } catch (e) {
+            // Jika konversi gagal, fallback pakai URL asli
+          }
         }
-        setNewProduct(prev => ({ ...prev, nama: data.product.product_name, gambar: fetchedImage || prev.gambar }));
+        
+        setNewProduct(prev => ({ 
+          ...prev, 
+          nama: data.product.product_name,
+          gambar: fetchedImage || prev.gambar
+        }));
         showToast('Nama otomatis terisi dari Database Global!', 'success');
       } else {
         showToast('Barcode Indonesia mungkin belum terdaftar global. Silakan ketik nama manual.', 'success');
@@ -605,6 +680,7 @@ function MainApp() {
     }
   };
 
+  // LOGIKA AUTO-MARGIN HARGA JUAL
   const handleModalChange = (val) => {
     const modalValue = parseInt(val) || 0;
     let jualValue = newProduct.jual;
@@ -640,7 +716,7 @@ function MainApp() {
   const handleEnhanceWithAI = async () => {
     if (!geminiKey) return showToast('Harap masukkan API Key Gemini di tab Pengaturan!', 'error');
     if (!newProduct.gambar || !newProduct.gambar.startsWith('data:image')) {
-       return showToast('Silakan ambil foto dari kamera/galeri terlebih dahulu.', 'error');
+       return showToast('Silakan ambil foto dari kamera/galeri terlebih dahulu, atau pastikan gambar dari scan barcode telah termuat sempurna.', 'error');
     }
     
     setIsProcessing(true);
@@ -648,7 +724,9 @@ function MainApp() {
     try {
       const base64Data = newProduct.gambar.split(',')[1];
       let mimeType = "image/jpeg";
-      if(newProduct.gambar.includes(";")) mimeType = newProduct.gambar.split(';')[0].split(':')[1];
+      if(newProduct.gambar.includes(";")) {
+         mimeType = newProduct.gambar.split(';')[0].split(':')[1];
+      }
       
       const payload = {
         contents: [{
@@ -660,6 +738,7 @@ function MainApp() {
         generationConfig: { responseModalities: ['IMAGE'] }
       };
 
+      // Memperbaiki Model Gemini ke versi yang berfungsi dengan output gambar (Multimodal)
       const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -687,57 +766,15 @@ function MainApp() {
     setIsProcessing(false);
   };
 
-  // FITUR BARU: AI CEK MUTASI UANG MASUK (SCREENSHOT)
-  const handleAIMutasiCheck = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-    if (!geminiKey) return showToast('Masukkan API Key Gemini di Pengaturan dulu!', 'error');
-    if (file.size > 3000000) return showToast('Maksimal ukuran foto mutasi 3MB.', 'error');
-
-    setShowMutasiModal(true);
-    setMutasiResult('Membaca tulisan pada struk/mutasi...');
-    
-    const reader = new FileReader();
-    reader.onloadend = async () => {
-       const base64Str = reader.result.split(',')[1];
-       let mimeType = "image/jpeg";
-       if(reader.result.includes(";")) mimeType = reader.result.split(';')[0].split(':')[1];
-       
-       try {
-          const payload = {
-            contents: [{
-              parts: [
-                { text: "Anda adalah AI kasir profesional. Baca screenshot mutasi rekening / aplikasi DANA / struk transfer ini. Cari dan jumlahkan TOTAL UANG MASUK (kredit/pendapatan) yang terjadi pada hari ini/tanggal yang tertera. Jawab dengan sangat singkat dan jelas format: 'TOTAL UANG MASUK: Rp X.XXX.XXX'." },
-                { inlineData: { mimeType: mimeType, data: base64Str } }
-              ]
-            }],
-            generationConfig: { temperature: 0.1 }
-          };
-
-          const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(payload)
-          });
-          const data = await res.json();
-          
-          if (!res.ok) {
-             setMutasiResult(`Gagal membaca mutasi. Error: ${data.error?.message}`);
-             return;
-          }
-          
-          const textResult = data.candidates?.[0]?.content?.parts?.[0]?.text;
-          if (textResult) {
-             setMutasiResult(`✅ Hasil Analisa AI:\n\n${textResult}\n\n*Silakan cocokkan nominal ini dengan omset di Dasbor Penjualan Anda.`);
-             playBeep('success');
-          } else {
-             setMutasiResult('AI tidak bisa menemukan angka pada gambar tersebut.');
-          }
-       } catch (err) {
-          setMutasiResult('Koneksi internet bermasalah atau kuota AI habis.');
-       }
-    };
-    reader.readAsDataURL(file);
+  const handleDownloadPreviewImage = () => {
+    if (!newProduct.gambar || !newProduct.gambar.startsWith('data:image')) return;
+    const link = document.createElement('a');
+    link.href = newProduct.gambar;
+    link.download = `${newProduct.nama || 'Produk'}_AI_Cleaned.png`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('Foto didownload! Silakan upload ke folder G-Drive.', 'success');
   };
 
   const handleUploadProductImage = (e) => {
@@ -745,7 +782,10 @@ function MainApp() {
     if (file) {
       if (file.size > 2097152) return showToast('Ukuran maksimal 2MB.', 'error');
       const reader = new FileReader();
-      reader.onloadend = () => { setNewProduct(prev => ({ ...prev, gambar: reader.result })); showToast('Foto berhasil diambil!', 'success'); };
+      reader.onloadend = () => {
+        setNewProduct(prev => ({ ...prev, gambar: reader.result }));
+        showToast('Foto berhasil diambil!', 'success');
+      };
       reader.readAsDataURL(file);
     }
   };
@@ -755,8 +795,61 @@ function MainApp() {
     if (file) {
       if (file.size > 2097152) return showToast('Ukuran logo maksimal 2MB.', 'error');
       const reader = new FileReader();
-      reader.onloadend = () => { setSettings(prev => ({ ...prev, logo_url: reader.result })); showToast('Logo berhasil diunggah, silakan simpan pengaturan.', 'success'); };
+      reader.onloadend = () => {
+        setSettings(prev => ({ ...prev, logo_url: reader.result }));
+        showToast('Logo berhasil diunggah, silakan simpan pengaturan.', 'success');
+      };
       reader.readAsDataURL(file);
+    }
+  };
+
+  // FITUR BARU: AI CEK MUTASI UANG MASUK (SCREENSHOT)
+  const handleAIMutasiCheck = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (!geminiKey) return showToast('Masukkan API Key Gemini di Pengaturan dulu!', 'error');
+    if (file.size > 3000000) return showToast('Maksimal ukuran foto mutasi 3MB.', 'error');
+
+    setMutasiResult('Membaca tulisan pada struk/mutasi, mohon tunggu...');
+    
+    try {
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64Data = reader.result.split(',')[1];
+        let mimeType = file.type;
+        
+        const omsetHariIni = pendapatanData?.totalOmset || 0;
+        
+        const prompt = `Ini adalah screenshot mutasi rekening / e-wallet. Tolong baca dengan teliti dan jumlahkan total uang masuk (income/kredit) pada tanggal hari ini saja. Kemudian, bandingkan dengan omset sistem saya hari ini yaitu sebesar Rp ${omsetHariIni}. Berikan analisa singkat apakah uang yang masuk sudah sesuai, kurang, atau lebih dari omset sistem. Gunakan bahasa Indonesia yang ramah, jelas, dan profesional. Pisahkan antara uang masuk dan keluar jika ada.`;
+
+        const payload = {
+          contents: [{
+            parts: [
+              { text: prompt },
+              { inlineData: { mimeType: mimeType, data: base64Data } }
+            ]
+          }],
+          generationConfig: { temperature: 0.2 }
+        };
+
+        const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        });
+        const data = await res.json();
+        
+        if (data.candidates && data.candidates[0]) {
+           setMutasiResult(data.candidates[0].content.parts[0].text);
+           showToast('Berhasil dianalisa!', 'success');
+        } else {
+           setMutasiResult(`Gagal menganalisa: ${data.error?.message || 'Coba foto lain'}`);
+           showToast('Gagal menganalisa', 'error');
+        }
+      };
+      reader.readAsDataURL(file);
+    } catch (err) {
+      setMutasiResult('Terjadi kesalahan koneksi.');
     }
   };
 
@@ -798,24 +891,21 @@ function MainApp() {
 
   const handleClearCart = () => {
     if(window.confirm('Yakin ingin mengosongkan seluruh isi keranjang Anda?')) {
-      setCart({}); setView('toko'); showToast('Keranjang berhasil dikosongkan.', 'success');
+      setCart({});
+      setView('toko');
+      showToast('Keranjang berhasil dikosongkan.', 'success');
     }
   };
 
   const handleClearLocalHistory = () => {
     if(window.confirm('Yakin ingin menghapus riwayat pembelian di HP ini? Data tidak bisa dikembalikan.')) {
-      setLocalHistory([]); showToast('Riwayat berhasil dihapus.', 'success');
+      setLocalHistory([]);
+      showToast('Riwayat berhasil dihapus.', 'success');
     }
   };
 
-  const handleSelesaiBayar = async (isAuto = false) => {
+  const handleSelesaiBayar = async (isAuto = false, overrideMethodName = null) => {
     if (!supabaseClient) return showToast('Database Sedang Tidak Terhubung!', 'error');
-    
-    if (!isAuto && !metodeBayar) {
-      showToast('Silakan pilih Metode Pembayaran terlebih dahulu (QRIS/Transfer)!', 'error');
-      return;
-    }
-
     setIsProcessing(true);
 
     const detailPesanan = Object.entries(cart).map(([id, qty]) => {
@@ -833,8 +923,10 @@ function MainApp() {
     const totalOmsetTrx = totalBelanja;
     const totalProfitTrx = totalOmsetTrx - totalModalTrx;
 
-    let metodeString = (metodeBayar === 'qris' ? 'QRIS / DANA / OVO' : (metodeBayar === 'transfer' ? 'Transfer Bank' : 'Belum Dipilih'));
-    if (isAuto) metodeString += ' (Selesai Otomatis - Cek CCTV/Mutasi)';
+    let metodeString = overrideMethodName || (metodeBayar === 'qris' ? 'QRIS Cepat' : 'Transfer Bank');
+    if (isAuto && !overrideMethodName) {
+      metodeString += ' (Selesai Otomatis)';
+    }
 
     const newTransaction = { 
       id: `TRX-${Date.now()}`, 
@@ -843,8 +935,7 @@ function MainApp() {
       total: totalOmsetTrx, 
       modal: totalModalTrx, 
       profit: totalProfitTrx, 
-      metode: metodeString,
-      status_pembayaran: 'Menunggu Konfirmasi'
+      metode: metodeString
     };
 
     setTransactions(prev => [newTransaction, ...prev]);
@@ -860,10 +951,7 @@ function MainApp() {
     setIsProcessing(false);
 
     const { error: trxError } = await supabaseClient.from('transaksi').insert([newTransaction]);
-    if (trxError) {
-        const { status_pembayaran, ...trxFallback } = newTransaction;
-        await supabaseClient.from('transaksi').insert([trxFallback]);
-    }
+    if (trxError) showToast(`Gagal nyimpan TRX: ${trxError.message}`, 'error');
     
     for (const item of detailPesanan) {
       const prod = products.find(p => p.id === item.id);
@@ -889,35 +977,29 @@ function MainApp() {
     }
   };
 
-  const cartRef = useRef(cart);
-  const viewRef = useRef(view);
-  const metodeRef = useRef(metodeBayar);
-  
-  useEffect(() => { cartRef.current = cart; }, [cart]);
-  useEffect(() => { viewRef.current = view; }, [view]);
-  useEffect(() => { metodeRef.current = metodeBayar; }, [metodeBayar]);
-
+  // TIMEOUT LOGIKA SINKRONISASI KASIR JIKA PEMBELI LUPA TAPE SELESAI
+  const autoCheckoutTimerRef = useRef(null);
   useEffect(() => {
-    if (view !== 'checkout' || isProcessing) {
+    if (view !== 'checkout' || !metodeBayar || isProcessing) {
       setAutoSelesaiCountdown(45);
+      if (autoCheckoutTimerRef.current) clearInterval(autoCheckoutTimerRef.current);
       return;
     }
     
-    const timer = setInterval(() => {
+    if (autoCheckoutTimerRef.current) clearInterval(autoCheckoutTimerRef.current);
+    autoCheckoutTimerRef.current = setInterval(() => {
       setAutoSelesaiCountdown(prev => {
         if (prev <= 1) {
-          clearInterval(timer);
-          if (Object.keys(cartRef.current).length > 0 && viewRef.current === 'checkout') {
-              handleSelesaiBayar(true);
-          }
+          clearInterval(autoCheckoutTimerRef.current);
+          handleSelesaiBayar(true);
           return 0;
         }
         return prev - 1;
       });
     }, 1000);
 
-    return () => clearInterval(timer);
-  }, [view, isProcessing]);
+    return () => clearInterval(autoCheckoutTimerRef.current);
+  }, [view, metodeBayar, isProcessing, cart, products]);
 
   const handleLogin = (e) => {
     e.preventDefault();
@@ -936,6 +1018,30 @@ function MainApp() {
     showToast('Berhasil Keluar', 'success');
   };
 
+  const handleDownloadQRIS = () => {
+    if (!settings.qris_url) return showToast('Belum ada gambar QRIS', 'error');
+    const link = document.createElement('a');
+    link.href = formatImageUrl(settings.qris_url);
+    link.download = 'QRIS_Toko_Kejujuran.png';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    showToast('Mendownload QRIS...', 'success');
+  };
+
+  const handleUploadQRIS = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      if (file.size > 1048576) return showToast('Ukuran gambar maksimal 1MB.', 'error');
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setSettings({ ...settings, qris_url: reader.result });
+        showToast('Gambar QRIS siap disimpan!', 'success');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSaveSettings = async () => {
     if (!supabaseClient) return showToast('Database belum terhubung', 'error');
     setIsProcessing(true);
@@ -943,19 +1049,31 @@ function MainApp() {
     try { localStorage.setItem('tokojujur_gemini_key', geminiKey); } catch(e){}
 
     let { error } = await supabaseClient.from('pengaturan').update({
-      nama_toko: settings.nama_toko, qris_url: settings.qris_url, rekening: settings.rekening, 
-      admin_password: settings.admin_password, logo_url: settings.logo_url, margin_default: settings.margin_default
+      nama_toko: settings.nama_toko, 
+      qris_url: settings.qris_url,
+      rekening: settings.rekening, 
+      admin_password: settings.admin_password,
+      logo_url: settings.logo_url,
+      margin_default: settings.margin_default
     }).eq('id', 1);
     
-    if (error && error.message.includes('logo_url')) {
+    // Auto Fallback jika kolom baru belum ada di Supabase
+    if (error) {
        const { error: fallbackError } = await supabaseClient.from('pengaturan').update({
-          nama_toko: settings.nama_toko, qris_url: settings.qris_url, rekening: settings.rekening, admin_password: settings.admin_password
+          nama_toko: settings.nama_toko, 
+          qris_url: settings.qris_url,
+          rekening: settings.rekening, 
+          admin_password: settings.admin_password
        }).eq('id', 1);
        error = fallbackError;
-       if (!error) showToast('Pengaturan disimpan, TAPI logo gagal. Harap buat kolom "logo_url" di Supabase.', 'error');
-    } else if (error) {
+       if (!error) showToast('Pengaturan dasar disimpan. Harap pastikan kolom logo/margin di Supabase sesuai.', 'error');
+    } 
+    
+    if (error) {
        showToast(`Gagal: ${error.message}`, 'error');
-    } else { showToast('Pengaturan Disimpan ke Database', 'success'); }
+    } else {
+       showToast('Pengaturan Disimpan ke Database', 'success');
+    }
     
     setIsProcessing(false);
   };
@@ -963,7 +1081,8 @@ function MainApp() {
   const handleEditClick = (product) => {
     setNewProduct({
       nama: product.nama, modal: product.modal || 0, jual: product.jual || 0, stok: product.stok || 0,
-      stok_real: product.stok_real || '', barcode: product.barcode || '', diskonQty: product.diskon ? product.diskon.min_qty : '', diskonHarga: product.diskon ? product.diskon.harga_total : '',
+      stok_real: product.stok_real || '',
+      barcode: product.barcode || '', diskonQty: product.diskon ? product.diskon.min_qty : '', diskonHarga: product.diskon ? product.diskon.harga_total : '',
       gambar: product.gambar || ''
     });
     setUseDiskon(!!product.diskon);
@@ -972,6 +1091,7 @@ function MainApp() {
     window.scrollTo({ top: 0, behavior: 'smooth' }); 
   };
 
+  // LOGIKA UPDATE REAL STOK FISIK LOKAL & SIMPAN MASSAL (SINKRONISASI AKTUAL)
   const handleSimpanSemuaFisik = async () => {
     if (!supabaseClient) return showToast('Database tidak terhubung', 'error');
     setIsProcessing(true);
@@ -982,29 +1102,34 @@ function MainApp() {
             const valFisik = parseInt(p.stok_real);
             const selisih = valFisik - (p.stok || 0);
 
+            // Update Stok Utama di DB ke Stok Fisik (stok_real tetap null agar bersih)
             await supabaseClient.from('produk').update({ stok: valFisik }).eq('id', p.id);
             
+            // Catat Kerugian jika ada selisih minus
             if (selisih < 0) {
                const qtyHilang = Math.abs(selisih);
                const modalHilang = qtyHilang * (p.modal || 0);
                const logEntry = {
                  id: `LOG-RUGI-${Date.now()}-${p.id}`,
                  tanggal: new Date().toLocaleString('id-ID'),
-                 items: [{ id: p.id, nama: p.nama, gambar: p.gambar, modal: p.modal, jual: p.jual, qty: qtyHilang, totalHarga: 0, profitItem: -modalHilang }],
+                 items: [{ 
+                    id: p.id, nama: p.nama, gambar: p.gambar, modal: p.modal, jual: p.jual, 
+                    qty: qtyHilang, totalHarga: 0, profitItem: -modalHilang 
+                 }],
                  total: 0, modal: modalHilang, profit: -modalHilang,
-                 metode: 'Catatan Kerugian (Sistem)', status_pembayaran: 'Lunas'
+                 metode: 'Catatan Kerugian (Sistem)'
                };
-               await supabaseClient.from('transaksi').insert([logEntry]).catch(e=>{
-                 const {status_pembayaran, ...fb} = logEntry; supabaseClient.from('transaksi').insert([fb]);
-               });
+               await supabaseClient.from('transaksi').insert([logEntry]);
                setTransactions(prev => [logEntry, ...prev]);
                totalKerugianTersimpan++;
             }
         }
     }
 
+    // Bersihkan stok_real di memori lokal setelah berhasil disinkron
     setProducts(prev => prev.map(p => ({ ...p, stok: p.stok_real !== null && p.stok_real !== undefined && p.stok_real !== '' ? parseInt(p.stok_real) : p.stok, stok_real: null })));
-    showToast(`Sinkronisasi Selesai! ${totalKerugianTersimpan} log kerugian dicatat ke sistem.`, 'success');
+    
+    showToast(`Sinkronisasi Selesai! ${totalKerugianTersimpan} item log kerugian dicatat.`, 'success');
     setIsProcessing(false);
   };
 
@@ -1026,11 +1151,9 @@ function MainApp() {
     if (useDiskon) disc = { min_qty: parseInt(newProduct.diskonQty) || 1, harga_total: parseInt(newProduct.diskonHarga) || 0 };
     
     const targetId = editingId ? editingId : Date.now();
-    const finalStokReal = newProduct.stok_real !== '' && newProduct.stok_real !== null ? parseInt(newProduct.stok_real) : null;
-
     const tempProd = { 
       nama: newProduct.nama, barcode: newProduct.barcode, modal: newProduct.modal||0, 
-      jual: newProduct.jual||0, stok: newProduct.stok||0, stok_real: finalStokReal, diskon: disc,
+      jual: newProduct.jual||0, stok: newProduct.stok||0, diskon: disc,
       gambar: newProduct.gambar || null
     };
     
@@ -1044,22 +1167,14 @@ function MainApp() {
     
     if (editingId) {
       let { error } = await supabaseClient.from('produk').update(tempProd).eq('id', editingId);
-      if (error && error.message.includes('stok_real')) {
-         const { stok_real, ...prodNoReal } = tempProd;
-         error = (await supabaseClient.from('produk').update(prodNoReal).eq('id', editingId)).error;
-      }
       if (error && error.message.includes('gambar')) {
-        const { gambar, stok_real, ...prodNoImg } = tempProd;
+        const { gambar, ...prodNoImg } = tempProd;
         await supabaseClient.from('produk').update(prodNoImg).eq('id', editingId);
       }
     } else {
       let { error } = await supabaseClient.from('produk').insert([{ ...tempProd, id: targetId, tanggal_dibuat: new Date().toISOString() }]);
-      if (error && error.message.includes('stok_real')) {
-         const { stok_real, ...prodNoReal } = tempProd;
-         error = (await supabaseClient.from('produk').insert([{ ...prodNoReal, id: targetId, tanggal_dibuat: new Date().toISOString() }])).error;
-      }
       if (error && error.message.includes('gambar')) {
-        const { gambar, stok_real, ...prodNoImg } = tempProd;
+        const { gambar, ...prodNoImg } = tempProd;
         await supabaseClient.from('produk').insert([{ ...prodNoImg, id: targetId, tanggal_dibuat: new Date().toISOString() }]);
       }
     }
@@ -1091,6 +1206,7 @@ function MainApp() {
       setIsProcessing(true);
       const stockToRestore = {};
       transactions.forEach(t => {
+        // Jangan kembalikan stok dari log kerugian
         if (t.metode !== 'Catatan Kerugian (Sistem)') {
           t.items.forEach(item => {
             if (!stockToRestore[item.id]) stockToRestore[item.id] = 0;
@@ -1100,7 +1216,7 @@ function MainApp() {
       });
 
       setProducts(prevProducts => prevProducts.map(p => {
-        if (stockToRestore[p.id]) return { ...p, stok: p.stok + stockToRestore[p.id] };
+        if (stockToRestore[p.id]) return { ...p, stok: (p.stok || 0) + stockToRestore[p.id] };
         return p;
       }));
       setTransactions([]); 
@@ -1129,6 +1245,7 @@ function MainApp() {
           if (boughtItem) return { ...p, stok: (p.stok || 0) + boughtItem.qty };
           return p;
         }));
+
         for (const item of trx.items) {
           const product = products.find(p => p.id === item.id);
           if (product) await supabaseClient.from('produk').update({ stok: (product.stok || 0) + item.qty }).eq('id', product.id);
@@ -1148,11 +1265,8 @@ function MainApp() {
      setIsProcessing(true);
      setTransactions(prev => prev.map(t => t.id === editingTrx.id ? editingTrx : t));
      await supabaseClient.from('transaksi').update({
-       metode: editingTrx.metode, total: editingTrx.total, profit: editingTrx.profit, modal: editingTrx.modal, status_pembayaran: editingTrx.status_pembayaran
-     }).eq('id', editingTrx.id).catch(err => {
-         const { status_pembayaran, ...fb } = editingTrx;
-         supabaseClient.from('transaksi').update(fb).eq('id', editingTrx.id);
-     });
+       metode: editingTrx.metode, total: editingTrx.total, profit: editingTrx.profit, modal: editingTrx.modal
+     }).eq('id', editingTrx.id);
      showToast('Transaksi diperbarui!', 'success');
      setEditingTrx(null);
      setIsProcessing(false);
@@ -1179,11 +1293,7 @@ function MainApp() {
     link.click();
   };
 
-  const renderLogo = (sizeCls = "w-8 h-8") => {
-    if (settings.logo_url) return <img src={formatImageUrl(settings.logo_url)} className={`${sizeCls} object-contain rounded-lg shadow-sm`} alt="Logo" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }} />
-    return <Store className="text-emerald-500 shrink-0" size={28} />;
-  };
-
+  // --- RENDER UI ---
   if (!isConnected || !supabaseClient) {
     return (
       <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 text-white text-center font-sans">
@@ -1222,50 +1332,33 @@ function MainApp() {
   return (
     <div className="min-h-screen bg-slate-50 font-sans text-slate-900 selection:bg-emerald-100 relative">
       
-      {liveNotif && (
-        <div className="fixed top-20 right-4 z-[9999] px-6 py-4 bg-emerald-500 text-white rounded-2xl shadow-2xl font-black flex items-center gap-3 animate-slide-up border border-emerald-400 max-w-sm">
-          <BellRing size={24} className="animate-bounce shrink-0"/>
-          <p className="text-sm leading-tight drop-shadow-md">{liveNotif}</p>
-        </div>
-      )}
-
-      {/* MODAL AI MUTASI UANG (FITUR BARU) */}
-      {showMutasiModal && (
-        <div className="fixed inset-0 bg-slate-900/60 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
-           <div className="bg-white rounded-[32px] p-6 w-full max-w-md animate-slide-up shadow-2xl border-4 border-white flex flex-col">
-              <h3 className="font-black text-xl mb-1 text-slate-800 flex items-center gap-2"><Sparkles className="text-blue-500"/> AI Analisa Mutasi</h3>
-              <p className="text-xs font-bold text-slate-400 mb-4 pb-4 border-b border-slate-100">AI Gemini sedang membaca screenshot DANA/Mutasi Anda.</p>
-              <div className="bg-slate-50 p-5 rounded-2xl border border-slate-200 min-h-[150px] flex items-center justify-center">
-                 <p className="text-sm font-semibold text-slate-700 whitespace-pre-wrap leading-relaxed text-center w-full">{mutasiResult}</p>
-              </div>
-              <button onClick={() => setShowMutasiModal(false)} className="w-full mt-6 py-4 bg-slate-900 font-bold rounded-2xl text-white hover:bg-slate-800 transition-colors shadow-lg">Tutup Analisa AI</button>
-           </div>
-        </div>
-      )}
-
+      {/* MODAL SCANNER KAMERA (LANDSCAPE/MEMANJANG) */}
       {isScanningModalOpen && (
         <div className="fixed inset-0 bg-black z-[999] flex flex-col animate-fade-in">
           <div className="flex justify-between items-center p-4 bg-gradient-to-b from-black/80 to-transparent text-white absolute top-0 w-full z-10">
             <span className="font-bold text-lg tracking-widest uppercase">Arahkan ke Barcode</span>
             <button onClick={stopScanner} className="p-3 bg-red-500/80 hover:bg-red-500 rounded-full transition-colors backdrop-blur-sm shadow-xl"><X size={24}/></button>
           </div>
-          <div id="reader-barcode" className="w-full h-full bg-black flex flex-col items-center justify-center pt-20"></div>
-          <div className="absolute inset-0 pointer-events-none flex items-center justify-center pt-20 z-10">
+          <div id="reader-barcode" className="w-full h-full bg-black flex flex-col items-center justify-center pt-20">
+            <div className="text-center text-white p-4 relative z-20">
+              <Camera size={48} className="mx-auto mb-4 opacity-50"/>
+              <p className="font-bold mb-4 drop-shadow-md">Jika kamera tidak muncul, gunakan file/foto.</p>
+              <label className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold cursor-pointer inline-flex items-center gap-2 hover:bg-emerald-500 transition-colors shadow-lg">
+                <ImageIcon size={20}/> Pilih Foto Barcode
+                <input type="file" accept="image/*" className="hidden" onChange={handleScanFromFile} />
+              </label>
+            </div>
+          </div>
+          <div className="absolute inset-0 pointer-events-none flex items-center justify-center pt-20">
+            {/* Box memanjang (Landscape) khusus Barcode */}
             <div className="w-80 h-40 border-4 border-emerald-500 rounded-2xl shadow-[0_0_0_9999px_rgba(0,0,0,0.7)] relative flex items-center justify-center">
               <div className="absolute w-full h-0.5 bg-emerald-400 animate-[scan_2s_ease-in-out_infinite] shadow-[0_0_10px_#34d399]"></div>
             </div>
           </div>
-          <div className="absolute bottom-10 left-0 right-0 text-center text-white p-4 z-20">
-             <Camera size={48} className="mx-auto mb-4 opacity-50"/>
-             <p className="font-bold mb-4 drop-shadow-md">Jika kamera diblokir, gunakan file/foto.</p>
-             <label className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold cursor-pointer inline-flex items-center gap-2 hover:bg-emerald-500 transition-colors shadow-lg">
-                <ImageIcon size={20}/> Pilih Foto Barcode
-                <input type="file" accept="image/*" className="hidden" onChange={handleScanFromFile} />
-             </label>
-          </div>
         </div>
       )}
 
+      {/* MODAL SHARE TOKO */}
       {showShareApp && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[999] flex items-center justify-center p-4 animate-fade-in">
           <div className="bg-white w-full max-w-sm rounded-[32px] p-8 shadow-2xl flex flex-col items-center relative text-center animate-slide-up">
@@ -1284,23 +1377,22 @@ function MainApp() {
         </div>
       )}
 
+      {/* MODAL EDIT TRANSAKSI */}
       {editingTrx && (
         <div className="fixed inset-0 bg-slate-900/60 z-[999] flex items-center justify-center p-4 backdrop-blur-sm animate-fade-in">
            <div className="bg-white rounded-3xl p-6 w-full max-w-md animate-slide-up shadow-2xl border-4 border-white">
               <h3 className="font-black text-xl mb-1 text-slate-800">Edit Data Transaksi</h3>
-              <p className="text-xs font-bold text-slate-400 mb-6 pb-4 border-b border-slate-100">Koreksi total harga atau status pembayaran.</p>
+              <p className="text-xs font-bold text-slate-400 mb-6 pb-4 border-b border-slate-100">Koreksi total harga atau metode pembayaran jika ada kesalahan.</p>
               <form onSubmit={handleSaveEditTrx}>
                  <div className="space-y-4">
                     <div>
-                      <label className="text-[10px] uppercase tracking-widest font-black text-gray-500 ml-1">Status Pembayaran</label>
-                      <select value={editingTrx.status_pembayaran || 'Lunas'} onChange={e => setEditingTrx({...editingTrx, status_pembayaran: e.target.value})} className="w-full p-4 mt-1 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm text-slate-700 outline-none focus:ring-4 focus:ring-emerald-500/20">
-                         <option value="Lunas">LUNAS (Selesai)</option>
-                         <option value="Menunggu Konfirmasi">MENUNGGU KONFIRMASI (Belum Bayar)</option>
-                      </select>
-                    </div>
-                    <div>
                       <label className="text-[10px] uppercase tracking-widest font-black text-gray-500 ml-1">Metode Pembayaran</label>
-                      <input type="text" value={editingTrx.metode} onChange={e => setEditingTrx({...editingTrx, metode: e.target.value})} className="w-full p-4 mt-1 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm text-slate-700 outline-none" />
+                      <select value={editingTrx.metode} onChange={e => setEditingTrx({...editingTrx, metode: e.target.value})} className="w-full p-4 mt-1 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm text-slate-700 outline-none focus:ring-4 focus:ring-emerald-500/20">
+                         <option value="QRIS / Kasir Etalase">QRIS / Kasir Etalase</option>
+                         <option value="QRIS Cepat">QRIS Cepat</option>
+                         <option value="Transfer Bank">Transfer Bank</option>
+                         <option value="Tunai">Tunai / Cash</option>
+                      </select>
                     </div>
                     <div>
                       <label className="text-[10px] uppercase tracking-widest font-black text-gray-500 ml-1">Total Belanja (Rp)</label>
@@ -1310,16 +1402,21 @@ function MainApp() {
                       <label className="text-[10px] uppercase tracking-widest font-black text-gray-500 ml-1">Total Modal (Rp)</label>
                       <input type="number" value={editingTrx.modal} onChange={e => setEditingTrx({...editingTrx, modal: parseInt(e.target.value)||0, profit: editingTrx.total - (parseInt(e.target.value)||0)})} className="w-full p-4 mt-1 bg-slate-50 border border-slate-200 rounded-2xl font-bold text-sm text-slate-700 outline-none focus:ring-4 focus:ring-emerald-500/20" />
                     </div>
+                    <div>
+                      <label className="text-[10px] uppercase tracking-widest font-black text-gray-500 ml-1">Keuntungan / Profit (Rp)</label>
+                      <input type="number" value={editingTrx.profit} onChange={e => setEditingTrx({...editingTrx, profit: parseInt(e.target.value)||0})} className="w-full p-4 mt-1 bg-emerald-50 border border-emerald-200 rounded-2xl font-extrabold text-sm text-emerald-700 outline-none focus:ring-4 focus:ring-emerald-500/20" />
+                    </div>
                  </div>
                  <div className="flex gap-3 mt-8">
                     <button type="button" onClick={() => setEditingTrx(null)} className="flex-1 py-4 bg-slate-100 font-bold rounded-2xl text-slate-600 hover:bg-slate-200 transition-colors">Batal</button>
-                    <button type="submit" disabled={isProcessing} className="flex-1 py-4 bg-emerald-600 font-bold rounded-2xl text-white hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">{isProcessing ? 'Menyimpan...' : 'Simpan Edit'}</button>
+                    <button type="submit" disabled={isProcessing} className="flex-1 py-4 bg-emerald-600 font-bold rounded-2xl text-white hover:bg-emerald-700 transition-colors shadow-lg shadow-emerald-200">Simpan Edit</button>
                  </div>
               </form>
            </div>
         </div>
       )}
 
+      {/* TOAST GLOBAL */}
       {toast.show && (
         <div className="fixed top-5 left-1/2 -translate-x-1/2 z-[100] px-6 py-3 bg-slate-900 text-white rounded-full shadow-2xl font-bold flex items-center gap-2 animate-slide-up border border-slate-700 w-max max-w-[90%] text-center text-sm md:text-base">
           {toast.type === 'success' ? <CheckCircle size={20} className="text-emerald-400 shrink-0"/> : <AlertTriangle size={20} className="text-rose-400 shrink-0"/>}
@@ -1327,12 +1424,13 @@ function MainApp() {
         </div>
       )}
 
+      {/* HEADER UMUM */}
       {view !== 'admin' && view !== 'struk' && (
         <header className="bg-white p-4 shadow-sm sticky top-0 z-40 mb-4 border-b">
           <div className="flex justify-between items-center mb-4 max-w-5xl mx-auto">
             <div className="flex items-center gap-2 text-emerald-600 font-black text-lg md:text-xl truncate max-w-[50%]">
               {renderLogo("w-8 h-8")}
-              <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v15.0 (Anti-Theft)</span></span>
+              <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v15.0</span></span>
             </div>
             <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
               <button onClick={() => setView('riwayat')} className="p-2 md:p-2.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition shadow-sm relative" title="Riwayat Pembelian">
@@ -1360,6 +1458,7 @@ function MainApp() {
         </header>
       )}
 
+      {/* VIEW: TOKO */}
       {view === 'toko' && (
         <div className="pb-28">
           <div className="max-w-5xl mx-auto px-4 mb-6">
@@ -1379,9 +1478,20 @@ function MainApp() {
               <div key={p.id} onClick={() => openProductModal(p)} className="bg-white p-3 md:p-5 rounded-3xl shadow-sm border border-slate-100 flex flex-col items-center text-center relative active:scale-95 transition-transform cursor-pointer border-b-4 border-b-slate-100 overflow-hidden w-full h-full">
                 {cart[p.id] > 0 && <div className="absolute top-0 right-0 bg-emerald-500 text-white text-[10px] md:text-xs font-black px-2 md:px-3 py-1 rounded-bl-xl shadow-lg z-20">{cart[p.id]}</div>}
                 
+                {/* GAMBAR PRODUK RAKSASA DENGAN PENGHILANG ERROR VISUAL */}
                 <div className="mb-3 md:mb-4 w-32 h-32 md:w-48 md:h-48 rounded-2xl border border-slate-100 shadow-inner relative overflow-hidden bg-slate-50 flex items-center justify-center shrink-0">
                   {p.gambar ? (
-                    <img loading="lazy" referrerPolicy="no-referrer" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" alt={p.nama} onError={(e) => { e.target.onerror = null; e.target.src = FALLBACK_IMAGE; }} />
+                    <img 
+                      loading="lazy" 
+                      referrerPolicy="no-referrer" 
+                      src={formatImageUrl(p.gambar)} 
+                      className="absolute inset-0 w-full h-full object-cover z-10 bg-white will-change-transform" 
+                      alt={p.nama} 
+                      onError={(e) => { 
+                        e.target.onerror = null; 
+                        e.target.src = FALLBACK_IMAGE; 
+                      }} 
+                    />
                   ) : (
                     <img src={FALLBACK_IMAGE} className="w-16 h-16 opacity-50" alt="kosong"/>
                   )}
@@ -1395,6 +1505,7 @@ function MainApp() {
             {searchFilteredProducts.length === 0 && <div className="col-span-full text-center text-slate-400 mt-10 font-bold text-sm">Barang tidak ditemukan.</div>}
           </main>
 
+          {/* MODAL PILIH JUMLAH BELI */}
           {selectedProduct && (
             <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-4 animate-fade-in">
               <div className="bg-white w-full max-w-md rounded-3xl p-6 md:p-8 shadow-2xl animate-slide-up border-4 border-white flex flex-col">
@@ -1430,6 +1541,7 @@ function MainApp() {
             </div>
           )}
 
+          {/* FLOATING CHECKOUT BUTTON */}
           {jumlahItem > 0 && !selectedProduct && (
             <div className="fixed bottom-6 left-4 right-4 z-50 max-w-md mx-auto">
               <button onClick={() => setView('checkout')} className="w-full bg-emerald-600 text-white p-4 md:p-5 rounded-3xl shadow-2xl flex justify-between items-center active:scale-95 transition-all border border-emerald-400">
@@ -1441,6 +1553,7 @@ function MainApp() {
         </div>
       )}
 
+      {/* VIEW: CHECKOUT */}
       {view === 'checkout' && (
         <div className="max-w-md mx-auto p-4 md:p-6 min-h-screen flex flex-col pb-32">
           <button onClick={() => setView('toko')} className="flex items-center gap-2 font-black mb-6 text-slate-400 hover:text-slate-600 transition w-max"><ArrowLeft size={18}/> Kembali Belanja</button>
@@ -1524,6 +1637,7 @@ function MainApp() {
              </div>
           )}
 
+          {/* SENSOR TIMER AUTO CHECKOUT JIKA DITINGGAL PERGI */}
           {metodeBayar && (
              <div className="mt-6 p-4 bg-amber-50 text-amber-800 border border-amber-200 rounded-2xl text-xs text-center font-bold animate-pulse flex flex-col items-center gap-2">
                 <div className="flex items-center gap-1.5 text-amber-600">
@@ -1537,11 +1651,14 @@ function MainApp() {
           <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 border-t z-50">
              <button 
                onClick={() => {
-                 if (!metodeBayar) showToast('Silakan pilih Metode Pembayaran terlebih dahulu!', 'error');
-                 else handleSelesaiBayar(false);
+                 if (!metodeBayar) {
+                   showToast('Silakan pilih Metode Pembayaran terlebih dahulu!', 'error');
+                 } else {
+                   handleSelesaiBayar(false);
+                 }
                }}
                disabled={isProcessing || Object.keys(cart).length === 0}
-               className="w-full max-w-md mx-auto block py-4 bg-slate-900 text-white rounded-xl font-bold text-lg disabled:opacity-30 transition-opacity active:scale-95"
+               className="w-full max-w-md mx-auto block py-4 bg-slate-900 text-white rounded-xl font-bold text-lg disabled:opacity-30 transition-opacity"
              >
                {isProcessing ? 'MENYIMPAN...' : 'Selesai & Cetak Struk'}
              </button>
@@ -1549,6 +1666,7 @@ function MainApp() {
         </div>
       )}
 
+      {/* VIEW: STRUK */}
       {view === 'struk' && (
         <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-start pt-10 px-4 pb-10">
           <div className="mb-6 flex flex-col items-center animate-slide-up text-center">
@@ -1621,6 +1739,7 @@ function MainApp() {
         </div>
       )}
 
+      {/* VIEWS: RIWAYAT LOKAL HP */}
       {view === 'riwayat' && (
          <div className="min-h-screen bg-slate-50 pb-20">
             <header className="bg-white p-4 shadow-sm flex items-center justify-between sticky top-0 z-40 border-b border-slate-200">
@@ -1695,10 +1814,14 @@ function MainApp() {
                <div><h2 className="font-extrabold text-xl text-white leading-tight tracking-wide">Admin Area</h2><p className="text-[10px] text-emerald-400 font-black uppercase tracking-widest mt-1">Toko Kejujuran</p></div>
             </div>
             <nav className="p-2 md:p-4 flex overflow-x-auto md:grid md:grid-cols-1 md:flex-col gap-2 w-full pb-3 md:pb-4 scrollbar-hide">
-              <button onClick={() => {setAdminTab('analisa'); setEditingId(null); setShowAddForm(false);}} className={`flex-1 min-w-[80px] flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='analisa' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><BarChart3 size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Analisa<br className="md:hidden"/>Penjualan</span></button>
+              <button onClick={() => {setAdminTab('analisa'); setEditingId(null); setShowAddForm(false);}} className={`flex-1 min-w-[80px] flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='analisa' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><BarChart3 size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Analisa<br className="md:hidden"/>Bisnis</span></button>
               <button onClick={() => {setAdminTab('pendapatan'); setEditingId(null); setShowAddForm(false);}} className={`flex-1 min-w-[80px] flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='pendapatan' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><TrendingUp size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Laporan<br className="md:hidden"/>Pendapatan</span></button>
               <button onClick={() => {setAdminTab('barang'); setEditingId(null); setShowAddForm(false);}} className={`flex-1 min-w-[80px] flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='barang' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Package size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Data<br className="md:hidden"/>Barang</span></button>
               <button onClick={() => {setAdminTab('audit'); setEditingId(null); setShowAddForm(false);}} className={`flex-1 min-w-[80px] flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='audit' ? 'bg-rose-600 text-white shadow-md' : 'text-rose-400 hover:bg-slate-800 hover:text-rose-300'}`}><AlertTriangle size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Log<br className="md:hidden"/>Kerugian</span></button>
+              
+              {/* TAB BARU: CEK MUTASI */}
+              <button onClick={() => {setAdminTab('mutasi'); setEditingId(null); setShowAddForm(false);}} className={`flex-1 min-w-[80px] flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='mutasi' ? 'bg-blue-600 text-white shadow-md' : 'text-blue-400 hover:bg-slate-800 hover:text-blue-300'}`}><Sparkles size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Cek<br className="md:hidden"/>Mutasi</span></button>
+
               <button onClick={() => {setAdminTab('pengaturan'); setEditingId(null); setShowAddForm(false);}} className={`flex-1 min-w-[80px] flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='pengaturan' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Settings size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Pengaturan<br className="md:hidden"/>Toko</span></button>
               <button onClick={handleLogout} className="flex-1 min-w-[80px] flex flex-col md:flex-row md:mt-auto items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl text-rose-500 hover:bg-slate-800 hover:text-rose-400 transition-all"><LogOut size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Keluar<br className="md:hidden"/>Admin</span></button>
             </nav>
@@ -1706,7 +1829,55 @@ function MainApp() {
           
           <main className="flex-1 p-4 md:p-10 overflow-y-auto w-full max-w-7xl mx-auto">
              
-             {/* TAB AUDIT KERUGIAN (BARU & PROFESIONAL) */}
+             {/* TAB CEK MUTASI (BARU) */}
+             {adminTab === 'mutasi' && (
+                <div className="animate-fade-in max-w-4xl mx-auto w-full pb-10">
+                  <div className="mb-8">
+                    <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-slate-800 flex items-center gap-3"><Sparkles className="text-blue-500" size={36}/> AI Sinkronisasi Mutasi</h1>
+                    <p className="text-sm font-bold text-slate-500 mt-2">Upload screenshot mutasi bank / e-wallet (DANA, OVO, dll). AI Gemini akan mencari total uang masuk dan membandingkannya dengan omset hari ini.</p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                     <div className="bg-white p-6 rounded-[32px] border border-slate-200 shadow-sm flex flex-col justify-center items-center text-center">
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Total Omset Sistem (Hari Ini)</p>
+                        <h2 className="text-4xl font-black text-slate-800 tracking-tighter">{formatRupiah(pendapatanData?.totalOmset || 0)}</h2>
+                        <p className="text-xs font-bold text-slate-500 mt-2">Pastikan uang di mutasi sama/lebih besar dari ini.</p>
+                     </div>
+                     
+                     <div className="bg-blue-600 p-6 rounded-[32px] shadow-lg shadow-blue-200 flex flex-col justify-center items-center text-center text-white relative overflow-hidden">
+                        <div className="absolute -right-4 -bottom-4 opacity-20"><Sparkles size={100}/></div>
+                        <div className="relative z-10 w-full">
+                          <label className="bg-white text-blue-600 hover:bg-blue-50 px-6 py-4 rounded-2xl font-black cursor-pointer transition-all active:scale-95 shadow-md flex items-center justify-center gap-2 mx-auto w-max">
+                            <ImageIcon size={20}/> Upload Screenshot Mutasi
+                            <input type="file" accept="image/*" className="hidden" onChange={handleAIMutasiCheck} />
+                          </label>
+                          <p className="text-xs font-bold text-blue-200 mt-4">Atau mutasi DANA, OVO, ShopeePay</p>
+                        </div>
+                     </div>
+                  </div>
+
+                  <div className="bg-white rounded-[40px] border border-slate-200 shadow-sm p-6 md:p-10">
+                     <h3 className="font-black text-slate-800 text-lg flex items-center gap-2 mb-4 border-b border-slate-100 pb-4"><BarChart3 className="text-blue-500" size={20}/> Hasil Analisa AI Gemini</h3>
+                     <div className="bg-slate-50 rounded-3xl p-6 min-h-[200px] border border-slate-100 flex flex-col items-center justify-center">
+                        {mutasiResult ? (
+                           <div className="w-full text-left">
+                              <p className="text-sm font-semibold text-slate-700 whitespace-pre-wrap leading-relaxed">{mutasiResult}</p>
+                           </div>
+                        ) : (
+                           <div className="text-center opacity-50">
+                              <Sparkles size={40} className="mx-auto mb-3"/>
+                              <p className="font-bold text-sm">Menunggu gambar mutasi diupload...</p>
+                           </div>
+                        )}
+                     </div>
+                     {mutasiResult && (
+                        <button onClick={() => setMutasiResult('')} className="mt-6 w-full py-4 bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold rounded-2xl transition">Bersihkan Hasil Analisa</button>
+                     )}
+                  </div>
+                </div>
+             )}
+
+             {/* TAB AUDIT KERUGIAN */}
              {adminTab === 'audit' && adminData && (
                 <div className="animate-fade-in max-w-7xl mx-auto w-full pb-10">
                   <div className="flex flex-col xl:flex-row justify-between xl:items-center mb-8 gap-6 w-full">
@@ -1784,13 +1955,14 @@ function MainApp() {
                 </div>
              )}
 
-             {/* TAB PENDAPATAN */}
+             {/* TAB PENDAPATAN BARU */}
              {adminTab === 'pendapatan' && pendapatanData && (
                <div className="animate-fade-in max-w-7xl mx-auto w-full pb-10">
                   <div className="flex flex-col xl:flex-row justify-between xl:items-center mb-8 gap-6 w-full">
                     <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-slate-800 flex items-center gap-3"><TrendingUp className="text-emerald-500" size={36}/> Laporan Pendapatan</h1>
                   </div>
 
+                  {/* FILTER BUTTONS */}
                   <div className="bg-white p-2 rounded-2xl md:rounded-[32px] border border-slate-200 shadow-sm flex flex-wrap mb-8 w-full md:w-max mx-auto md:mx-0">
                      <button onClick={() => setFilterPendapatan('hari_ini')} className={`flex-1 md:flex-none px-6 py-3 rounded-xl md:rounded-3xl font-black text-[10px] md:text-sm transition-all ${filterPendapatan === 'hari_ini' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>HARI INI</button>
                      <button onClick={() => setFilterPendapatan('minggu_ini')} className={`flex-1 md:flex-none px-6 py-3 rounded-xl md:rounded-3xl font-black text-[10px] md:text-sm transition-all ${filterPendapatan === 'minggu_ini' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>7 HARI TERAKHIR</button>
@@ -1798,6 +1970,7 @@ function MainApp() {
                      <button onClick={() => setFilterPendapatan('semua')} className={`flex-1 md:flex-none px-6 py-3 rounded-xl md:rounded-3xl font-black text-[10px] md:text-sm transition-all ${filterPendapatan === 'semua' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>SEMUA WAKTU</button>
                   </div>
 
+                  {/* CARDS METRICS */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
                      <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
                         <div className="absolute top-0 right-0 p-4 opacity-5"><TrendingUp size={60}/></div>
@@ -1829,6 +2002,7 @@ function MainApp() {
                      </div>
                   </div>
 
+                  {/* TABLE RINCIAN */}
                   <div className="bg-white rounded-3xl md:rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col w-full">
                     <div className="p-4 md:p-6 border-b border-slate-100"><h2 className="font-black text-base md:text-xl text-slate-800 flex items-center gap-2"><Package className="text-blue-500" size={20}/> Rincian Barang Terjual ({filterPendapatan.replace('_', ' ').toUpperCase()})</h2></div>
                     <div className="overflow-x-auto w-full block">
@@ -1871,6 +2045,7 @@ function MainApp() {
                      <div className="space-y-3"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Store size={14}/> Nama Toko Digital</label><input value={settings.nama_toko || ''} onChange={e => setSettings({...settings, nama_toko: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-3xl font-black focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all text-sm md:text-lg"/></div>
                      <hr className="border-slate-100"/>
                      
+                     {/* PENGATURAN LOGO TOKO / FAVICON */}
                      <div className="space-y-3">
                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><ImageIcon size={14}/> Logo Toko & Ikon Aplikasi (PWA)</label>
                        <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6 bg-slate-50 border border-slate-200 p-6 rounded-[32px]">
@@ -1903,13 +2078,14 @@ function MainApp() {
                      <hr className="border-slate-100"/>
                      <div className="space-y-3"><label className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-2 flex items-center gap-2"><CreditCard size={14}/> Info Rekening Manual (Cadangan)</label><input value={settings.rekening || ''} onChange={e => setSettings({...settings, rekening: e.target.value})} className="w-full p-4 bg-slate-50 border border-slate-200 rounded-3xl font-bold focus:ring-4 focus:ring-emerald-500/20 outline-none transition-all text-xs md:text-sm"/><p className="text-[10px] text-slate-400 font-bold ml-2">Format: NAMA BANK [SPASI] NO REKENING [SPASI] a.n NAMA PEMILIK</p></div>
                      <hr className="border-slate-100"/>
+                     {/* PENGATURAN MARGIN DEFAULT */}
                      <div className="space-y-3">
                         <label className="text-[10px] font-black text-orange-500 uppercase tracking-widest ml-2 flex items-center gap-2"><TrendingUp size={14}/> Margin Keuntungan Default (%)</label>
                         <input type="number" value={settings.margin_default || ''} onChange={e => setSettings({...settings, margin_default: e.target.value})} placeholder="Misal: 10" className="w-full p-4 bg-orange-50/50 text-orange-900 rounded-3xl font-bold border border-orange-200 focus:border-orange-400 focus:ring-4 focus:ring-orange-500/20 outline-none transition-all text-xs md:text-sm"/>
                         <p className="text-[10px] text-slate-400 font-bold ml-2">Persentase ini akan otomatis mengkalkulasi harga jual saat Anda mengetik harga modal di menu tambah barang.</p>
                      </div>
                      <hr className="border-slate-100"/>
-                     <div className="space-y-3"><label className="text-[10px] font-black text-blue-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Sparkles size={14}/> Gemini API Key (Untuk AI Gambar & Cek Mutasi)</label><input type="password" value={geminiKey} onChange={e => setGeminiKey(e.target.value)} placeholder="AIzaSy..." className="w-full p-4 bg-blue-50/50 text-blue-900 rounded-3xl font-bold border border-blue-200 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/20 outline-none transition-all text-xs md:text-sm"/><p className="text-[10px] text-slate-400 font-bold ml-2">Tersimpan aman di memori HP Anda. Diperlukan untuk merapihkan foto otomatis dan cek bukti mutasi pembeli.</p></div>
+                     <div className="space-y-3"><label className="text-[10px] font-black text-blue-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Sparkles size={14}/> Gemini API Key (Untuk AI Gambar & Mutasi)</label><input type="password" value={geminiKey} onChange={e => setGeminiKey(e.target.value)} placeholder="AIzaSy..." className="w-full p-4 bg-blue-50/50 text-blue-900 rounded-3xl font-bold border border-blue-200 focus:border-blue-400 focus:ring-4 focus:ring-blue-500/20 outline-none transition-all text-xs md:text-sm"/><p className="text-[10px] text-slate-400 font-bold ml-2">Tersimpan aman di memori HP Anda. Diperlukan untuk cek mutasi dan merapihkan foto otomatis.</p></div>
                      <hr className="border-slate-100"/>
                      <div className="space-y-3"><label className="text-[10px] font-black text-rose-500 uppercase tracking-widest ml-2 flex items-center gap-2"><Lock size={14}/> Sandi Rahasia Admin</label><input type="text" value={settings.admin_password || ''} onChange={e => setSettings({...settings, admin_password: e.target.value})} className="w-full p-4 bg-rose-50/50 text-rose-900 rounded-3xl font-black border border-rose-200 focus:border-rose-400 focus:ring-4 focus:ring-rose-500/20 outline-none transition-all tracking-[0.5em] text-lg md:text-xl text-center"/></div>
                      <div className="space-y-3 pt-4 border-t border-slate-100 mt-6">
@@ -2157,23 +2333,14 @@ function MainApp() {
                   <div className="bg-white rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 p-4 md:p-8 w-full">
                     <div className="flex flex-col md:flex-row justify-between md:items-center mb-4 gap-3">
                       <h2 className="font-black text-base md:text-lg flex items-center gap-2 text-slate-900"><List className="text-blue-500" size={20}/> Riwayat Transaksi Lengkap</h2>
-                      <div className="flex items-center gap-2">
-                         <label className="bg-emerald-100 text-emerald-700 px-3 py-2 rounded-xl font-bold text-xs cursor-pointer hover:bg-emerald-200 transition flex items-center gap-1">
-                           <Sparkles size={14}/> AI Cek Mutasi
-                           <input type="file" accept="image/*" className="hidden" onChange={handleAIMutasiCheck} />
-                         </label>
-                         <select value={sortTrx} onChange={e => setSortTrx(e.target.value)} className="bg-slate-50 px-3 py-2 rounded-xl text-xs font-bold outline-none text-slate-700 border border-slate-200">
-                            <option value="terbaru">Paling Baru</option><option value="terlama">Paling Lama</option><option value="terbesar">Nominal Terbesar</option><option value="terkecil">Nominal Terkecil</option>
-                         </select>
-                      </div>
+                      <select value={sortTrx} onChange={e => setSortTrx(e.target.value)} className="bg-slate-50 px-3 py-2 rounded-xl text-xs font-bold outline-none text-slate-700 border border-slate-200">
+                         <option value="terbaru">Paling Baru</option><option value="terlama">Paling Lama</option><option value="terbesar">Nominal Terbesar</option><option value="terkecil">Nominal Terkecil</option>
+                      </select>
                     </div>
                     <div className="space-y-3 max-h-[500px] overflow-y-auto pr-1 w-full block">
                       {adminData.sortedTransactions.length === 0 ? <p className="text-gray-400 text-xs font-bold text-center py-10">Belum ada transaksi.</p> : adminData.sortedTransactions.map(t => (
                         <div key={t.id} className="border border-gray-200 rounded-2xl p-4 bg-gray-50/50">
-                          <div className="flex justify-between items-center text-[10px] md:text-xs mb-2 pb-2 border-b border-gray-200">
-                             <span className="font-mono font-bold text-slate-500">{t.id} • {t.tanggal}</span>
-                             <span className={`font-black px-2 py-0.5 rounded uppercase text-white ${t.metode.includes('Otomatis') ? 'bg-amber-500' : 'bg-emerald-500'}`}>{t.metode}</span>
-                          </div>
+                          <div className="flex justify-between items-center text-[10px] md:text-xs mb-2 pb-2 border-b border-gray-200"><span className="font-mono font-bold text-slate-500">{t.id} • {t.tanggal}</span><span className="font-black px-2 py-0.5 rounded uppercase bg-slate-200 text-slate-600">{t.metode}</span></div>
                           <div className="space-y-1 mb-2">{t.items.map((i, idx) => (<div key={idx} className="text-[10px] md:text-xs flex justify-between text-slate-700 font-bold"><span className="break-words pr-2 leading-tight">{i.qty}x {i.nama}</span><span className="text-slate-900 shrink-0 whitespace-nowrap">{formatRupiah(i.totalHarga)}</span></div>))}</div>
                           <div className="flex flex-col sm:flex-row justify-between sm:items-end mt-2 pt-2 border-t border-gray-200 gap-3">
                             <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -2196,7 +2363,7 @@ function MainApp() {
                     <h1 className="text-3xl font-black tracking-tighter text-slate-800">Manajemen Barang</h1>
                     <div className="flex flex-col sm:flex-row gap-2">
                       <button onClick={handleClearAllProducts} disabled={isProcessing} className="bg-rose-100 text-rose-600 px-4 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-sm hover:bg-rose-200 active:scale-95 transition-all uppercase text-xs w-full sm:w-auto"><Trash2 size={16}/> Hapus Semua</button>
-                      <button onClick={() => { setEditingId(null); setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, stok_real: null, barcode: '', diskonQty: '', diskonHarga: '', gambar: '' }); setUseDiskon(false); setShowAddForm(!showAddForm); }} className="bg-emerald-600 text-white px-4 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-md hover:bg-emerald-500 active:scale-95 transition-all uppercase text-xs w-full sm:w-auto">{showAddForm ? <X size={16}/> : <PlusCircle size={16}/>} {showAddForm ? 'Tutup Form' : 'Tambah Barang'}</button>
+                      <button onClick={() => { setEditingId(null); setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, stok_real: '', barcode: '', diskonQty: '', diskonHarga: '', gambar: '' }); setUseDiskon(false); setShowAddForm(!showAddForm); }} className="bg-emerald-600 text-white px-4 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-md hover:bg-emerald-500 active:scale-95 transition-all uppercase text-xs w-full sm:w-auto">{showAddForm ? <X size={16}/> : <PlusCircle size={16}/>} {showAddForm ? 'Tutup Form' : 'Tambah Barang'}</button>
                     </div>
                   </div>
 
@@ -2227,10 +2394,10 @@ function MainApp() {
                       <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-slate-100 flex flex-col justify-between h-full relative overflow-hidden">
                         <div className="absolute top-0 right-0 p-4 opacity-5"><Sparkles size={60}/></div>
                         <div className="relative z-10 w-full">
-                          <span className="text-slate-400 text-[10px] md:text-xs font-black uppercase tracking-wider mb-1.5 break-words block">Potensi Sisa Profit</span>
-                          <span className="text-lg sm:text-xl xl:text-2xl font-extrabold text-emerald-600 block break-words whitespace-normal tracking-tighter">{formatRupiah(adminData.grandTotalPotensiSisaProfit)}</span>
+                          <span className="text-slate-400 text-[10px] md:text-xs font-black uppercase tracking-wider mb-1.5 break-words block">Potensi Profit Awal</span>
+                          <span className="text-lg sm:text-xl xl:text-2xl font-extrabold text-emerald-600 block break-words whitespace-normal tracking-tighter">{formatRupiah(adminData.totalProfitKeseluruhan)}</span>
                         </div>
-                        <div className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Jika sisa stok habis terjual</div>
+                        <div className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Target untung jika laku semua</div>
                       </div>
                   </div>
 
@@ -2277,7 +2444,7 @@ function MainApp() {
                          <input required type="number" value={newProduct.jual} onChange={e => setNewProduct({...newProduct, jual: parseInt(e.target.value)})} className="w-full p-3 bg-white rounded-xl font-bold border border-slate-200 outline-none text-sm"/>
                        </div>
                        <div className="md:col-span-1">
-                         <label className="text-[10px] font-black uppercase text-slate-500 mb-1 block">Stok (Sisa Hari Ini)</label>
+                         <label className="text-[10px] font-black uppercase text-slate-500 mb-1 block">Stok Sistem (Sisa Hari Ini)</label>
                          <input required type="number" value={newProduct.stok} onChange={e => setNewProduct({...newProduct, stok: parseInt(e.target.value)})} className="w-full p-3 bg-white rounded-xl font-bold border border-slate-200 outline-none text-sm"/>
                        </div>
                        <div className="flex items-center gap-2 pt-1 ml-1 md:col-span-4">
@@ -2415,6 +2582,9 @@ function MainApp() {
                                <div className="font-black text-slate-800 text-sm md:text-base">Awal: {adminData.grandTotalStokAwal}</div>
                                <div className="font-bold text-blue-600 text-xs md:text-sm mt-0.5">Sisa: {adminData.grandTotalSisaStok}</div>
                              </td>
+                             <td className="p-4 md:p-6 text-center font-black text-rose-600 bg-blue-100/50">
+                                {adminData.totalSelisihBarangMinus > 0 && `Hilang ${adminData.totalSelisihBarangMinus}`}
+                             </td>
                              <td className="p-4 md:p-6 text-center font-black text-slate-500">-</td>
                              <td className="p-4 md:p-6 break-words">
                                 <div className="text-sm md:text-base font-extrabold text-rose-700 mb-1 leading-tight">Total Modal:<br/>{formatRupiah(adminData.grandTotalModalAwal)}</div>
@@ -2435,21 +2605,24 @@ function MainApp() {
   );
 }
 
-export default class App extends React.Component {
-  constructor(props) { super(props); this.state = { hasError: false, errorInfo: null }; }
-  static getDerivedStateFromError(error) { return { hasError: true }; }
-  componentDidCatch(error, errorInfo) { this.setState({ errorInfo: String(error) + '\n' + errorInfo.componentStack }); }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: '40px', background: '#f87171', color: 'white', minHeight: '100vh', fontFamily: 'sans-serif' }}>
-          <h1 style={{ fontSize: '2rem', fontWeight: '900' }}>⚠️ Aplikasi Mengalami Crash Server (V15.0 Master)</h1>
-          <p style={{ marginTop: '10px', fontSize: '1.2rem' }}>Layar putih berhasil dihindari! Masalahnya ada pada kode di bawah ini:</p>
-          <pre style={{ background: 'rgba(0,0,0,0.3)', padding: '20px', borderRadius: '10px', marginTop: '20px', whiteSpace: 'pre-wrap', fontWeight: 'bold' }}>{String(this.state.errorInfo)}</pre>
-          <button onClick={() => { localStorage.clear(); window.location.reload(true); }} style={{ marginTop: '20px', padding: '10px 20px', borderRadius: '10px', border: 'none', background: 'white', color: '#f87171', fontWeight: 'bold', cursor: 'pointer' }}>Hapus Cache & Muat Ulang</button>
-        </div>
-      );
-    }
+export default function App() {
+  const [hasError, setHasError] = useState(false);
+  const [errorInfo, setErrorInfo] = useState('');
+
+  try {
     return <MainApp />;
+  } catch (error) {
+    if (!hasError) {
+       setHasError(true);
+       setErrorInfo(String(error));
+    }
+    return (
+      <div style={{ padding: '40px', background: '#f87171', color: 'white', minHeight: '100vh', fontFamily: 'sans-serif' }}>
+        <h1 style={{ fontSize: '2rem', fontWeight: '900' }}>⚠️ Aplikasi Mengalami Crash Server (V15.0 Master)</h1>
+        <p style={{ marginTop: '10px', fontSize: '1.2rem' }}>Layar putih berhasil dihindari! Masalahnya ada pada kode di bawah ini:</p>
+        <pre style={{ background: 'rgba(0,0,0,0.3)', padding: '20px', borderRadius: '10px', marginTop: '20px', whiteSpace: 'pre-wrap', fontWeight: 'bold' }}>{errorInfo}</pre>
+        <button onClick={() => { localStorage.clear(); window.location.reload(true); }} style={{ marginTop: '20px', padding: '10px 20px', borderRadius: '10px', border: 'none', background: 'white', color: '#f87171', fontWeight: 'bold', cursor: 'pointer' }}>Hapus Cache & Muat Ulang</button>
+      </div>
+    );
   }
 }
