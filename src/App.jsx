@@ -162,13 +162,13 @@ function MainApp() {
   const jumlahItem = Object.values(cart).reduce((a, b) => a + b, 0);
 
   // =========================================================================
-  // LOGIKA ADMIN & DATA BARANG (MASTER KUNCI + ANALISA KERUGIAN)
+  // LOGIKA ADMIN & DATA BARANG (STOK AWAL x HARGA MODAL BARU + HISTORI KERUGIAN)
   // =========================================================================
   const adminData = useMemo(() => {
     if (view !== 'admin' || !isAdminLogged) return null;
 
-    // FILTER TRANSAKSI WAKTU
-    const filteredTransactions = transactions.filter(t => {
+    // FILTER TRANSAKSI WAKTU KESELURUHAN (Termasuk Log Kerugian)
+    const filteredTransactionsAll = transactions.filter(t => {
       if (!filterStart && !filterEnd) return true;
       let tDate;
       const match = t.id?.match(/\d+/);
@@ -178,6 +178,10 @@ function MainApp() {
       if (filterEnd) eDate.setHours(23, 59, 59, 999);
       return tDate >= sDate && tDate <= eDate;
     });
+
+    // PISAHKAN TRANSAKSI ASLI VS LOG KERUGIAN FISIK
+    const filteredTransactions = filteredTransactionsAll.filter(t => t.metode !== 'Catatan Kerugian (Sistem)');
+    const lossLogs = filteredTransactionsAll.filter(t => t.metode === 'Catatan Kerugian (Sistem)');
 
     const sortedTransactions = [...filteredTransactions].sort((a, b) => {
       if (sortTrx === 'terbaru') return b.id.localeCompare(a.id);
@@ -194,40 +198,45 @@ function MainApp() {
     let totalModalTerjualDinamis = 0; 
     let totalKeuntunganBersihDinamis = 0;
     
-    filteredTransactions.forEach(t => {
+    // Looping seluruh data (Termasuk Catatan Kerugian) agar stok awal tidak pernah berubah
+    filteredTransactionsAll.forEach(t => {
       if (!t.items) return;
       t.items.forEach(item => {
-        if (!itemSalesMap[item.id]) itemSalesMap[item.id] = { qty: 0, revenue: 0, profit: 0, modalTerjual: 0 };
+        if (!itemSalesMap[item.id]) itemSalesMap[item.id] = { qtySales: 0, qtyLost: 0, revenue: 0, profit: 0, modalTerjual: 0 };
         
         const currentProduct = products.find(p => p.id === item.id);
         const modalTerbaru = currentProduct ? (currentProduct.modal || 0) : (item.modal || 0);
         
-        const qtyItem = item.qty || 0;
-        const omsetItem = item.totalHarga || 0;
-        const modalItemDinamis = modalTerbaru * qtyItem;
-        const profitItemDinamis = omsetItem - modalItemDinamis; 
-        
-        itemSalesMap[item.id].qty += qtyItem;
-        itemSalesMap[item.id].revenue += omsetItem;
-        itemSalesMap[item.id].profit += profitItemDinamis;
-        itemSalesMap[item.id].modalTerjual += modalItemDinamis;
-        
-        totalBarangTerjual += qtyItem;
-        totalPendapatanKotor += omsetItem;
-        totalModalTerjualDinamis += modalItemDinamis;
-        totalKeuntunganBersihDinamis += profitItemDinamis;
+        if (t.metode === 'Catatan Kerugian (Sistem)') {
+           // Item ini hilang, tidak dihitung sebagai omset/penjualan, tapi tetap dicatat agar Stok Awal tidak turun
+           itemSalesMap[item.id].qtyLost += (item.qty || 0);
+        } else {
+           // Item ini resmi terjual
+           const qtyItem = item.qty || 0;
+           const omsetItem = item.totalHarga || 0;
+           const modalItemDinamis = modalTerbaru * qtyItem;
+           const profitItemDinamis = omsetItem - modalItemDinamis; 
+           
+           itemSalesMap[item.id].qtySales += qtyItem;
+           itemSalesMap[item.id].revenue += omsetItem;
+           itemSalesMap[item.id].profit += profitItemDinamis;
+           itemSalesMap[item.id].modalTerjual += modalItemDinamis;
+           
+           totalBarangTerjual += qtyItem;
+           totalPendapatanKotor += omsetItem;
+           totalModalTerjualDinamis += modalItemDinamis;
+           totalKeuntunganBersihDinamis += profitItemDinamis;
+        }
       });
     });
 
-    // MENGGABUNGKAN DATA STOK AWAL, MODAL TOTAL & REALITAS FISIK KERUGIAN
-    const inventoryList = [];
-    const kerugianList = [];
-    let totalSelisihBarangMinus = 0;
-    let totalKerugianSelisihUang = 0;
-
-    products.forEach(p => {
-      const qtyTerjual = itemSalesMap[p.id]?.qty || 0;
-      const stokAwal = (p.stok || 0) + qtyTerjual; 
+    // MENGGABUNGKAN DATA STOK AWAL & MODAL TOTAL
+    const inventoryList = products.map(p => {
+      const qtyTerjual = itemSalesMap[p.id]?.qtySales || 0;
+      const qtyHilangHistori = itemSalesMap[p.id]?.qtyLost || 0;
+      
+      // STOK AWAL ABSOLUT: Sisa Stok Saat Ini + Total Terjual + Total Hilang (Sejarah)
+      const stokAwal = (p.stok || 0) + qtyTerjual + qtyHilangHistori; 
       
       const modalTotalAwal = stokAwal * (p.modal || 0);
       const potensiProfitAwal = stokAwal * ((p.jual || 0) - (p.modal || 0));
@@ -235,39 +244,31 @@ function MainApp() {
       const potensiSisaProfit = (p.stok || 0) * ((p.jual || 0) - (p.modal || 0));
       const sisaModal = (p.stok || 0) * (p.modal || 0);
 
-      // Logika Selisih Real Fisik vs Sistem
+      // Logika Selisih Real Fisik (BELUM DISIMPAN)
       let selisihFisik = 0; 
       let isAdaFisik = false;
       if (p.stok_real !== null && p.stok_real !== undefined && p.stok_real !== '') {
          isAdaFisik = true;
          selisihFisik = parseInt(p.stok_real) - (p.stok || 0);
       }
-      
-      const kerugianSelisih = selisihFisik < 0 ? Math.abs(selisihFisik) * (p.modal || 0) : 0;
 
-      const fullProductData = {
+      const daysActive = Math.max(1, Math.floor((new Date() - new Date(p.tanggal_dibuat || new Date())) / (1000 * 60 * 60 * 24)));
+      
+      return {
         ...p,
         qtyTerjual,
+        qtyHilangHistori,
         stokAwal,
         modalTotalAwal,
         potensiProfitAwal,
         potensiSisaProfit,
         sisaModal,
         selisihFisik,
-        kerugianSelisih,
         isAdaFisik,
         revenue: itemSalesMap[p.id]?.revenue || 0,
         profitTerjual: itemSalesMap[p.id]?.profit || 0,
-        daysActive: Math.max(1, Math.floor((new Date() - new Date(p.tanggal_dibuat || new Date())) / (1000 * 60 * 60 * 24)))
+        daysActive
       };
-
-      inventoryList.push(fullProductData);
-
-      if (isAdaFisik && selisihFisik < 0) {
-          totalSelisihBarangMinus += Math.abs(selisihFisik);
-          totalKerugianSelisihUang += kerugianSelisih;
-          kerugianList.push(fullProductData);
-      }
     });
 
     // SORTING BERDASARKAN ABJAD A-Z
@@ -290,11 +291,15 @@ function MainApp() {
     const totalInventoryPotentialRevenue = inventoryList.reduce((sum, p) => sum + ((p.jual || 0) * (p.stok || 0)), 0);
     const grandTotalPotensiSisaProfit = inventoryList.reduce((sum, p) => sum + p.potensiSisaProfit, 0);
 
+    // TOTAL KERUGIAN DARI LOG (HISTORI)
+    const totalKerugianPcs = lossLogs.reduce((sum, log) => sum + (log.items?.reduce((s, i) => s + (i.qty || 0), 0) || 0), 0);
+    const totalKerugianUang = Math.abs(lossLogs.reduce((sum, log) => sum + (log.profit || 0), 0));
+
     return {
       grandTotalModalAwal, grandTotalStokAwal, totalOmsetKeseluruhan, totalProfitKeseluruhan, totalJenisBarang,
       grandTotalSisaStok, totalInventoryModal, totalInventoryPotentialRevenue, grandTotalPotensiSisaProfit,
       totalBarangTerjual, totalPendapatanKotor, totalKeuntunganBersih: totalKeuntunganBersihDinamis, totalModalTerjual: totalModalTerjualDinamis,
-      totalSelisihBarangMinus, totalKerugianSelisih: totalKerugianSelisihUang, kerugianList,
+      lossLogs, totalKerugianPcs, totalKerugianUang,
       filteredTransactions, sortedTransactions, productRankings, topSelling, bottomSelling, sortedInventoryList
     };
   }, [transactions, products, filterStart, filterEnd, sortTrx, view, isAdminLogged]);
@@ -306,8 +311,11 @@ function MainApp() {
     if (view !== 'admin' || !isAdminLogged || adminTab !== 'pendapatan') return null;
 
     const now = new Date();
+    // Hanya hitung transaksi resmi (Bukan Kerugian Sistem)
     const filteredTrx = transactions.filter(t => {
+      if (t.metode === 'Catatan Kerugian (Sistem)') return false;
       if (!t.id) return false;
+      
       const match = t.id.match(/\d+/);
       const tDate = match ? new Date(parseInt(match[0])) : new Date();
 
@@ -387,7 +395,7 @@ function MainApp() {
       
       document.title = settings.nama_toko || 'Toko Kejujuran';
 
-      // Load Html5Qrcode dynamically (Pustaka Handal Scanner)
+      // Load Html5Qrcode dynamically
       if (!document.getElementById('html5qrcode-script')) {
         const script = document.createElement('script');
         script.id = 'html5qrcode-script';
@@ -507,7 +515,7 @@ function MainApp() {
         const html5QrCode = new window.Html5Qrcode("reader-barcode");
         html5QrCodeRef.current = html5QrCode;
         
-        // Konfigurasi Aspect Ratio Landscape (Memanjang) khusus Barcode
+        // Konfigurasi Aspect Ratio Landscape khusus Barcode
         html5QrCode.start(
           { facingMode: "environment" },
           { fps: 15, qrbox: { width: 320, height: 160 }, aspectRatio: 2.0 },
@@ -982,13 +990,45 @@ function MainApp() {
     if (!supabaseClient) return showToast('Database tidak terhubung', 'error');
     
     setIsProcessing(true);
-    setProducts(prev => prev.map(p => p.id === id ? { ...p, stok_real: parseInt(val) } : p));
+    const product = products.find(p => p.id === id);
+    const selisih = parseInt(val) - (product.stok || 0);
+
+    // Optimistic Update
+    setProducts(prev => prev.map(p => p.id === id ? { ...p, stok: parseInt(val), stok_real: null } : p)); // Langsung mengubah stok utama & mereset form fisik
     
-    const { error } = await supabaseClient.from('produk').update({ stok_real: parseInt(val) }).eq('id', id);
+    // 1. Simpan stok utama ke Supabase dan reset kolom stok_real di DB
+    const { error } = await supabaseClient.from('produk').update({ stok: parseInt(val), stok_real: null }).eq('id', id);
+    
+    // 2. Jika ada kehilangan barang (selisih < 0), simpan sebagai catatan transaksi kerugian historis
+    if (selisih < 0 && !error) {
+       const qtyHilang = Math.abs(selisih);
+       const modalHilang = qtyHilang * (product.modal || 0);
+       const logEntry = {
+         id: `LOG-RUGI-${Date.now()}`,
+         tanggal: new Date().toLocaleString('id-ID'),
+         items: [{ 
+            id: product.id, 
+            nama: product.nama, 
+            gambar: product.gambar, 
+            modal: product.modal, 
+            jual: product.jual, 
+            qty: qtyHilang, 
+            totalHarga: 0, 
+            profitItem: -modalHilang 
+         }],
+         total: 0,
+         modal: modalHilang,
+         profit: -modalHilang,
+         metode: 'Catatan Kerugian (Sistem)' // Keyword khusus untuk memisahkan dari penjualan
+       };
+       await supabaseClient.from('transaksi').insert([logEntry]);
+       setTransactions(prev => [logEntry, ...prev]);
+    }
+
     if (error && error.message.includes('stok_real')) {
         showToast('Kolom "stok_real" (tipe int8) belum ada di Supabase. Silakan tambahkan!', 'error');
     } else if (!error) {
-        showToast('Stok Fisik berhasil diupdate!', 'success');
+        showToast('Stok berhasil disinkronkan!', 'success');
     } else {
         showToast(`Gagal menyimpan: ${error.message}`, 'error');
     }
@@ -1010,15 +1050,51 @@ function MainApp() {
     let successCount = 0;
     let failCount = 0;
     let missingColumnError = false;
+    let lostItemsList = [];
+    let totalModalHilangGlobal = 0;
+
+    // Optimistic Batch Update
+    setProducts(prev => prev.map(p => {
+       const up = updates.find(u => u.id === p.id);
+       return up ? { ...p, stok: parseInt(up.stok_real), stok_real: null } : p;
+    }));
 
     for (const p of updates) {
-      const { error } = await supabaseClient.from('produk').update({ stok_real: parseInt(p.stok_real) }).eq('id', p.id);
+      const targetStokBaru = parseInt(p.stok_real);
+      const selisih = targetStokBaru - (p.stok || 0);
+
+      const { error } = await supabaseClient.from('produk').update({ stok: targetStokBaru, stok_real: null }).eq('id', p.id);
+      
       if (error) {
         failCount++;
         if(error.message.includes('stok_real')) missingColumnError = true;
       } else {
         successCount++;
+        // Catat jika ada kerugian / barang hilang pada item ini
+        if (selisih < 0) {
+           const qtyHilang = Math.abs(selisih);
+           const modalItemHilang = qtyHilang * (p.modal || 0);
+           totalModalHilangGlobal += modalItemHilang;
+           lostItemsList.push({
+             id: p.id, nama: p.nama, gambar: p.gambar, modal: p.modal, jual: p.jual, qty: qtyHilang, totalHarga: 0, profitItem: -modalItemHilang
+           });
+        }
       }
+    }
+
+    // Insert Bulk Loss Log as a single transaction entry if there are missing items
+    if (lostItemsList.length > 0) {
+       const logEntry = {
+         id: `LOG-RUGI-${Date.now()}`,
+         tanggal: new Date().toLocaleString('id-ID'),
+         items: lostItemsList,
+         total: 0,
+         modal: totalModalHilangGlobal,
+         profit: -totalModalHilangGlobal,
+         metode: 'Catatan Kerugian (Sistem)'
+       };
+       await supabaseClient.from('transaksi').insert([logEntry]);
+       setTransactions(prev => [logEntry, ...prev]);
     }
 
     if (missingColumnError) {
@@ -1189,8 +1265,11 @@ function MainApp() {
     });
 
     if (filteredForExport.length === 0) return showToast('Tidak ada data', 'error');
+    // Export semua (Kecuali log kerugian agar akuntansi pihak ketiga tidak rusak)
+    const dataEkspor = filteredForExport.filter(t => t.metode !== 'Catatan Kerugian (Sistem)');
+    
     let csv = "ID Transaksi,Tanggal,Metode,Total Belanja,Total Modal,Profit Bersih\n";
-    filteredForExport.forEach(t => csv += `"${t.id}","${t.tanggal}","${t.metode}","${t.total}","${t.modal}","${t.profit}"\n`);
+    dataEkspor.forEach(t => csv += `"${t.id}","${t.tanggal}","${t.metode}","${t.total}","${t.modal}","${t.profit}"\n`);
     const link = document.createElement("a");
     link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
     link.download = `Laporan_Toko_Kejujuran_${new Date().toISOString().split('T')[0]}.csv`;
@@ -1341,7 +1420,7 @@ function MainApp() {
           <div className="flex justify-between items-center mb-4 max-w-5xl mx-auto">
             <div className="flex items-center gap-2 text-emerald-600 font-black text-lg md:text-xl truncate max-w-[50%]">
               {renderLogo("w-8 h-8")}
-              <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v9.0</span></span>
+              <span className="truncate">{settings.nama_toko} <span className="text-[10px] text-white bg-emerald-500 px-2 py-0.5 rounded-full ml-2 align-middle">v10.0</span></span>
             </div>
             <div className="flex items-center gap-1.5 md:gap-2 shrink-0">
               <button onClick={() => setView('riwayat')} className="p-2 md:p-2.5 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition shadow-sm relative" title="Riwayat Pembelian">
@@ -1560,7 +1639,6 @@ function MainApp() {
           )}
 
           <div className="fixed bottom-0 left-0 right-0 p-4 bg-white/90 border-t z-50">
-             {/* TOMBOL SELESAI DENGAN VALIDASI ERROR (NOTIFIKASI) */}
              <button 
                onClick={() => {
                  if (!metodeBayar) {
@@ -1584,7 +1662,7 @@ function MainApp() {
           <div className="mb-6 flex flex-col items-center animate-slide-up text-center">
             <div className="w-14 h-14 md:w-16 md:h-16 bg-emerald-500 text-white rounded-full flex items-center justify-center mb-3 shadow-lg shadow-emerald-200"><CheckCircle size={32} /></div>
             <h2 className="text-xl md:text-2xl font-extrabold text-slate-800">Struk Tersimpan!</h2>
-            <p className="text-slate-500 text-xs md:text-sm mt-1 font-bold">Lanjutkan dengan pembayaran di bawah.</p>
+            <p className="text-slate-500 text-xs md:text-sm mt-1 font-bold">Terima kasih atas pembelian Anda.</p>
           </div>
 
           <div className="bg-white w-full max-w-md rounded-3xl shadow-xl overflow-hidden animate-fade-in relative mb-6 border border-slate-200">
@@ -1725,99 +1803,16 @@ function MainApp() {
                {renderLogo("w-8 h-8")}
                <div><h2 className="font-extrabold text-xl text-white leading-tight tracking-wide">Admin Area</h2><p className="text-[10px] text-emerald-400 font-black uppercase tracking-widest mt-1">Toko Kejujuran</p></div>
             </div>
-            <nav className="p-2 md:p-4 flex overflow-x-auto md:grid md:grid-cols-1 md:flex-col gap-2 w-full pb-3 md:pb-4 scrollbar-hide">
-              <button onClick={() => {setAdminTab('analisa'); setEditingId(null); setShowAddForm(false);}} className={`flex-1 min-w-[80px] flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='analisa' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><BarChart3 size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Analisa<br className="md:hidden"/>Bisnis</span></button>
-              <button onClick={() => {setAdminTab('pendapatan'); setEditingId(null); setShowAddForm(false);}} className={`flex-1 min-w-[80px] flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='pendapatan' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><TrendingUp size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Laporan<br className="md:hidden"/>Pendapatan</span></button>
-              <button onClick={() => {setAdminTab('barang'); setEditingId(null); setShowAddForm(false);}} className={`flex-1 min-w-[80px] flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='barang' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Package size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Data<br className="md:hidden"/>Barang</span></button>
-              <button onClick={() => {setAdminTab('pengaturan'); setEditingId(null); setShowAddForm(false);}} className={`flex-1 min-w-[80px] flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='pengaturan' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Settings size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Pengaturan<br className="md:hidden"/>Toko</span></button>
-              <button onClick={handleLogout} className="flex-1 min-w-[80px] flex flex-col md:flex-row md:mt-auto items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl text-rose-500 hover:bg-slate-800 hover:text-rose-400 transition-all"><LogOut size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Keluar<br className="md:hidden"/>Admin</span></button>
+            <nav className="p-2 md:p-4 grid grid-cols-4 md:flex md:flex-col gap-2 w-full">
+              <button onClick={() => {setAdminTab('analisa'); setEditingId(null); setShowAddForm(false);}} className={`flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='analisa' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><BarChart3 size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Analisa<br className="md:hidden"/>Penjualan</span></button>
+              <button onClick={() => {setAdminTab('barang'); setEditingId(null); setShowAddForm(false);}} className={`flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='barang' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Package size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Data<br className="md:hidden"/>Barang</span></button>
+              <button onClick={() => {setAdminTab('pengaturan'); setEditingId(null); setShowAddForm(false);}} className={`flex flex-col md:flex-row items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl transition-all ${adminTab==='pengaturan' ? 'bg-emerald-500 text-white shadow-md' : 'text-slate-400 hover:bg-slate-800 hover:text-white'}`}><Settings size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Pengaturan<br className="md:hidden"/>Toko</span></button>
+              <button onClick={handleLogout} className="flex flex-col md:flex-row md:mt-auto items-center justify-center md:justify-start gap-1 md:gap-3 p-2 md:p-4 rounded-xl md:rounded-2xl text-rose-500 hover:bg-slate-800 hover:text-rose-400 transition-all"><LogOut size={20} className="md:w-6 md:h-6 shrink-0" /><span className="text-[10px] md:text-sm font-black text-center md:text-left leading-tight">Keluar<br className="md:hidden"/>Admin</span></button>
             </nav>
           </aside>
           
           <main className="flex-1 p-4 md:p-10 overflow-y-auto w-full max-w-7xl mx-auto">
              
-             {/* TAB PENDAPATAN BARU */}
-             {adminTab === 'pendapatan' && pendapatanData && (
-               <div className="animate-fade-in max-w-7xl mx-auto w-full pb-10">
-                  <div className="flex flex-col xl:flex-row justify-between xl:items-center mb-8 gap-6 w-full">
-                    <h1 className="text-3xl md:text-4xl font-black tracking-tighter text-slate-800 flex items-center gap-3"><TrendingUp className="text-emerald-500" size={36}/> Laporan Pendapatan</h1>
-                  </div>
-
-                  {/* FILTER BUTTONS */}
-                  <div className="bg-white p-2 rounded-2xl md:rounded-[32px] border border-slate-200 shadow-sm flex flex-wrap mb-8 w-full md:w-max mx-auto md:mx-0">
-                     <button onClick={() => setFilterPendapatan('hari_ini')} className={`flex-1 md:flex-none px-6 py-3 rounded-xl md:rounded-3xl font-black text-[10px] md:text-sm transition-all ${filterPendapatan === 'hari_ini' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>HARI INI</button>
-                     <button onClick={() => setFilterPendapatan('minggu_ini')} className={`flex-1 md:flex-none px-6 py-3 rounded-xl md:rounded-3xl font-black text-[10px] md:text-sm transition-all ${filterPendapatan === 'minggu_ini' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>7 HARI TERAKHIR</button>
-                     <button onClick={() => setFilterPendapatan('bulan_ini')} className={`flex-1 md:flex-none px-6 py-3 rounded-xl md:rounded-3xl font-black text-[10px] md:text-sm transition-all ${filterPendapatan === 'bulan_ini' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>BULAN INI</button>
-                     <button onClick={() => setFilterPendapatan('semua')} className={`flex-1 md:flex-none px-6 py-3 rounded-xl md:rounded-3xl font-black text-[10px] md:text-sm transition-all ${filterPendapatan === 'semua' ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:bg-slate-100'}`}>SEMUA WAKTU</button>
-                  </div>
-
-                  {/* CARDS METRICS */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6 mb-8">
-                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
-                        <div className="absolute top-0 right-0 p-4 opacity-5"><TrendingUp size={60}/></div>
-                        <div className="relative z-10 w-full">
-                           <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Total Pendapatan (Omset)</p>
-                           <p className="text-lg sm:text-xl xl:text-3xl font-extrabold text-slate-900 break-words whitespace-normal tracking-tighter">{formatRupiah(pendapatanData.totalOmset)}</p>
-                        </div>
-                     </div>
-                     <div className="bg-gradient-to-br from-emerald-500 to-teal-600 p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm text-white relative overflow-hidden flex flex-col justify-between h-full">
-                        <div className="absolute top-0 right-0 p-4 opacity-10"><Sparkles size={60}/></div>
-                        <div className="relative z-10 w-full">
-                           <p className="text-[10px] md:text-xs font-black text-emerald-100 uppercase tracking-wider mb-1.5 break-normal">Total Profit Bersih</p>
-                           <p className="text-lg sm:text-xl xl:text-3xl font-extrabold drop-shadow-sm tracking-tighter break-words whitespace-normal">{formatRupiah(pendapatanData.totalProfit)}</p>
-                        </div>
-                     </div>
-                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
-                        <div className="absolute top-0 right-0 p-4 opacity-5"><List size={60}/></div>
-                        <div className="relative z-10 w-full">
-                           <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Jumlah Struk Pembelian</p>
-                           <p className="text-lg sm:text-xl xl:text-3xl font-extrabold text-blue-600 tracking-tighter">{pendapatanData.totalStruk} Nota</p>
-                        </div>
-                     </div>
-                     <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
-                        <div className="absolute top-0 right-0 p-4 opacity-5"><Package size={60}/></div>
-                        <div className="relative z-10 w-full">
-                           <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Barang Laku Terjual</p>
-                           <p className="text-lg sm:text-xl xl:text-3xl font-extrabold text-rose-600 tracking-tighter">{pendapatanData.totalBarangTerjual} Pcs</p>
-                        </div>
-                     </div>
-                  </div>
-
-                  {/* TABLE RINCIAN */}
-                  <div className="bg-white rounded-3xl md:rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col w-full">
-                    <div className="p-4 md:p-6 border-b border-slate-100"><h2 className="font-black text-base md:text-xl text-slate-800 flex items-center gap-2"><Package className="text-blue-500" size={20}/> Rincian Barang Terjual ({filterPendapatan.replace('_', ' ').toUpperCase()})</h2></div>
-                    <div className="overflow-x-auto w-full block">
-                      <table className="w-full text-left min-w-[700px] border-collapse">
-                         <thead className="bg-slate-50 border-b border-slate-200">
-                           <tr className="text-[10px] font-black uppercase text-slate-500 tracking-widest whitespace-nowrap">
-                             <th className="p-4 md:p-6">Nama Barang</th>
-                             <th className="p-4 md:p-6 text-center">Qty Terjual</th>
-                             <th className="p-4 md:p-6 text-right">Total Pendapatan</th>
-                             <th className="p-4 md:p-6 text-right">Total Profit</th>
-                           </tr>
-                         </thead>
-                         <tbody className="divide-y divide-slate-50">
-                           {pendapatanData.rincianBarang.length === 0 && <tr><td colSpan="4" className="p-10 text-center text-slate-400 font-bold text-sm">Belum ada barang yang terjual di rentang waktu ini.</td></tr>}
-                           {pendapatanData.rincianBarang.map((p, idx) => (
-                             <tr key={idx} className="text-xs md:text-sm font-bold hover:bg-slate-50 transition-colors">
-                               <td className="p-3 md:p-4 flex items-center gap-3 break-words min-w-[200px]">
-                                 <div className="w-10 h-10 rounded-lg border border-slate-200 flex items-center justify-center bg-white shrink-0 overflow-hidden relative">
-                                    {p.gambar ? <img loading="lazy" referrerPolicy="no-referrer" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" alt="img" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/> : <img src={FALLBACK_IMAGE} className="w-4 h-4 opacity-50" alt="kosong"/>}
-                                 </div>
-                                 <span className="text-slate-700 leading-tight">{p.nama}</span>
-                               </td>
-                               <td className="p-3 md:p-4 text-center text-emerald-600 font-black whitespace-nowrap">{p.qtyTerjual}</td>
-                               <td className="p-3 md:p-4 text-right text-slate-800 break-words min-w-[120px]">{formatRupiah(p.omset)}</td>
-                               <td className="p-3 md:p-4 text-right text-emerald-700 font-black break-words min-w-[120px]">{formatRupiah(p.profit)}</td>
-                             </tr>
-                           ))}
-                         </tbody>
-                      </table>
-                    </div>
-                  </div>
-               </div>
-             )}
-
              {/* TAB PENGATURAN */}
              {adminTab === 'pengaturan' && (
                <div className="max-w-4xl animate-fade-in mx-auto md:mx-0">
@@ -2016,18 +2011,18 @@ function MainApp() {
                      <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
                         <div className="absolute top-0 right-0 p-4 opacity-5"><List size={60}/></div>
                         <div className="relative z-10 w-full">
-                           <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Total Struk / Nota</p>
+                           <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Total Struk Penjualan</p>
                            <p className="text-lg sm:text-xl xl:text-2xl font-black text-slate-900 tracking-tighter">{adminData.filteredTransactions.length} Lembar</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Bukti transaksi di sistem</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Bukti transaksi sistem</p>
                      </div>
                      <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
                         <div className="absolute top-0 right-0 p-4 opacity-5"><Package size={60}/></div>
                         <div className="relative z-10 w-full">
-                           <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Total Laku di Struk</p>
+                           <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Barang Laku di Struk</p>
                            <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-blue-600 break-words whitespace-normal block">{adminData.totalBarangTerjual} Pcs</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Kuantitas fisik yang terjual</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Kuantitas fisik terjual</p>
                      </div>
                      <div className="bg-white p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm border border-gray-100 relative overflow-hidden flex flex-col justify-between h-full">
                         <div className="absolute top-0 right-0 p-4 opacity-5"><CreditCard size={60}/></div>
@@ -2035,63 +2030,52 @@ function MainApp() {
                            <p className="text-[10px] md:text-xs font-black text-slate-400 uppercase tracking-wider mb-1.5 break-normal">Uang Realita Struk</p>
                            <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold text-emerald-600 break-words whitespace-normal block">{formatRupiah(adminData.totalPendapatanKotor)}</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Uang tunai/transfer valid di laci</p>
+                        <p className="text-[10px] md:text-xs font-bold text-slate-500 mt-2 relative z-10 break-words">Uang nyata di laci</p>
                      </div>
-                     <div className={`p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm relative overflow-hidden flex flex-col justify-between h-full ${adminData.totalSelisihBarangMinus > 0 ? 'bg-rose-600 text-white' : 'bg-slate-900 text-white'}`}>
+                     <div className={`p-5 md:p-6 rounded-3xl md:rounded-[32px] shadow-sm relative overflow-hidden flex flex-col justify-between h-full ${adminData.totalKerugianPcs > 0 ? 'bg-rose-600 text-white' : 'bg-slate-900 text-white'}`}>
                         <div className="absolute top-0 right-0 p-4 opacity-10"><AlertTriangle size={60}/></div>
                         <div className="relative z-10 w-full">
-                           <p className="text-[10px] md:text-xs font-black text-slate-300 uppercase tracking-wider mb-1.5 break-normal">Barang Hilang (Sistem vs Fisik)</p>
-                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold drop-shadow-sm break-words whitespace-normal block">{adminData.totalSelisihBarangMinus} Pcs</p>
+                           <p className="text-[10px] md:text-xs font-black text-slate-300 uppercase tracking-wider mb-1.5 break-normal">Riwayat Barang Hilang (Selisih)</p>
+                           <p className="text-lg sm:text-xl md:text-2xl lg:text-3xl font-extrabold drop-shadow-sm break-words whitespace-normal block">{adminData.totalKerugianPcs} Pcs</p>
                         </div>
-                        <p className="text-[10px] md:text-xs font-bold text-rose-200 mt-2 relative z-10 break-words">Potensi Kerugian Uang: {formatRupiah(adminData.totalKerugianSelisih)}</p>
+                        <p className="text-[10px] md:text-xs font-bold text-rose-200 mt-2 relative z-10 break-words">Total Rugi Uang: {formatRupiah(adminData.totalKerugianUang)}</p>
                      </div>
                   </div>
 
-                  {/* 5. SECTION BARU: ANALISA KERUGIAN & SELISIH FISIK */}
-                  <h2 className="text-lg md:text-2xl font-black text-slate-800 mb-5 flex items-center gap-3"><AlertTriangle className="text-red-500" size={26}/> 5. Analisa Kerugian & Barang Hilang</h2>
+                  {/* 5. SECTION BARU: LOG RIWAYAT KERUGIAN */}
+                  <h2 className="text-lg md:text-2xl font-black text-slate-800 mb-5 flex items-center gap-3"><AlertTriangle className="text-red-500" size={26}/> 5. Riwayat Sinkronisasi (Log Kerugian)</h2>
                   <div className="bg-white rounded-3xl md:rounded-[40px] border border-slate-100 shadow-sm overflow-hidden flex flex-col mb-12 w-full">
                     <div className="p-4 md:p-6 border-b border-slate-100 flex flex-col sm:flex-row justify-between sm:items-center gap-3">
-                       <h2 className="font-black text-base md:text-xl text-rose-700 flex items-center gap-2"><AlertCircle size={20}/> Rincian Kerugian Barang</h2>
-                       <span className="text-xs font-bold bg-rose-50 text-rose-600 px-3 py-1.5 rounded-lg border border-rose-100">Hanya menampilkan barang yang selisih/hilang.</span>
+                       <h2 className="font-black text-base md:text-xl text-rose-700 flex items-center gap-2"><AlertCircle size={20}/> Histori Kehilangan Fisik Barang</h2>
+                       <span className="text-xs font-bold bg-rose-50 text-rose-600 px-3 py-1.5 rounded-lg border border-rose-100">Otomatis dicatat saat Anda klik Simpan Sinkronisasi Fisik.</span>
                     </div>
-                    <div className="overflow-x-auto w-full block">
-                      <table className="w-full text-left min-w-[800px] border-collapse">
-                         <thead className="bg-rose-50 border-b border-rose-100">
-                           <tr className="text-[10px] font-black uppercase text-rose-800 tracking-widest whitespace-nowrap">
-                             <th className="p-4 md:p-6">Nama Barang Bermasalah</th>
-                             <th className="p-4 md:p-6 text-center">Stok Sistem Seharusnya</th>
-                             <th className="p-4 md:p-6 text-center">Stok Fisik (Asli di Rak)</th>
-                             <th className="p-4 md:p-6 text-center">Selisih (Pcs Hilang)</th>
-                             <th className="p-4 md:p-6 text-right">Kerugian (Berdasarkan Modal)</th>
-                           </tr>
-                         </thead>
-                         <tbody className="divide-y divide-slate-50">
-                           {adminData.kerugianList.length === 0 && <tr><td colSpan="5" className="p-10 text-center text-emerald-600 font-black text-sm"><CheckCircle size={40} className="mx-auto mb-3 opacity-50"/>Aman! Tidak ada barang hilang atau selisih fisik yang merugikan.</td></tr>}
-                           {adminData.kerugianList.map((p) => (
-                             <tr key={p.id} className="text-xs md:text-sm font-bold hover:bg-slate-50 transition-colors">
-                               <td className="p-3 md:p-4 flex items-center gap-3 break-words min-w-[200px]">
-                                 <div className="w-10 h-10 rounded-lg border border-slate-200 flex items-center justify-center bg-white shrink-0 overflow-hidden relative">
-                                    {p.gambar ? <img loading="lazy" referrerPolicy="no-referrer" src={formatImageUrl(p.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" alt="img" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/> : <img src={FALLBACK_IMAGE} className="w-4 h-4 opacity-50" alt="kosong"/>}
-                                 </div>
-                                 <span className="text-slate-700 leading-tight">{p.nama}</span>
-                               </td>
-                               <td className="p-3 md:p-4 text-center text-slate-800 font-black whitespace-nowrap">{p.stok} Pcs</td>
-                               <td className="p-3 md:p-4 text-center text-blue-600 font-black whitespace-nowrap">{p.stok_real} Pcs</td>
-                               <td className="p-3 md:p-4 text-center text-rose-600 font-black whitespace-nowrap">Hilang {Math.abs(p.selisihFisik)} Pcs</td>
-                               <td className="p-3 md:p-4 text-right text-rose-700 font-black break-words min-w-[120px]">{formatRupiah(p.kerugianSelisih)}</td>
-                             </tr>
-                           ))}
-                         </tbody>
-                         <tfoot className="bg-rose-50 border-t-2 border-rose-200">
-                           <tr>
-                             <td className="p-4 md:p-6 text-right font-black text-rose-800 uppercase tracking-widest text-[10px] md:text-xs">TOTAL KERUGIAN TOKO</td>
-                             <td className="p-4 md:p-6 text-center font-black text-slate-500">-</td>
-                             <td className="p-4 md:p-6 text-center font-black text-slate-500">-</td>
-                             <td className="p-4 md:p-6 text-center font-black text-rose-600 text-sm md:text-base">{adminData.totalSelisihBarangMinus} Pcs</td>
-                             <td className="p-4 md:p-6 text-right font-black text-rose-700 text-sm md:text-base">{formatRupiah(adminData.totalKerugianSelisih)}</td>
-                           </tr>
-                         </tfoot>
-                      </table>
+                    <div className="space-y-4 max-h-[500px] overflow-y-auto p-4 md:p-6 bg-slate-50/50">
+                       {adminData.lossLogs.length === 0 && (
+                          <div className="text-center py-10 text-emerald-600 font-black text-sm">
+                             <CheckCircle size={40} className="mx-auto mb-3 opacity-50"/>Aman! Tidak ada histori kerugian atau barang hilang pada rentang waktu ini.
+                          </div>
+                       )}
+                       {adminData.lossLogs.map(log => (
+                          <div key={log.id} className="bg-white border border-rose-200 p-4 md:p-5 rounded-2xl shadow-sm">
+                             <div className="flex justify-between items-center mb-3 pb-3 border-b border-rose-100">
+                                <span className="font-bold text-xs text-slate-500">{log.tanggal}</span>
+                                <span className="font-black text-[10px] md:text-xs text-rose-600 bg-rose-50 px-2 py-1 rounded">RUGI: {formatRupiah(Math.abs(log.profit))}</span>
+                             </div>
+                             <div className="space-y-2">
+                                {log.items.map((item, idx) => (
+                                   <div key={idx} className="flex justify-between items-center text-xs md:text-sm font-bold text-slate-700">
+                                      <div className="flex items-center gap-3">
+                                         <div className="w-8 h-8 rounded-lg border border-slate-200 bg-slate-50 flex items-center justify-center shrink-0 overflow-hidden relative">
+                                            {item.gambar ? <img src={formatImageUrl(item.gambar)} className="absolute inset-0 w-full h-full object-cover z-10 bg-white" alt="img" onError={(e) => { e.target.onerror=null; e.target.src=FALLBACK_IMAGE; }}/> : <img src={FALLBACK_IMAGE} className="w-4 h-4 opacity-50" alt="kosong"/>}
+                                         </div>
+                                         <span>{item.qty}x {item.nama}</span>
+                                      </div>
+                                      <span className="text-rose-600 shrink-0 whitespace-nowrap">- {formatRupiah(Math.abs(item.profitItem))}</span>
+                                   </div>
+                                ))}
+                             </div>
+                          </div>
+                       ))}
                     </div>
                   </div>
 
@@ -2192,7 +2176,7 @@ function MainApp() {
                     <h1 className="text-3xl font-black tracking-tighter text-slate-800">Manajemen Barang</h1>
                     <div className="flex flex-col sm:flex-row gap-2">
                       <button onClick={handleClearAllProducts} disabled={isProcessing} className="bg-rose-100 text-rose-600 px-4 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-sm hover:bg-rose-200 active:scale-95 transition-all uppercase text-xs w-full sm:w-auto"><Trash2 size={16}/> Hapus Semua</button>
-                      <button onClick={() => { setEditingId(null); setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, stok_real: null, barcode: '', diskonQty: '', diskonHarga: '', gambar: '' }); setUseDiskon(false); setShowAddForm(!showAddForm); }} className="bg-emerald-600 text-white px-4 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-md hover:bg-emerald-500 active:scale-95 transition-all uppercase text-xs w-full sm:w-auto">{showAddForm ? <X size={16}/> : <PlusCircle size={16}/>} {showAddForm ? 'Tutup Form' : 'Tambah Barang'}</button>
+                      <button onClick={() => { setEditingId(null); setNewProduct({ nama: '', modal: 0, jual: 0, stok: 0, barcode: '', diskonQty: '', diskonHarga: '', gambar: '' }); setUseDiskon(false); setShowAddForm(!showAddForm); }} className="bg-emerald-600 text-white px-4 py-3 rounded-xl font-black flex items-center justify-center gap-2 shadow-md hover:bg-emerald-500 active:scale-95 transition-all uppercase text-xs w-full sm:w-auto">{showAddForm ? <X size={16}/> : <PlusCircle size={16}/>} {showAddForm ? 'Tutup Form' : 'Tambah Barang'}</button>
                     </div>
                   </div>
 
@@ -2273,7 +2257,7 @@ function MainApp() {
                          <input required type="number" value={newProduct.jual} onChange={e => setNewProduct({...newProduct, jual: parseInt(e.target.value)})} className="w-full p-3 bg-white rounded-xl font-bold border border-slate-200 outline-none text-sm"/>
                        </div>
                        <div className="md:col-span-1">
-                         <label className="text-[10px] font-black uppercase text-slate-500 mb-1 block">Stok Sistem (Sisa Hari Ini)</label>
+                         <label className="text-[10px] font-black uppercase text-slate-500 mb-1 block">Stok Real Hari Ini (Pcs)</label>
                          <input required type="number" value={newProduct.stok} onChange={e => setNewProduct({...newProduct, stok: parseInt(e.target.value)})} className="w-full p-3 bg-white rounded-xl font-bold border border-slate-200 outline-none text-sm"/>
                        </div>
                        <div className="flex items-center gap-2 pt-1 ml-1 md:col-span-4">
@@ -2299,7 +2283,7 @@ function MainApp() {
                     <div className="flex flex-col sm:flex-row justify-between sm:items-center bg-blue-50 p-4 border-b border-blue-100 gap-3">
                        <div>
                          <h3 className="font-black text-blue-800 text-sm md:text-base mb-1 flex items-center gap-1.5"><AlertCircle size={16}/> Sinkronisasi Realita Fisik</h3>
-                         <p className="text-[10px] md:text-xs font-bold text-blue-600">Isi kolom "Real Barang" pada tabel di bawah, lalu klik tombol Simpan Semua untuk mengamankan data.</p>
+                         <p className="text-[10px] md:text-xs font-bold text-blue-600">Isi angka fisik pada tabel, lalu klik tombol Simpan Semua untuk mengamankan data.</p>
                        </div>
                        <button onClick={handleSimpanSemuaFisik} disabled={isProcessing} className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-3 rounded-xl font-black text-xs md:text-sm shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 shrink-0 w-full sm:w-auto">
                          <Save size={16}/> SIMPAN SEMUA FISIK
@@ -2310,7 +2294,7 @@ function MainApp() {
                          <thead className="bg-slate-50 border-b border-slate-200">
                            <tr className="text-[10px] font-black uppercase text-slate-500 tracking-widest whitespace-nowrap">
                              <th className="p-4 md:p-6">Produk (A-Z)</th>
-                             <th className="p-4 md:p-6 text-center">Stok Sistem & Histori</th>
+                             <th className="p-4 md:p-6 text-center">Stok & Histori</th>
                              <th className="p-4 md:p-6 text-center bg-blue-100/30 border-l border-r border-blue-100 text-blue-800">Real Barang (Fisik)</th>
                              <th className="p-4 md:p-6">Info Harga</th>
                              <th className="p-4 md:p-6">Total Modal & Potensi</th>
@@ -2331,14 +2315,14 @@ function MainApp() {
                                  </div>
                                </td>
                                <td className="p-4 md:p-6 text-center whitespace-nowrap">
-                                  <span className={`px-3 py-1 md:px-4 md:py-2 rounded-lg md:rounded-xl text-[10px] md:text-xs font-black tracking-widest uppercase ${p.stok > 10 ? 'bg-emerald-100 text-emerald-800' : p.stok > 0 ? 'bg-orange-100 text-orange-800' : 'bg-rose-100 text-rose-800'}`}>Sistem: {p.stok}</span>
+                                  <span className={`px-3 py-1 md:px-4 md:py-2 rounded-lg md:rounded-xl text-[10px] md:text-xs font-black tracking-widest uppercase ${p.stok > 10 ? 'bg-emerald-100 text-emerald-800' : p.stok > 0 ? 'bg-orange-100 text-orange-800' : 'bg-rose-100 text-rose-800'}`}>Sisa: {p.stok}</span>
                                   <div className="text-[10px] md:text-xs font-bold text-slate-500 mt-2">Terjual: {p.qtyTerjual}</div>
                                   <div className="text-[10px] md:text-xs font-bold text-blue-600 mt-0.5">Total Awal: {p.stokAwal}</div>
                                </td>
-                               {/* KOLOM REAL BARANG (FISIK) DENGAN INPUT */}
+                               {/* KOLOM REAL BARANG (FISIK) DENGAN TOMBOL SIMPAN */}
                                <td className="p-4 md:p-6 text-center bg-blue-50/20 border-l border-r border-blue-50 align-middle">
                                   <div className="flex flex-col items-center gap-1 w-full max-w-[120px] mx-auto">
-                                    <div className="flex w-full shadow-sm rounded-xl relative group">
+                                    <div className="flex w-full shadow-sm rounded-xl">
                                       <input 
                                          type="number" 
                                          value={p.stok_real === null ? '' : p.stok_real}
@@ -2419,21 +2403,24 @@ function MainApp() {
   );
 }
 
-export default class App extends React.Component {
-  constructor(props) { super(props); this.state = { hasError: false, errorInfo: null }; }
-  static getDerivedStateFromError(error) { return { hasError: true }; }
-  componentDidCatch(error, errorInfo) { this.setState({ errorInfo: String(error) + '\n' + errorInfo.componentStack }); }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: '40px', background: '#f87171', color: 'white', minHeight: '100vh', fontFamily: 'sans-serif' }}>
-          <h1 style={{ fontSize: '2rem', fontWeight: '900' }}>⚠️ Aplikasi Mengalami Crash Server (V9.0 Master)</h1>
-          <p style={{ marginTop: '10px', fontSize: '1.2rem' }}>Layar putih berhasil dihindari! Masalahnya ada pada kode di bawah ini:</p>
-          <pre style={{ background: 'rgba(0,0,0,0.3)', padding: '20px', borderRadius: '10px', marginTop: '20px', whiteSpace: 'pre-wrap', fontWeight: 'bold' }}>{String(this.state.errorInfo)}</pre>
-          <button onClick={() => { localStorage.clear(); window.location.reload(true); }} style={{ marginTop: '20px', padding: '10px 20px', borderRadius: '10px', border: 'none', background: 'white', color: '#f87171', fontWeight: 'bold', cursor: 'pointer' }}>Hapus Cache & Muat Ulang</button>
-        </div>
-      );
-    }
+export default function App() {
+  const [hasError, setHasError] = useState(false);
+  const [errorInfo, setErrorInfo] = useState('');
+
+  try {
     return <MainApp />;
+  } catch (error) {
+    if (!hasError) {
+       setHasError(true);
+       setErrorInfo(String(error));
+    }
+    return (
+      <div style={{ padding: '40px', background: '#f87171', color: 'white', minHeight: '100vh', fontFamily: 'sans-serif' }}>
+        <h1 style={{ fontSize: '2rem', fontWeight: '900' }}>⚠️ Aplikasi Mengalami Crash Server (V10.0 Final Master)</h1>
+        <p style={{ marginTop: '10px', fontSize: '1.2rem' }}>Layar putih berhasil dihindari! Masalahnya ada pada kode di bawah ini:</p>
+        <pre style={{ background: 'rgba(0,0,0,0.3)', padding: '20px', borderRadius: '10px', marginTop: '20px', whiteSpace: 'pre-wrap', fontWeight: 'bold' }}>{errorInfo}</pre>
+        <button onClick={() => { localStorage.clear(); window.location.reload(true); }} style={{ marginTop: '20px', padding: '10px 20px', borderRadius: '10px', border: 'none', background: 'white', color: '#f87171', fontWeight: 'bold', cursor: 'pointer' }}>Hapus Cache & Muat Ulang</button>
+      </div>
+    );
   }
 }
